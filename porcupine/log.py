@@ -5,11 +5,12 @@ from .config import settings
 LOG_FILE = 'porcupine.log'
 
 log = logging.root
-formatter = logging.Formatter(settings['log']['format'])
+log_settings = settings['log']
+formatter = logging.Formatter(log_settings['format'])
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 log.addHandler(handler)
-log.setLevel(settings['log']['level'])
+log.setLevel(log_settings['level'])
 
 
 def setup_daemon_logging():
@@ -19,7 +20,7 @@ def setup_daemon_logging():
     handler = logging.handlers.RotatingFileHandler(
         LOG_FILE,
         'a',
-        int(settings['log']['maxbytes']),
-        int(settings['log']['backups']))
+        log_settings['maxbytes'],
+        log_settings['backups'])
     handler.setFormatter(formatter)
     log.addHandler(handler)

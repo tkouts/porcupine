@@ -8,6 +8,7 @@ from .config import settings
 from .log import log, setup_daemon_logging
 from .core.app import app
 
+
 PID_FILE = '.pid'
 
 
@@ -67,7 +68,9 @@ def start(args):
             sys.exit()
 
     log.info('Starting Porcupine {}'.format(__version__))
-    app.run(host=settings['host'], port=settings['port'])
+    app.run(host=settings['host'],
+            port=settings['port'],
+            workers=settings['workers'])
 
 
 def run():
@@ -76,6 +79,9 @@ def run():
                         help='host name for incoming connections')
     parser.add_argument('--port',
                         help='port listening for incoming connections',
+                        type=int)
+    parser.add_argument('--workers',
+                        help='number of worker processes',
                         type=int)
     parser.add_argument('--daemon',
                         help='run porcupine as a background service',
