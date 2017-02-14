@@ -3,16 +3,16 @@ import sys
 import signal
 import time
 import argparse
+
 from . import __version__
 from .config import settings
 from .log import log, setup_daemon_logging
 from .core.app import app
 
-
 PID_FILE = '.pid'
 
 
-def set_pid(pid):
+def set_pid():
     with open(PID_FILE, 'w') as pid_file:
         pid_file.write(str(os.getpgid(os.getpid())))
 
@@ -29,7 +29,7 @@ def fork():
     sys.stderr = out
     pid = os.fork()
     if pid:
-        set_pid(pid)
+        set_pid()
     return pid
 
 
@@ -67,7 +67,7 @@ def start(args):
         if pid:
             sys.exit()
 
-    log.info('Starting Porcupine {}'.format(__version__))
+    log.info('Starting Porcupine %s', __version__)
     app.run(host=settings['host'],
             port=settings['port'],
             workers=settings['workers'])
@@ -101,4 +101,3 @@ def run():
             settings[arg] = override
 
     start(args)
-    # app.run(host=settings['host'], port=settings['port'])

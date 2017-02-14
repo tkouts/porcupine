@@ -1,5 +1,5 @@
 """
-Sanic
+Porcupine
 """
 import codecs
 import os
@@ -7,6 +7,7 @@ import re
 from setuptools import setup
 
 
+version = 'dev'
 with codecs.open(os.path.join(os.path.abspath(os.path.dirname(
         __file__)), 'porcupine', '__init__.py'), 'r', 'latin1') as fp:
     try:
@@ -28,6 +29,7 @@ setup(
     platforms='any',
     install_requires=[
         'sanic>=0.3.0',
+        'couchbase>=2.2.1',
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
