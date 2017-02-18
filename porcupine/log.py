@@ -17,10 +17,10 @@ def setup_daemon_logging():
     # remove stream handler
     log.removeHandler(log.handlers[0])
     # add file handler
-    handler = logging.handlers.RotatingFileHandler(
+    new_handler = logging.handlers.RotatingFileHandler(
         LOG_FILE,
         'a',
-        log_settings['maxbytes'],
+        log_settings['max_bytes'],
         log_settings['backups'])
-    handler.setFormatter(formatter)
-    log.addHandler(handler)
+    new_handler.setFormatter(formatter)
+    log.addHandler(new_handler)

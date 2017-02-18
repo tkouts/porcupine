@@ -4,7 +4,7 @@ default_settings = {
     'workers': 1,
     'daemon': False,
     'temp_folder': 'tmp',
-    'store': {
+    'db': {
         # how many times a transaction is retried
         # before an error is raised
         'txn_max_retries': 16,
@@ -13,14 +13,13 @@ default_settings = {
             ('name', True, False),
             ('is_collection', False, True),
         ),
-        'type': 'couchbase',
-        'couchbase': {
-            'hosts': ['localhost:8091'],
-            'bucket': 'porcupine',
-            'password': '',
-            # optional for running unit tests suite
-            # 'tests_bucket': 'porcupine_tests'
-        },
+        'type': 'porcupine.connectors.couchbase.connector.Couchbase',
+        'hosts': ['localhost:8091'],
+        'bucket': 'porcupine',
+        'password': '',
+        # optional for running unit tests suite
+        # 'tests_bucket': 'porcupine_tests'
+        # },
     },
     'session_manager': {
         'interface': 'porcupine.core.session.incookie.SessionManager',
@@ -28,7 +27,7 @@ default_settings = {
         'guest_user_id': 'guest',
         'params': {'secret': 'SECRET'}
     },
-    'templatelanguages': {
+    'template_languages': {
         'string_template': 'porcupine.core.templates.string_template',
         'normal_template': 'porcupine.core.templates.normal_template',
     },
@@ -39,7 +38,7 @@ default_settings = {
         # 40 - ERROR
         # 50 - CRITICAL
         'level': 10,
-        'maxbytes': 0,
+        'max_bytes': 0,
         'backups': 3,
         'format': '%(asctime)s [%(levelname)s] %(message)s',
         # 'mp_format': '%(asctime)s [%(levelname)s/%(processName)s] %(message)s'
