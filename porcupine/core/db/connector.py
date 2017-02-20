@@ -3,6 +3,7 @@ from porcupine.config import settings
 from porcupine.datatypes import Composition, Embedded
 from porcupine.utils import system
 from .persist import DefaultPersistence
+from .join import Join
 
 
 class AbstractConnector(object, metaclass=abc.ABCMeta):
@@ -10,7 +11,8 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
     indexes = {}
     active_txns = 0
     root_id = ''
-    transaction_type = None
+    TransactionType = None
+    CursorType = None
     persist = DefaultPersistence
 
     def _get_item_by_path(self, path_tokens, get_lock):
@@ -139,9 +141,10 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
     def get_child_id_by_name(self, container_id, name):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def get_child_by_name(self, container_id, name, get_lock=True):
-        raise NotImplementedError
+        child_id = self.get_child_id_by_name(container_id, name)
+        if child_id:
+            return self.get(child_id, get_lock)
 
     # atomic operations
     @abc.abstractmethod
@@ -172,6 +175,33 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def delete_external(self, ext_id):
         raise NotImplementedError
+
+    # transaction
+    def get_transaction(self, **options):
+        return self.TransactionType(self, **options)
+
+    # indices
+    def get_cursor_list(self, conditions):
+        cur_list = []
+        for index, value in conditions:
+            cursor = self.CursorType(self, self.indexes[index])
+            if isinstance(value, (list, tuple)):
+                is_reversed = len(value) == 3 and value[2]
+                cursor.set_range(value[0], value[1])
+                if is_reversed:
+                    cursor.reverse()
+            else:
+                cursor.set(value)
+            cur_list.append(cursor)
+        return cur_list
+
+    def query(self, conditions):
+        cur_list = self.get_cursor_list(conditions)
+        if len(cur_list) == 1:
+            return cur_list[0]
+        else:
+            c_join = Join(self, cur_list)
+            return c_join
 
     # event handling
     def handle_update(self, item, old_item,

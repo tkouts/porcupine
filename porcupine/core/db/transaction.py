@@ -3,9 +3,10 @@ import abc
 
 class AbstractTransaction(object, metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def __init__(self, connector):
+    def __init__(self, connector, **options):
         self.connector = connector
         self.connector.active_txns += 1
+        self.options = options
 
     @abc.abstractmethod
     def _retry(self):
