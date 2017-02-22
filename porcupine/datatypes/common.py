@@ -5,7 +5,7 @@ Porcupine data types
 import hashlib
 import copy
 
-from porcupine.utils import date
+# from porcupine.utils import date
 
 
 class DataType(object):
@@ -91,7 +91,7 @@ class DataType(object):
 
 class String(DataType):
     """String data type"""
-    safe_type = basestring
+    safe_type = str
 
     def __init__(self, default='', **kwargs):
         super(String, self).__init__(default, **kwargs)
@@ -191,7 +191,7 @@ class Password(String):
     This data type is actually storing MD5 hex digests
     of the assigned string value.
     """
-    empty = hashlib.md5('').hexdigest()
+    empty = hashlib.md5(''.encode()).hexdigest()
 
     def __set__(self, instance, value):
         self.validate_value(value)

@@ -2,7 +2,7 @@
 Helper module for resolving object permissions
 """
 
-from porcupine.core.cache import context_cacheable
+# from porcupine.core.cache import context_cacheable
 
 # 1 - read
 # 2 - update, delete if owner
@@ -35,7 +35,7 @@ def get_role(security_descriptor, user_or_group):
     return max(perms)
 
 
-@context_cacheable
+# @context_cacheable
 def resolve_membership(group_ids):
     from porcupine import db
     extended_membership = []

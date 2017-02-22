@@ -4,7 +4,7 @@ Porcupine atomic data types
 """
 from porcupine import db
 from .common import DataType
-from porcupine.utils import date
+# from porcupine.utils import date
 
 
 class Atomic(DataType):
@@ -25,7 +25,7 @@ class Atomic(DataType):
         else:
             return value
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def __set__(self, instance, value):
         if value != self.default:
             db._db.set_atomic(instance.id, self.name, value)
@@ -65,7 +65,7 @@ class CounterValue(int):
         obj.__descriptor = descriptor
         return obj
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def incr(self, y):
         db._db.incr(self.__instance,
                     self.__descriptor.name,
@@ -73,7 +73,7 @@ class CounterValue(int):
                     self.__descriptor.default)
         return self + y
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def decr(self, y):
         db._db.incr(self.__instance,
                     self.__descriptor.name,

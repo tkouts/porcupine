@@ -15,22 +15,26 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
     CursorType = None
     persist = DefaultPersistence
 
-    def _get_item_by_path(self, path_tokens, get_lock):
+    @abc.abstractmethod
+    def connect(self):
+        raise NotImplementedError
+
+    async def _get_item_by_path(self, path_tokens, get_lock):
         child_id = ''
         child = None
         for name in path_tokens[1:]:
             if name:
-                child = self.get_child_by_name(child_id, name, get_lock)
+                child = await self.get_child_by_name(child_id, name, get_lock)
                 if child is None:
                     return None
                 else:
                     child_id = child.id
         return child
 
-    def _get_nested(self, path_tokens, get_lock, item=None):
+    async def _get_nested(self, path_tokens, get_lock, item=None):
         nested = None
         if item is None:
-            item = self._get(path_tokens.pop(0), get_lock)
+            item = await self.get_raw(path_tokens.pop(0), get_lock)
         if item is not None:
             attr_name = path_tokens.pop(0)
             if attr_name in item.__schema__:
@@ -42,10 +46,10 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
                 elif isinstance(attr_def, Embedded):
                     nested = getattr(item, attr_name)
         if nested is not None and path_tokens:
-            return self._get_nested(path_tokens, get_lock, nested)
+            return await self._get_nested(path_tokens, get_lock, nested)
         return nested
 
-    def get(self, object_id, get_lock):
+    async def get(self, object_id, get_lock):
         if object_id.startswith('/'):
             item = None
             path_tokens = object_id.split('/')
@@ -54,17 +58,18 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
             if path_depth == 2:
                 if '.' in path_tokens[1]:
                     # nested composite
-                    item = self._get_nested(path_tokens[1].split('.'), get_lock)
+                    item = await self._get_nested(path_tokens[1].split('.'),
+                                                  get_lock)
                 else:
-                    item = self._get(path_tokens[1], get_lock)
+                    item = await self.get_raw(path_tokens[1], get_lock)
             # /folder1/folder2/item
             if item is None:
-                return self._get_item_by_path(path_tokens, get_lock)
+                return await self._get_item_by_path(path_tokens, get_lock)
         elif '.' in object_id:
             # nested composite
-            return self._get_nested(object_id.split('.'), get_lock)
+            return await self._get_nested(object_id.split('.'), get_lock)
         else:
-            item = self._get(object_id, get_lock)
+            item = await self.get_raw(object_id, get_lock)
 
         if item is not None:
             item = self.persist.loads(item)
@@ -98,82 +103,85 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
                 # embedded
                 root._dict['bag'][attr_name] = self.persist.dumps(nested)
 
-    def put(self, item):
+    async def put(self, item):
         if '.' in item.id:
             # nested composite
             path_tokens = item.id.split('.')
-            root = self._get(path_tokens.pop(0), True)
+            root = await self.get_raw(path_tokens.pop(0), True)
             self._put_nested(root, item, path_tokens)
-            self._put(root)
+            await self.put_raw(root.id, self.persist.dumps(root))
         else:
-            self._put(item)
+            await self.put_raw(item.id, item)
 
-    def get_multi(self, object_ids, get_lock=True):
+    async def get_multi(self, object_ids, get_lock=True):
         if object_ids:
             return [self.persist.loads(item)
-                    for item in self._get_multi(object_ids, get_lock)
+                    for item in await self.get_multi_raw(object_ids, get_lock)
                     if item is not None]
         return []
 
+    async def delete(self, item):
+        await self.delete_raw(item.id, self.persist.dumps(item))
+
     # item operations
-    @abc.abstractmethod
-    def _get(self, object_id, get_lock):
+    # @abc.abstractmethod
+    async def get_raw(self, key, get_lock):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def _get_multi(self, object_ids, get_lock):
+    # @abc.abstractmethod
+    async def get_multi_raw(self, keys, get_lock):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def _put(self, item):
+    # @abc.abstractmethod
+    async def put_raw(self, key, value):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def delete(self, item):
+    # @abc.abstractmethod
+    async def delete_raw(self, key, value):
         raise NotImplementedError
 
     # containers
-    @abc.abstractmethod
-    def get_children(self, container_id, deep=False):
+    # @abc.abstractmethod
+    async def get_children(self, container_id, deep=False):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def get_child_id_by_name(self, container_id, name):
+    # @abc.abstractmethod
+    async def get_child_id_by_name(self, container_id, name):
         raise NotImplementedError
 
-    def get_child_by_name(self, container_id, name, get_lock=True):
-        child_id = self.get_child_id_by_name(container_id, name)
+    async def get_child_by_name(self, container_id, name, get_lock=True):
+        child_id = await self.get_child_id_by_name(container_id, name)
         if child_id:
-            return self.get(child_id, get_lock)
+            return await self.get(child_id, get_lock)
 
     # atomic operations
-    @abc.abstractmethod
-    def get_atomic(self, object_id, name):
+    # @abc.abstractmethod
+    async def get_atomic(self, object_id, name):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def set_atomic(self, object_id, name, value):
+    # @abc.abstractmethod
+    async def set_atomic(self, object_id, name, value):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def delete_atomic(self, object_id, name):
+    # @abc.abstractmethod
+    async def delete_atomic(self, object_id, name):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def increment_atomic(self, object_id, name, amount, default):
+    # @abc.abstractmethod
+    async def increment_atomic(self, object_id, name, amount, default):
         raise NotImplementedError
 
     # external data types
-    @abc.abstractmethod
-    def get_external(self, ext_id):
+    # @abc.abstractmethod
+    async def get_external(self, ext_id):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def put_external(self, ext_id, stream):
+    # @abc.abstractmethod
+    async def put_external(self, ext_id, stream):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def delete_external(self, ext_id):
+    # @abc.abstractmethod
+    async def delete_external(self, ext_id):
         raise NotImplementedError
 
     # transaction
@@ -328,10 +336,10 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
             attr_def.on_undelete(item, attr)
 
     # management
-    @abc.abstractmethod
-    def truncate(self):
+    # @abc.abstractmethod
+    async def truncate(self, **options):
         raise NotImplementedError
 
-    @abc.abstractmethod
+    # @abc.abstractmethod
     def close(self):
         raise NotImplementedError

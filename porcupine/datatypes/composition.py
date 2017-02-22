@@ -4,7 +4,7 @@ Porcupine composition data types
 """
 from porcupine import db, exceptions
 from .common import DataType, List
-from porcupine.utils import misc
+from porcupine.utils import system
 
 Composite = None
 
@@ -63,7 +63,7 @@ class Composition(List):
 
         if value:
             # load objects
-            composite_type = misc.get_rto_by_name(self.composite_class)
+            composite_type = system.get_rto_by_name(self.composite_class)
 
             for i, obj in enumerate(value):
                 if isinstance(obj, Composite):
@@ -241,7 +241,7 @@ class Embedded(DataType):
                         value.__class__.__name__))
 
             # check containment
-            composite_type = misc.get_rto_by_name(self.composite_class)
+            composite_type = system.get_rto_by_name(self.composite_class)
 
             if not isinstance(value, composite_type):
                 raise exceptions.ContainmentError(

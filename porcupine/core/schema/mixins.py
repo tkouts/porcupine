@@ -153,7 +153,7 @@ class Cloneable(object):
         clone.modified = now
         return clone
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def copy_to(self: Elastic, target):
         """
         Copies the item to the designated target.
@@ -221,7 +221,7 @@ class Movable(object):
                     self._update_pids(path_info)
             cursor.close()
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def move_to(self, target, inherit_roles=False):
         """
         Moves the item to the designated target.
@@ -341,7 +341,7 @@ class Removable(object):
 
         db._db.handle_post_delete(self, True)
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def delete(self):
         """
         Deletes the item permanently.
@@ -438,7 +438,7 @@ class Removable(object):
 
         db._db.put_item(self)
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def recycle(self, rb_id):
         """
         Moves the item to the specified recycle bin.

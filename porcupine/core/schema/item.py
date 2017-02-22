@@ -63,7 +63,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
                 db._db.put_item(child)
             cursor.close()
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def append_to(self, parent):
         """
         Adds the item to the specified container.

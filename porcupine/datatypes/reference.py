@@ -4,9 +4,8 @@ Porcupine reference data types
 """
 from porcupine import db, exceptions
 from .common import DataType, String, List
-# from porcupine.core.compat import str
-from porcupine.core.objectSet import ObjectSet
-from porcupine.utils import misc
+# from porcupine.core.objectSet import ObjectSet
+from porcupine.utils import system
 
 
 class SingleReference(str):
@@ -36,7 +35,7 @@ class Reference1(String):
     @cvar relates_to: a list of strings containing all the permitted content
                     classes that the instances of this type can reference.
     """
-    safe_type = (basestring, type(None))
+    safe_type = (str, type(None))
     relates_to = ()
 
     def __init__(self, default=None, **kwargs):
@@ -218,7 +217,7 @@ class Relator1(Reference1):
         ref_item = db._db.get_item(value)
         if ref_item is not None and isinstance(
                 ref_item,
-                tuple([misc.get_rto_by_name(cc) for cc in self.relates_to])):
+                tuple([system.get_rto_by_name(cc) for cc in self.relates_to])):
             ref_attr = getattr(ref_item, self.rel_attr)
             ref_attr_def = ref_item.__props__[self.rel_attr]
             reference_added = False

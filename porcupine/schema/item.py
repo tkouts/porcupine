@@ -19,7 +19,7 @@ class Item(GenericItem):
         cascade_delete=True,
     )
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def update(self) -> None:
         """
         Updates the item.

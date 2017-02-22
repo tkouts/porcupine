@@ -39,7 +39,7 @@ class Shortcut(Item):
         shortcut.target = target.id
         return shortcut
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def append_to(self, parent):
         if isinstance(parent, (str, bytes)):
             parent = db._db.get_item(parent)
@@ -52,7 +52,7 @@ class Shortcut(Item):
         else:
             return super(Shortcut, self).append_to(parent)
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def copy_to(self, target):
         if isinstance(target, str):
             target = db._db.get_item(target)
@@ -65,7 +65,7 @@ class Shortcut(Item):
         else:
             return super(Shortcut, self).copy_to(target)
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def move_to(self, target, inherit_roles=False):
         if isinstance(target, str):
             target = db._db.get_item(target)
@@ -78,7 +78,7 @@ class Shortcut(Item):
         else:
             return super(Shortcut, self).move_to(target, inherit_roles)
 
-    @db.requires_transactional_context
+    # @db.requires_transactional_context
     def update(self):
         parent = db._db.get_item(self._pid)
         content_class = self.get_target_contentclass()

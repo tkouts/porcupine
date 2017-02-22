@@ -88,10 +88,9 @@ class AbstractCursor(object, metaclass=abc.ABCMeta):
     def resolve(self, v):
         item = self.connector.persist.loads(v)
         if not self.enforce_permissions:
-            if self.resolve_shortcuts and isinstance(item, Shortcut):
-                item = item.get_target(get_lock=False)
-                # while item is not None and isinstance(item, Shortcut):
-                #     item = _db.get_item(item.target)
+            if self.resolve_shortcuts:
+                while item is not None and isinstance(item, Shortcut):
+                    item = self.connector.get(item.target)
         else:
             # check read permissions
             access = permissions.resolve(item, context.user)

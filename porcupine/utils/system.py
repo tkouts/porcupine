@@ -33,7 +33,7 @@ def get_rto_by_name(name):
 
     @rtype: type
     """
-    modules = name.encode().split('.')
+    modules = name.split('.')
     if len(modules) == 1:
         module = modules[0]
         attribute = None

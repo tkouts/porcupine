@@ -13,13 +13,13 @@ default_settings = {
             ('name', True, False),
             ('is_collection', False, True),
         ),
-        'type': 'porcupine.connectors.couchbase.connector.Couchbase',
-        'hosts': ['localhost:8091'],
+        'type': 'porcupine.db.connectors.Couchbase',
+        'hosts': ['localhost:32772'],
+        # 'protocol': 'couchbase',
         'bucket': 'porcupine',
         'password': '',
         # optional for running unit tests suite
         # 'tests_bucket': 'porcupine_tests'
-        # },
     },
     'session_manager': {
         'interface': 'porcupine.core.session.incookie.SessionManager',
@@ -37,7 +37,7 @@ default_settings = {
         # 30 - WARNING
         # 40 - ERROR
         # 50 - CRITICAL
-        'level': 10,
+        'level': 20,
         'max_bytes': 0,
         'backups': 3,
         'format': '%(asctime)s [%(levelname)s] %(message)s',

@@ -3,13 +3,17 @@ import sys
 import signal
 import time
 import argparse
+import logging
+
+from sanic import Sanic
 
 from . import __version__
 from .config import settings
-from .log import log, setup_daemon_logging
-from .core.app import app
+from .log import setup_daemon_logging
+from porcupine.apps.main import Porcupine
 
 PID_FILE = '.pid'
+sanic = Sanic()
 
 
 def set_pid():
@@ -67,10 +71,12 @@ def start(args):
         if pid:
             sys.exit()
 
-    log.info('Starting Porcupine %s', __version__)
-    app.run(host=settings['host'],
-            port=settings['port'],
-            workers=settings['workers'])
+    logging.info('Starting Porcupine %s', __version__)
+    # register main app
+    Porcupine.install()
+    sanic.run(host=settings['host'],
+              port=settings['port'],
+              workers=settings['workers'])
 
 
 def run():
