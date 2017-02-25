@@ -17,7 +17,6 @@ class Shortcut(Item):
     In order to resolve the terminal target object use the
     L{get_target} method.
     """
-    # __image__ = "desktop/images/link.png"
     target = Relator1(
         relates_to=('porcupine.schema.Item', ),
         rel_attr='shortcuts',

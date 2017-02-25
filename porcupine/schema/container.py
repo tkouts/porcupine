@@ -1,4 +1,4 @@
-from porcupine.datatypes import AtomicTimestamp, AtomicCounter
+from porcupine.datatypes import Integer
 from porcupine.utils import permissions
 from .item import Item
 from .shortcut import Shortcut
@@ -19,9 +19,9 @@ class Container(Item):
     containment = ('porcupine.schema.Shortcut',)
     is_collection = True
 
-    modified = AtomicTimestamp(required=True)
-    _ni = AtomicCounter()
-    _nc = AtomicCounter()
+    # modified = AtomicTimestamp(required=True)
+    ni = Integer(readonly=True)
+    nc = Integer(readonly=True)
 
     def child_exists(self, name):
         """
@@ -105,7 +105,7 @@ class Container(Item):
         cursor.close()
         return subfolders
 
-    def has_children(self):
+    def has_items(self):
         """
         Checks if the container has at least one non-container child.
 
@@ -113,7 +113,7 @@ class Container(Item):
         """
         return self._ni > 0
 
-    def has_subfolders(self):
+    def has_containers(self):
         """
         Checks if the container has at least one child container.
 
@@ -132,6 +132,6 @@ class Container(Item):
         return self._ni
 
     @property
-    def subfolders_count(self):
+    def containers_count(self):
         """The number of containers contained"""
         return self._nc

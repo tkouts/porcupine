@@ -1,6 +1,8 @@
-import time
+import datetime
 
-from porcupine.datatypes import String, DateTime
+from porcupine import context, exceptions, db
+from porcupine.datatypes import String, DateTime, List, Boolean, Dictionary
+from porcupine.core.context import system_override
 from porcupine.utils import permissions
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable
@@ -30,26 +32,34 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     @type description: L{String<porcupine.dt.String>}
     @type created: float
     """
-    # __image__ = "desktop/images/object.gif"
     is_collection = False
+
+    # system attributes
+    p_ids = List(readonly=True)
+    created = DateTime(readonly=True)
+    owner = String(required=True, readonly=True)
+    modified_by = String(required=True, readonly=True)
+    is_system = Boolean(readonly=True)
+    modified = DateTime(required=True, readonly=True)
 
     name = String(required=True)
     description = String()
-    modified = DateTime(required=True)
+    security = Dictionary()
+    inherit_roles = Boolean(True)
 
-    def __init__(self):
-        super(GenericItem, self).__init__()
-        # system props
-        self._dict.update({
-            '_pids': [],
-            '_owner': '',
-            '_is_system': False,
-            '_created': 0,
-
-            'modified_by': '',
-            'security': {},
-            'inherit_roles': True
-        })
+    # def __init__(self):
+    #     super(GenericItem, self).__init__()
+    #     # system props
+    #     self._dict.update({
+    #         '_pids': [],
+    #         '_owner': '',
+    #         '_is_system': False,
+    #         '_created': 0,
+    #
+    #         'modified_by': '',
+    #         'security': {},
+    #         'inherit_roles': True
+    #     })
 
     def _apply_security(self, parent, is_new, get_children=True):
         if parent is not None and self.inherit_roles:
@@ -63,7 +73,6 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
                 db._db.put_item(child)
             cursor.close()
 
-    # @db.requires_transactional_context
     def append_to(self, parent):
         """
         Adds the item to the specified container.
@@ -73,13 +82,13 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         @type parent: str OR L{Container}
         @return: None
         """
-        if self._pid:
-            raise exceptions.ContainmentError(
+        if self.p_id:
+            raise exceptions.DBAlreadyExists(
                 'Object already exists. Use update or move_to instead.')
         if isinstance(parent, str):
-            parent = db._db.get_item(parent, get_lock=False)
+            parent = db.connector.get(parent, get_lock=False)
 
-        content_class = self.contentclass
+        content_class = self.content_class
 
         user = context.user
         user_role = permissions.resolve(parent, user)
@@ -101,20 +110,22 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
             self.inherit_roles = True
             self.security = parent.security
 
-        self._owner = user.id
-        self._created = self.modified = time.time()
+        self.owner = user.id
+        self.created = self.modified = \
+            datetime.datetime.utcnow().isoformat()
         self.modified_by = user.name
         # self.modified = time.time()
-        self._pid = parent._id
-        self._pids = parent._pids + [parent._id]
+        self.p_id = parent.id
+        self.p_ids = parent.p_ids + [parent.id]
 
         db._db.handle_update(self, None)
         db._db.put_item(self)
-        if self.is_collection:
-            parent._nc.incr(1)
-        else:
-            parent._ni.incr(1)
-        parent.modified = self.modified
+        with system_override(parent):
+            if self.is_collection:
+                parent.nc.incr(1)
+            else:
+                parent.ni.incr(1)
+            parent.modified = self.modified
         db._db.handle_post_update(self, None)
 
     def is_contained_in(self, item_id: str) -> bool:
@@ -165,29 +176,29 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         parents.reverse()
         return ObjectSet(parents)
 
-    @property
-    def issystem(self):
-        """Indicates if this is a systemic object
+    # @property
+    # def issystem(self):
+    #     """Indicates if this is a systemic object
+    #
+    #     @rtype: bool
+    #     """
+    #     return self._is_system
 
-        @rtype: bool
-        """
-        return self._is_system
+    # @property
+    # def owner(self):
+    #     """The object's creator
+    #
+    #     @rtype: type
+    #     """
+    #     return self._owner
 
-    @property
-    def owner(self):
-        """The object's creator
-
-        @rtype: type
-        """
-        return self._owner
-
-    @property
-    def created(self):
-        """The creation date
-
-        @rtype: float
-        """
-        return self._created
+    # @property
+    # def created(self):
+    #     """The creation date
+    #
+    #     @rtype: float
+    #     """
+    #     return self._created
 
     # @property
     # def parentid(self):

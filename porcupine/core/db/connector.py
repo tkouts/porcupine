@@ -1,4 +1,5 @@
 import abc
+from porcupine import context, exceptions
 from porcupine.config import settings
 from porcupine.datatypes import Composition, Embedded
 from porcupine.utils import system
@@ -80,17 +81,17 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
         raw_root = None
         attr_name = path_tokens.pop(0)
         oid = path_tokens.pop(0)
-        attr_value = root._dict['bag'][attr_name]
+        attr_value = root.__storage__[attr_name]
         if isinstance(attr_value, list):
             # composition
             for i, composite_dict in enumerate(attr_value):
-                if composite_dict['_id'].split('.')[-1] == oid:
+                if composite_dict['id'].split('.')[-1] == oid:
                     raw_root = composite_dict
                     composite_index = i
                     break
         else:
             # embedded
-            raw_root = root._dict['bag'][attr_name]
+            raw_root = root.__storage__[attr_name]
 
         if path_tokens:
             self._put_nested(nested, self.persist.loads(raw_root), path_tokens)
@@ -101,17 +102,17 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
                 attr_value[composite_index] = self.persist.dumps(nested)
             else:
                 # embedded
-                root._dict['bag'][attr_name] = self.persist.dumps(nested)
+                root.__storage__[attr_name] = self.persist.dumps(nested)
 
-    async def put(self, item):
+    async def insert(self, item):
         if '.' in item.id:
             # nested composite
             path_tokens = item.id.split('.')
             root = await self.get_raw(path_tokens.pop(0), True)
             self._put_nested(root, item, path_tokens)
-            await self.put_raw(root.id, self.persist.dumps(root))
+            await self.insert_raw(root.id, self.persist.dumps(root))
         else:
-            await self.put_raw(item.id, item)
+            await self.insert_raw(item.id, item)
 
     async def get_multi(self, object_ids, get_lock=True):
         if object_ids:
@@ -133,7 +134,7 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     # @abc.abstractmethod
-    async def put_raw(self, key, value):
+    async def insert_raw(self, key, value):
         raise NotImplementedError
 
     # @abc.abstractmethod
@@ -247,7 +248,7 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
                         ind = self.indexes[attr_name]
                         doc_id = ind.exists(item.parent_id, new_attr)
                         if doc_id and doc_id != (item.id or self.root_id):
-                            context._trans.abort()
+                            context.txn.abort()
                             raise exceptions.DBAlreadyExists
                     if old_attr:
                         atomic_key = '{}_{}'.format(
@@ -296,7 +297,7 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
             if hasattr(item, '_owner'):
                 if attr_name in self.indexes \
                         and self.indexes[attr_name].unique \
-                        and not item._is_deleted:
+                        and not item.is_deleted:
                     atomic_key = '{}_{}'.format(
                         attr_name,
                         system.hash_series(attr).hexdigest()
@@ -324,7 +325,7 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
                     ind = self.indexes[attr_name]
                     doc_id = ind.exists(item.parent_id, attr)
                     if doc_id and doc_id != (item.id or self.root_id):
-                        context._trans.abort()
+                        context.txn.abort()
                         raise exceptions.DBAlreadyExists
                     atomic_key = '{}_{}'.format(
                         attr_name,

@@ -151,7 +151,8 @@ class ExternalFile(String):
     Data type for linking external files. Its value
     is a string which contains the path to the file.
     """
-    safe_type = (str, type(None))
+    safe_type = str
+    allow_none = True
     remove_file_on_deletion = True
 
     def __init__(self, default=None, **kwargs):

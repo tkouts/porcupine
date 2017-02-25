@@ -35,7 +35,8 @@ class Reference1(String):
     @cvar relates_to: a list of strings containing all the permitted content
                     classes that the instances of this type can reference.
     """
-    safe_type = (str, type(None))
+    safe_type = str
+    allow_none = True
     relates_to = ()
 
     def __init__(self, default=None, **kwargs):

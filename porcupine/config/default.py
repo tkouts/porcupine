@@ -7,7 +7,7 @@ default_settings = {
     'db': {
         # how many times a transaction is retried
         # before an error is raised
-        'txn_max_retries': 16,
+        # 'txn_max_retries': 16,
         # tuples of (field_name, unique per container, immutable)
         'indices': (
             ('name', True, False),

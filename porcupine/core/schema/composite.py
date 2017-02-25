@@ -21,7 +21,6 @@ class Composite(Elastic):
 
     @see: L{porcupine.datatypes.Composition}
     """
-    # __image__ = "desktop/images/object.gif"
     name = String(required=True)
 
     @property
@@ -31,7 +30,7 @@ class Composite(Elastic):
 
         @rtype: dict
         """
-        return db._db.get_item(self._pid[1:]).security
+        return db._db.get_item(self.p_id[1:]).security
 
     def clone(self, memo=None):
         """
@@ -47,10 +46,11 @@ class Composite(Elastic):
                 '_dup_ext_': True,
                 '_id_map_': {}
             }
-        new_id = memo['_id_map_'].get(self._id, system.generate_oid())
-        memo['_id_map_'][self._id] = new_id
+        new_id = memo['_id_map_'].get(self.id, system.generate_oid())
+        memo['_id_map_'][self.id] = new_id
         clone = copy.deepcopy(self)
         # call data types clone method
-        [dt.clone(clone, memo) for dt in self.__schema__.values()]
-        clone._id = new_id
+        for dt in self.__schema__.values():
+            dt.clone(clone, memo)
+        clone.id = new_id
         return clone

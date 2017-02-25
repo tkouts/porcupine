@@ -1,0 +1,21 @@
+indices:
+  name: Yes
+  is_collection: No
+
+items:
+  - id: ''
+    type: porcupine.schema.system.RootContainer
+    name: Root Container
+    is_system: Yes
+    security:
+      everyone: READER
+    children:
+      - id: admintools
+        type: porcupine.schema.system.AdminTools
+        name: Administrative Tools
+        is_system: Yes
+
+  - id: rb
+    type: porcupine.schema.system.RecycleBin
+    name: Recycle Bin
+    is_system: Yes

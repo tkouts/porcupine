@@ -186,7 +186,8 @@ class Embedded(DataType):
 
     @see: L{porcupine.schema.Composite}
     """
-    safe_type = (object, type(None))
+    safe_type = object
+    allow_none = True
     composite_class = ''
     nested = False
 

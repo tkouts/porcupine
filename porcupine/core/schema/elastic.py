@@ -1,8 +1,8 @@
-from porcupine.datatypes import DataType, Composition
+from porcupine.datatypes import DataType, Composition, String, Integer, List
 from porcupine.utils import system
 
 
-class Elastic(object):
+class Elastic:
     """
     Base class for all Porcupine objects.
     Accommodates schema updates without requiring database updates.
@@ -14,7 +14,13 @@ class Elastic(object):
     """
     __schema__ = {}
     __sig__ = 0
+    __sys__ = False
     event_handlers = []
+
+    id = String(readonly=True)
+    p_id = String(readonly=True)
+    is_deleted = Integer(readonly=True)
+    sig = String(readonly=True)
 
     def __new__(cls, *args, **kwargs):
         sig = hash(tuple(cls.__dict__.keys()))
@@ -31,63 +37,27 @@ class Elastic(object):
             cls.__schema__ = schema
             cls.__sig__ = sig
         obj = super(Elastic, cls).__new__(cls)
-        super(Elastic, obj).__setattr__('_dict', {
-            'bag': {}
-        })
+        super(Elastic, obj).__setattr__('__storage__', {})
         return obj
 
     def __init__(self):
-        self._dict.update({
-            '_id': system.generate_oid(),
-            '_pid': None,
-            '_is_deleted': 0,
-            '_sig': hash(tuple(self.__schema__.keys()))
-        })
+        self.id = system.generate_oid()
+        self.sig = system.hash_series(*self.__schema__.keys()).hexdigest()
 
     def __hash__(self):
-        return hash(self._dict['_id'])
-
-    def __getattr__(self, name):
-        if name in self._dict:
-            # attribute
-            return self._dict[name]
-        else:
-            raise AttributeError(
-                "'{}' object has no attribute '{}'".format(
-                    self.__class__.__name__, name))
-
-    def __setattr__(self, name, value):
-        if name in self._dict:
-            self._dict[name] = value
-        else:
-            super(Elastic, self).__setattr__(name, value)
-
-    def __delattr__(self, name):
-        try:
-            del self._dict[name]
-        except KeyError:
-            super(Elastic, self).__delattr__(name)
+        return hash(self.__storage__['id'])
 
     def __repr__(self):
-        return str(self._dict)
+        return str(self.__storage__)
 
     @property
-    def id(self) -> str:
-        """
-        The ID of the object
-
-        @rtype: str
-        """
-        return self._dict['_id']
-
-    @property
-    def parent_id(self) -> str:
+    def parent_id(self):
         """
         The ID of the parent container
 
         @rtype: str
         """
-        return self._dict['_pid']
+        return self.p_id
 
     @property
     def content_class(self) -> str:
@@ -113,8 +83,8 @@ class Elastic(object):
     def update_schema(self):
         schema = self.__schema__
         new_sig = hash(tuple(schema.keys()))
-        if '_sig' not in self._dict or self._dict['_sig'] != new_sig:
-            item_schema = set(self._dict['bag'].keys())
+        if 'sig' not in self.__storage__ or self.__storage__['sig'] != new_sig:
+            item_schema = set(self.__storage__.keys())
             current_schema = set(schema.keys())
 
             for_addition = current_schema - item_schema
@@ -129,7 +99,7 @@ class Elastic(object):
             composite_pid = ':{}'.format(self.id)
             for attr_name in for_removal:
                 # detect if it is composite attribute
-                attr_value = self._dict['bag'].pop(attr_name)
+                attr_value = self.__storage__.pop(attr_name)
                 if attr_value:
                     if isinstance(attr_value, str):
                         # is it an embedded data type?
@@ -146,4 +116,4 @@ class Elastic(object):
                                 for item in items:
                                     Composition._remove_composite(item, True)
             # [self._dict['bag'].pop(x) for x in for_removal]
-            self._dict['_sig'] = new_sig
+            self.__storage__['sig'] = new_sig

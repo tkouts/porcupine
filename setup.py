@@ -30,6 +30,7 @@ setup(
     install_requires=[
         'sanic>=0.3.0',
         'couchbase>=2.2.1',
+        'PyYAML>=3.12',
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

@@ -1,5 +1,6 @@
 import random
 import couchbase.experimental
+from porcupine import context
 from porcupine.core.db.connector import AbstractConnector
 # from porcupine.exceptions import DBConnectionError
 from .transaction import Transaction
@@ -40,6 +41,9 @@ class Couchbase(AbstractConnector):
         await self.bucket.connect()
         # except (CouchbaseTransientError, CouchbaseNetworkError):
         #     raise DBConnectionError
+
+    async def insert_raw(self, key, value):
+        context.txn.insert(key, value)
 
     async def close(self):
         pass

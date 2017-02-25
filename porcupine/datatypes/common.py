@@ -8,17 +8,18 @@ import copy
 # from porcupine.utils import date
 
 
-class DataType(object):
+class DataType:
     """
     Base data type class.
 
     Use this as a base class if you want to create your own custom data type.
 
-    @var required: boolean indicating if the data type is mandatory
-    @type required: bool
+    :var required: boolean indicating if the data type is mandatory
+    :type required: bool
     """
-    event_handler = None
     required = False
+    allow_none = False
+    readonly = False
     safe_type = object
 
     def __init__(self, default=None, **kwargs):
@@ -27,8 +28,14 @@ class DataType(object):
         self.name = None
         if 'required' in kwargs:
             self.required = kwargs['required']
+        if 'allow_none' in kwargs:
+            self.allow_none = kwargs['allow_none']
+        if 'readonly' in kwargs:
+            self.readonly = kwargs['readonly']
 
     def validate_value(self, value):
+        if self.allow_none and value is None:
+            return
         if not isinstance(value, self.safe_type):
             raise TypeError('Unsupported type "{}" for "{}"'.format(
                 value.__class__.__name__, self.name))
@@ -37,24 +44,30 @@ class DataType(object):
         if instance is None:
             return self
         name = self.name
-        if name in instance._dict['bag']:
-            return instance._dict['bag'][name]
+        if name in instance.__storage__:
+            return instance.__storage__[name]
         else:
             if isinstance(self.default, (list, dict)):
                 # mutable
                 value = copy.deepcopy(self.default)
-                instance._dict['bag'][name] = value
+                instance.__storage__[name] = value
                 return value
             else:
                 return self.default
 
     def __set__(self, instance, value):
+        if self.readonly and instance.parent_id and not instance.__sys__:
+            raise TypeError('Attribute "{}" of "{}" is readonly'.format(
+                instance.__class__.__name__, self.name))
+        # elif self.immutable and instance.parent_id:
+        #     raise TypeError('Attribute "{}" of "{}" is immutable'.format(
+        #         instance.__class__.__name__, self.name))
         self.validate_value(value)
-        instance._dict['bag'][self.name] = value
+        instance.__storage__[self.name] = value
 
     def __delete__(self, instance):
-        if self.name in instance._dict['bag']:
-            del instance._dict['bag'][self.name]
+        if self.name in instance.__storage__:
+            del instance.__storage__[self.name]
 
     def validate(self, instance):
         """
@@ -145,6 +158,14 @@ class List(DataType):
         default = default or []
         super(List, self).__init__(default, **kwargs)
 
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        value = super().__get__(instance, owner)
+        if self.readonly:
+            return tuple(value)
+        return value
+
 
 class Dictionary(DataType):
     """Dictionary data type
@@ -160,9 +181,9 @@ class Dictionary(DataType):
         super(Dictionary, self).__init__(default, **kwargs)
 
 
-class Date(Float):
+class Date(String):
     """Date data type"""
-    safe_type = (type(None), float)
+    allow_none = True
 
     def __init__(self, default=None, **kwargs):
         super(Date, self).__init__(default, **kwargs)
@@ -195,7 +216,7 @@ class Password(String):
 
     def __set__(self, instance, value):
         self.validate_value(value)
-        instance._dict['bag'][self.name] = hashlib.md5(value).hexdigest()
+        instance.__storage__[self.name] = hashlib.md5(value).hexdigest()
 
     def validate(self, instance):
         if self.required \

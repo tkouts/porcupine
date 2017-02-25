@@ -1,7 +1,15 @@
+import os
+import sys
+import yaml
 from sanic import Blueprint
+
+from porcupine.utils import system
+from porcupine.db import transactional
+from .context import context, with_context
 
 
 class App(Blueprint):
+    db_blueprint = None
 
     @classmethod
     def install(cls):
@@ -16,18 +24,33 @@ class App(Blueprint):
         self.listeners['before_server_stop'].append(self.before_stop)
         self.listeners['after_server_stop'].append(self.after_stop)
 
-    @staticmethod
-    def before_start(app, loop):
+    async def before_start(self, app, loop):
+        if self.db_blueprint is not None:
+            await self.__initialize_db()
+
+    def after_start(self, app, loop):
         pass
 
-    @staticmethod
-    def after_start(app, loop):
+    def before_stop(self, app, loop):
         pass
 
-    @staticmethod
-    def before_stop(app, loop):
+    def after_stop(self, app, loop):
         pass
 
-    @staticmethod
-    def after_stop(app, loop):
-        pass
+    @with_context
+    @transactional()
+    async def __initialize_db(self):
+        from porcupine.schema.system.users import SystemUser
+        context.user = SystemUser()
+        context.data['sd'] = 1
+        app_class_dir = os.path.abspath(
+            os.path.dirname(
+                sys.modules[self.__class__.__module__].__file__))
+        blueprint_file = os.path.join(app_class_dir, self.db_blueprint)
+        with open(blueprint_file, encoding='utf-8') as f:
+            db_blueprint = yaml.load(f.read())
+        for item in db_blueprint.get('items', []):
+            await self.__process_item(item, None)
+
+    async def __process_item(self, item_dict, parent_id):
+        print(item_dict['type'], context.data)

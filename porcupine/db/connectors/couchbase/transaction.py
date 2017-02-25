@@ -1,4 +1,5 @@
 import logging
+from porcupine import exceptions, context
 from couchbase.items import Item, ItemOptionDict
 from couchbase.exceptions import TemporaryFailError, NotFoundError
 from porcupine.core.db.transaction import AbstractTransaction
@@ -17,14 +18,13 @@ class Transaction(AbstractTransaction):
 
     def __init__(self, connector, **options):
         super().__init__(connector, **options)
-        self._locks = {}
-        self._atomic = {}
-        self._incr = {}
+        self._insertions = {}
+        self._deletions = {}
+        self._mutations = {}
+        # self._locks = {}
+        # self._atomic = {}
+        # self._incr = {}
         self.done = False
-
-    def _retry(self):
-        self.done = False
-        super()._retry()
 
     def _get_update(self, oid):
         update = self._locks[oid]
@@ -33,43 +33,43 @@ class Transaction(AbstractTransaction):
         else:
             return update
 
-    def get(self, object_id):
-        if object_id in self._locks:
-            return self._get_update(object_id)
-        try:
-            rv = self.connector.bucket.lock(object_id, ttl=self.lock_ttl)
-        except NotFoundError:
-            # new item
-            return Result()
-        except TemporaryFailError:
-            logging.warning('Failed to get lock for object %s' % object_id)
-            raise exceptions.DBRetryTransaction
-
-        self._locks[object_id] = Result(value=rv.value, cas=rv.cas)
-        return rv
-
-    def get_multi(self, object_ids):
-        multi = {}
-        for oid in object_ids:
-            if oid in self._locks:
-                multi[oid] = self._get_update(oid)
-        # multi lock
-        for_lock = [oid for oid in object_ids if oid not in multi]
-        if for_lock:
-            try:
-                multi_result = self.connector.bucket.lock_multi(
-                    for_lock, ttl=self.lock_ttl)
-            except TemporaryFailError:
-                logging.warning('Failed to get lock for objects: {}'.format(
-                    ', '.join(object_ids)))
-                raise exceptions.DBRetryTransaction
-            for oid in multi_result:
-                multi[oid] = multi_result[oid]
-                self._locks[oid] = Result(
-                    value=multi_result[oid].value,
-                    cas=multi_result[oid].cas
-                )
-        return multi
+    # def get(self, object_id):
+    #     if object_id in self._locks:
+    #         return self._get_update(object_id)
+    #     try:
+    #         rv = self.connector.bucket.lock(object_id, ttl=self.lock_ttl)
+    #     except NotFoundError:
+    #         # new item
+    #         return Result()
+    #     except TemporaryFailError:
+    #         logging.warning('Failed to get lock for object %s' % object_id)
+    #         raise exceptions.DBRetryTransaction
+    #
+    #     self._locks[object_id] = Result(value=rv.value, cas=rv.cas)
+    #     return rv
+    #
+    # def get_multi(self, object_ids):
+    #     multi = {}
+    #     for oid in object_ids:
+    #         if oid in self._locks:
+    #             multi[oid] = self._get_update(oid)
+    #     # multi lock
+    #     for_lock = [oid for oid in object_ids if oid not in multi]
+    #     if for_lock:
+    #         try:
+    #             multi_result = self.connector.bucket.lock_multi(
+    #                 for_lock, ttl=self.lock_ttl)
+    #         except TemporaryFailError:
+    #             logging.warning('Failed to get lock for objects: {}'.format(
+    #                 ', '.join(object_ids)))
+    #             raise exceptions.DBRetryTransaction
+    #         for oid in multi_result:
+    #             multi[oid] = multi_result[oid]
+    #             self._locks[oid] = Result(
+    #                 value=multi_result[oid].value,
+    #                 cas=multi_result[oid].cas
+    #             )
+    #     return multi
 
     def mark_parent_as_stale(self, item):
         if item['_pid'] is not None:
@@ -82,28 +82,31 @@ class Transaction(AbstractTransaction):
         result = self._atomic.setdefault(atomic_key, Result())
         result.is_removed = True
 
-    def set(self, item, object_id=None):
-        is_new = False
-        if object_id is None:
-            object_id = item['_id'] or self.connector.root_id
-        if object_id in self._locks:
-            # it is a locked item
-            self._locks[object_id].value = item
-        else:
-            # it is a new item
-            # we need to make sure it is locked
-            r = self.get(object_id)
-            if r.cas:
-                self._locks[object_id].value = item
-            else:
-                # first time insert
-                is_new = True
-                self._locks[object_id] = Result(value=item)
-        self._locks[object_id].is_modified = True
-        self._locks[object_id].is_removed = False
-        if '_owner' in item:
-            self.mark_parent_as_stale(item)
-        return is_new
+    def insert(self, key, value):
+        if key in self._insertions:
+            raise exceptions.DBAlreadyExists
+        self._insertions[key] = value
+        # is_new = False
+        # if object_id is None:
+        #     object_id = item['_id'] or self.connector.root_id
+        # if object_id in self._locks:
+        #     # it is a locked item
+        #     self._locks[object_id].value = item
+        # else:
+        #     # it is a new item
+        #     # we need to make sure it is locked
+        #     r = self.get(object_id)
+        #     if r.cas:
+        #         self._locks[object_id].value = item
+        #     else:
+        #         # first time insert
+        #         is_new = True
+        #         self._locks[object_id] = Result(value=item)
+        # self._locks[object_id].is_modified = True
+        # self._locks[object_id].is_removed = False
+        # if '_owner' in item:
+        #     self.mark_parent_as_stale(item)
+        # return is_new
 
     def delete(self, item, object_id=None):
         if object_id is None:
@@ -178,7 +181,7 @@ class Transaction(AbstractTransaction):
                 if type(v.value) == dict
                 and self.in_scope(scope_id, v.value) and not v.cas}
 
-    def commit(self):
+    async def commit(self):
         """
         Commits the transaction.
 
@@ -190,71 +193,73 @@ class Transaction(AbstractTransaction):
         # pprint.pprint(locks)
 
         if not self.done:
-            context.data['stale'] = False
-            context.data['__cache'] = {}
+            if self._insertions:
+                self.connector.bucket.insert_multi(self._insertions)
+            # context.data['stale'] = False
+            # context.data['__cache'] = {}
             # add new, update existing and remove deleted
-            update_items = ItemOptionDict()
-            removed_items = ItemOptionDict()
-            unlocks = {}
-            # print 'locks:', len(self._locks)
-            for k, v in self._locks.items():
-                item = Item(k, v.value)
-                item.cas = v.cas
-                if v.is_removed:
-                    if v.cas != 0:
-                        removed_items.add(item)
-                else:
-                    if v.is_modified:
-                        update_items.add(item)
-                    else:
-                        unlocks[k] = v.cas
-            if unlocks:
-                # print 'UNLOCKING: ', unlocks
-                try:
-                    self.connector.bucket.unlock_multi(unlocks)
-                except TemporaryFailError:
-                    pass
-
-            # add atomic updates
-            for object_id, item in self._atomic.items():
-                if item.is_removed:
-                    removed_items.add(Item(object_id))
-                elif item.is_modified:
-                    update_items.add(Item(object_id, item.value))
-
-            # update docs
-            if len(update_items) > 0:
-                # print 'UPDATING: %d' % len(update_items)
-                self.connector.bucket.set_multi(update_items)
-            # execute deltas
-            for atomic_id, amount in self._incr.items():
-                # print atomic_id, amount
-                self.connector.bucket.incr(atomic_id, amount[0],
-                                           initial=sum(amount))
-            # remove deleted
-            if len(removed_items) > 0:
-                self.connector.bucket.delete_multi(removed_items, quiet=True)
-
+            # update_items = ItemOptionDict()
+            # removed_items = ItemOptionDict()
+            # unlocks = {}
+            # # print 'locks:', len(self._locks)
+            # for k, v in self._locks.items():
+            #     item = Item(k, v.value)
+            #     item.cas = v.cas
+            #     if v.is_removed:
+            #         if v.cas != 0:
+            #             removed_items.add(item)
+            #     else:
+            #         if v.is_modified:
+            #             update_items.add(item)
+            #         else:
+            #             unlocks[k] = v.cas
+            # if unlocks:
+            #     # print 'UNLOCKING: ', unlocks
+            #     try:
+            #         self.connector.bucket.unlock_multi(unlocks)
+            #     except TemporaryFailError:
+            #         pass
+            #
+            # # add atomic updates
+            # for object_id, item in self._atomic.items():
+            #     if item.is_removed:
+            #         removed_items.add(Item(object_id))
+            #     elif item.is_modified:
+            #         update_items.add(Item(object_id, item.value))
+            #
+            # # update docs
+            # if len(update_items) > 0:
+            #     # print 'UPDATING: %d' % len(update_items)
+            #     self.connector.bucket.set_multi(update_items)
+            # # execute deltas
+            # for atomic_id, amount in self._incr.items():
+            #     # print atomic_id, amount
+            #     self.connector.bucket.incr(atomic_id, amount[0],
+            #                                initial=sum(amount))
+            # # remove deleted
+            # if len(removed_items) > 0:
+            #     self.connector.bucket.delete_multi(removed_items, quiet=True)
+            #
             self.done = True
             super().commit()
 
-    def abort(self):
+    async def abort(self):
         """
         Aborts the transaction.
 
         @return: None
         """
         if not self.done:
-            if 'stale' in context.data:
-                del context.data['stale']
-            unlocks = {k: v.cas for k, v in self._locks.items() if v.cas}
-            if unlocks:
-                try:
-                    self.connector.bucket.unlock_multi(unlocks)
-                except TemporaryFailError:
-                    pass
-            self._locks = {}
-            self._atomic = {}
-            self._incr = {}
-            self.done = True
+            # if 'stale' in context.data:
+            #     del context.data['stale']
+            # unlocks = {k: v.cas for k, v in self._locks.items() if v.cas}
+            # if unlocks:
+            #     try:
+            #         self.connector.bucket.unlock_multi(unlocks)
+            #     except TemporaryFailError:
+            #         pass
+            # self._locks = {}
+            # self._atomic = {}
+            # self._incr = {}
+            # self.done = True
             super().abort()

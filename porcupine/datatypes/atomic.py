@@ -92,6 +92,6 @@ class AtomicCounter(Atomic):
     def __get__(self, instance, owner) -> int:
         if instance is None:
             return self
-        value = super(AtomicCounter, self).__get__(instance, owner)
+        value = super().__get__(instance, owner)
         if value is not None:
             return CounterValue(instance, self, value)
