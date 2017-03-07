@@ -50,7 +50,7 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
             return await self._get_nested(path_tokens, get_lock, nested)
         return nested
 
-    async def get(self, object_id, get_lock):
+    async def get(self, object_id, get_lock=False):
         if object_id.startswith('/'):
             item = None
             path_tokens = object_id.split('/')
@@ -104,15 +104,15 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
                 # embedded
                 root.__storage__[attr_name] = self.persist.dumps(nested)
 
-    async def insert(self, item):
-        if '.' in item.id:
-            # nested composite
-            path_tokens = item.id.split('.')
-            root = await self.get_raw(path_tokens.pop(0), True)
-            self._put_nested(root, item, path_tokens)
-            await self.insert_raw(root.id, self.persist.dumps(root))
-        else:
-            await self.insert_raw(item.id, item)
+    def insert(self, item):
+        # if '.' in item.id:
+        #     # nested composite
+        #     path_tokens = item.id.split('.')
+        #     root = await self.get_raw(path_tokens.pop(0), True)
+        #     self._put_nested(root, item, path_tokens)
+        #     await self.insert_raw(root.id, self.persist.dumps(root))
+        # else:
+        self.insert_raw(item.id, item)
 
     async def get_multi(self, object_ids, get_lock=True):
         if object_ids:

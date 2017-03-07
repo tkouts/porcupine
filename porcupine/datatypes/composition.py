@@ -3,7 +3,8 @@ Porcupine composition data types
 ================================
 """
 from porcupine import db, exceptions
-from .common import DataType, List
+from .common import List
+from .datatype import DataType
 from porcupine.utils import system
 
 Composite = None
@@ -288,7 +289,8 @@ class Embedded(DataType):
 
             if nested and '.' not in value.id:
                 db._db.delete_item(value)
-                value._id = '{}.{}.{}'.format(instance.id, self.name, value.id)
+                value._id = '{0}.{1}.{2}'.format(
+                    instance.id, self.name, value.id)
             elif not nested and '.' in value.id:
                 db._db.handle_delete(value, True, execute_event_handlers=False)
                 value._id = value.id.split('.')[-1]

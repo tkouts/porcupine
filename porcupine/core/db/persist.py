@@ -6,21 +6,20 @@ from porcupine.utils import system
 
 
 class DefaultPersistence(object):
-    additional = ['is_collection']
+    additional = []
 
     @staticmethod
     def loads(value):
         value = marshal.loads(marshal.dumps(value))
-        content_class = system.get_rto_by_name(value['content/class'])
-        item = content_class.__new__(content_class)
-        item._dict = value
+        content_class = system.get_rto_by_name(value.pop('c/c'))
+        item = content_class(storage=value)
         return item
 
     @staticmethod
     def dumps(obj):
-        dct = obj._dict
+        dct = obj.__storage__
         for attr in DefaultPersistence.additional:
             if hasattr(obj, attr):
                 dct[attr] = getattr(obj, attr)
-        dct['content/class'] = obj.contentclass
+        dct['c/c'] = obj.content_class
         return dct

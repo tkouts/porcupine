@@ -72,7 +72,7 @@ def transactional(auto_commit=True):
                             # except exceptions.ResponseEnd
                             # as response_ended_exception:
                             #     pass
-                            print(context.txn)
+                            # print(context.txn)
                             if auto_commit:
                                 await context.txn.commit()
                             else:

@@ -35,7 +35,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     is_collection = False
 
     # system attributes
-    p_ids = List(readonly=True)
+    # p_ids = List(readonly=True)
     created = DateTime(readonly=True)
     owner = String(required=True, readonly=True)
     modified_by = String(required=True, readonly=True)
@@ -47,31 +47,17 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     security = Dictionary()
     inherit_roles = Boolean(True)
 
-    # def __init__(self):
-    #     super(GenericItem, self).__init__()
-    #     # system props
-    #     self._dict.update({
-    #         '_pids': [],
-    #         '_owner': '',
-    #         '_is_system': False,
-    #         '_created': 0,
-    #
-    #         'modified_by': '',
-    #         'security': {},
-    #         'inherit_roles': True
-    #     })
-
     def _apply_security(self, parent, is_new, get_children=True):
         if parent is not None and self.inherit_roles:
             self.security = parent.security
-        db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-        if get_children and self.is_collection and self.children_count and not is_new:
-            cursor = db._db.get_children(self._id, deep=db_supports_deep_indexing)
-            cursor.enforce_permissions = False
-            for child in cursor:
-                child._apply_security(self, is_new, get_children=not db_supports_deep_indexing)
-                db._db.put_item(child)
-            cursor.close()
+        # db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
+        # if get_children and self.is_collection and self.children_count and not is_new:
+        #     cursor = db._db.get_children(self._id, deep=db_supports_deep_indexing)
+        #     cursor.enforce_permissions = False
+        #     for child in cursor:
+        #         child._apply_security(self, is_new, get_children=not db_supports_deep_indexing)
+        #         db._db.put_item(child)
+        #     cursor.close()
 
     def append_to(self, parent):
         """
@@ -85,48 +71,57 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         if self.p_id:
             raise exceptions.DBAlreadyExists(
                 'Object already exists. Use update or move_to instead.')
-        if isinstance(parent, str):
-            parent = db.connector.get(parent, get_lock=False)
+
+        if parent is not None:
+            if isinstance(parent, str):
+                parent = db.connector.get(parent)
+            security = parent.security
+        else:
+            # add as root
+            security = {}
 
         content_class = self.content_class
 
         user = context.user
-        user_role = permissions.resolve(parent, user)
+        user_role = permissions.resolve(security, user)
         if user_role == permissions.READER:
             raise exceptions.PermissionDenied(
                 'The user does not have write permissions '
                 'on the parent folder.')
-        if content_class not in parent.containment:
-            raise exceptions.ContainmentError(
-                'The target container does not accept '
-                'objects of type\n"%s".' % content_class)
-
         # set security to new item
-        if user_role == permissions.COORDINATOR:
-            # user is COORDINATOR
-            self._apply_security(parent, True)
+        if parent is not None:
+            # if content_class not in parent.containment:
+            #     raise exceptions.ContainmentError(
+            #         'The target container does not accept '
+            #         'objects of type\n"%s".' % content_class)
+
+            if user_role == permissions.COORDINATOR:
+                # user is COORDINATOR
+                self._apply_security(parent, True)
+            else:
+                # user is not COORDINATOR
+                self.inherit_roles = True
+                self.security = parent.security
         else:
-            # user is not COORDINATOR
-            self.inherit_roles = True
-            self.security = parent.security
+            self.inherit_roles = False
 
         self.owner = user.id
         self.created = self.modified = \
             datetime.datetime.utcnow().isoformat()
         self.modified_by = user.name
-        # self.modified = time.time()
-        self.p_id = parent.id
-        self.p_ids = parent.p_ids + [parent.id]
+        if parent is not None:
+            self.p_id = parent.id
+        # self.p_ids = parent.p_ids + [parent.id]
 
-        db._db.handle_update(self, None)
-        db._db.put_item(self)
-        with system_override(parent):
-            if self.is_collection:
-                parent.nc.incr(1)
-            else:
-                parent.ni.incr(1)
-            parent.modified = self.modified
-        db._db.handle_post_update(self, None)
+        # db._db.handle_update(self, None)
+        db.connector.insert(self)
+        if parent is not None:
+            with system_override():
+                parent.children.add(self.id)
+                if self.is_collection:
+                    parent.containers.add(self.id)
+                parent.modified = self.modified
+        # db._db.handle_post_update(self, None)
 
     def is_contained_in(self, item_id: str) -> bool:
         """

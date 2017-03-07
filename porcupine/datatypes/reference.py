@@ -3,14 +3,15 @@ Porcupine reference data types
 ==============================
 """
 from porcupine import db, exceptions
-from .common import DataType, String, List
+from .common import String, List
+from .datatype import DataType
 # from porcupine.core.objectSet import ObjectSet
 from porcupine.utils import system
 
 
 class SingleReference(str):
 
-    def get_item(self, get_lock=True):
+    def get_item(self):
         """
         This method returns the object that this data type
         instance references. If the current user has no read
@@ -22,7 +23,7 @@ class SingleReference(str):
         """
         item = None
         if self:
-            item = db.get_item(self, get_lock=get_lock)
+            item = db.get_item(self)
         return item
 
 

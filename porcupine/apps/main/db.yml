@@ -3,7 +3,7 @@ indices:
   is_collection: No
 
 items:
-  - id: ''
+  - id: 'ROOT'
     type: porcupine.schema.system.RootContainer
     name: Root Container
     is_system: Yes

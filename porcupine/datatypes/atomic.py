@@ -3,7 +3,9 @@ Porcupine atomic data types
 ===========================
 """
 from porcupine import db
-from .common import DataType
+from porcupine.datatypes import DataType
+
+
 # from porcupine.utils import date
 
 

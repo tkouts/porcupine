@@ -1,4 +1,4 @@
-from porcupine.datatypes import Integer
+from porcupine.datatypes import ItemCollection
 from porcupine.utils import permissions
 from .item import Item
 from .shortcut import Shortcut
@@ -8,20 +8,18 @@ class Container(Item):
     """
     Generic container class.
 
-    Base class for all containers. Containers do not support versioning.
+    Base class for all containers.
 
     @cvar containment: a tuple of strings with all the content types of
                        Porcupine objects that this class instance can accept.
     @type containment: tuple
     @type is_collection: bool
     """
-    # __image__ = "desktop/images/folder.gif"
     containment = ('porcupine.schema.Shortcut',)
     is_collection = True
 
-    # modified = AtomicTimestamp(required=True)
-    ni = Integer(readonly=True)
-    nc = Integer(readonly=True)
+    children = ItemCollection(readonly=True)
+    containers = ItemCollection(readonly=True)
 
     def child_exists(self, name):
         """

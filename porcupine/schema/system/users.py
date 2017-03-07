@@ -10,6 +10,7 @@ class SystemUser(Item):
     This user has no security restrictions.
     """
     def __init__(self):
+        super().__init__()
         self.id = 'system'
         self.name = 'SYSTEM'
         self.description = 'System User'

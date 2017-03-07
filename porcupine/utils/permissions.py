@@ -15,11 +15,11 @@ CONTENT_CO = 4
 COORDINATOR = 8
 
 
-def resolve(item, user):
-    return get_role(item.security, user)
+# def resolve(item, user):
+#     return get_role(item.security, user)
 
 
-def get_role(security_descriptor, user_or_group):
+def resolve(security_descriptor, user_or_group):
     if user_or_group.is_admin():
         return COORDINATOR
     if user_or_group.id in security_descriptor:

@@ -3,103 +3,8 @@ Porcupine data types
 ====================
 """
 import hashlib
-import copy
 
-# from porcupine.utils import date
-
-
-class DataType:
-    """
-    Base data type class.
-
-    Use this as a base class if you want to create your own custom data type.
-
-    :var required: boolean indicating if the data type is mandatory
-    :type required: bool
-    """
-    required = False
-    allow_none = False
-    readonly = False
-    safe_type = object
-
-    def __init__(self, default=None, **kwargs):
-        self.validate_value(default)
-        self.default = default
-        self.name = None
-        if 'required' in kwargs:
-            self.required = kwargs['required']
-        if 'allow_none' in kwargs:
-            self.allow_none = kwargs['allow_none']
-        if 'readonly' in kwargs:
-            self.readonly = kwargs['readonly']
-
-    def validate_value(self, value):
-        if self.allow_none and value is None:
-            return
-        if not isinstance(value, self.safe_type):
-            raise TypeError('Unsupported type "{}" for "{}"'.format(
-                value.__class__.__name__, self.name))
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        name = self.name
-        if name in instance.__storage__:
-            return instance.__storage__[name]
-        else:
-            if isinstance(self.default, (list, dict)):
-                # mutable
-                value = copy.deepcopy(self.default)
-                instance.__storage__[name] = value
-                return value
-            else:
-                return self.default
-
-    def __set__(self, instance, value):
-        if self.readonly and instance.parent_id and not instance.__sys__:
-            raise TypeError('Attribute "{}" of "{}" is readonly'.format(
-                instance.__class__.__name__, self.name))
-        # elif self.immutable and instance.parent_id:
-        #     raise TypeError('Attribute "{}" of "{}" is immutable'.format(
-        #         instance.__class__.__name__, self.name))
-        self.validate_value(value)
-        instance.__storage__[self.name] = value
-
-    def __delete__(self, instance):
-        if self.name in instance.__storage__:
-            del instance.__storage__[self.name]
-
-    def validate(self, instance):
-        """
-        Data type validation method.
-
-        This method is called automatically for each I{DataType}
-        instance attribute of an object, whenever this object
-        is appended or updated.
-
-        @raise ValueError:
-            if the data type is mandatory and is empty.
-
-        @return: None
-        """
-        if self.required and not self.__get__(instance, instance.__class__):
-            raise ValueError('Attribute "{}" of "{}" is mandatory.'.format(
-                self.name, instance.__class__.__name__))
-
-    def clone(self, instance, memo):
-        pass
-
-    def on_create(self, instance, value):
-        pass
-
-    def on_update(self, instance, value, old_value):
-        pass
-
-    def on_delete(self, instance, value, is_permanent):
-        pass
-
-    def on_undelete(self, instance, value):
-        pass
+from .datatype import DataType
 
 
 class String(DataType):
@@ -147,11 +52,7 @@ class Boolean(DataType):
 
 
 class List(DataType):
-    """List data type
-
-    @ivar value: The datatype's value
-    @type value: list
-    """
+    """List data type"""
     safe_type = list
 
     def __init__(self, default=None, **kwargs):
@@ -168,11 +69,7 @@ class List(DataType):
 
 
 class Dictionary(DataType):
-    """Dictionary data type
-
-    @ivar value: The datatype's value
-    @type value: dict
-    """
+    """Dictionary data type"""
     safe_type = dict
 
     def __init__(self, default=None, **kwargs):
@@ -188,17 +85,17 @@ class Date(String):
     def __init__(self, default=None, **kwargs):
         super(Date, self).__init__(default, **kwargs)
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        value = super(Date, self).__get__(instance, owner)
-        if value is not None:
-            return date.Date(value)
-
-    def __set__(self, instance, value):
-        if isinstance(value, date.Date):
-            value = value.value
-        super(Date, self).__set__(instance, value)
+    # def __get__(self, instance, owner):
+    #     if instance is None:
+    #         return self
+    #     value = super(Date, self).__get__(instance, owner)
+    #     if value is not None:
+    #         return date.Date(value)
+    #
+    # def __set__(self, instance, value):
+    #     if isinstance(value, date.Date):
+    #         value = value.value
+    #     super(Date, self).__set__(instance, value)
 
 
 class DateTime(Date):
@@ -215,8 +112,9 @@ class Password(String):
     empty = hashlib.md5(''.encode()).hexdigest()
 
     def __set__(self, instance, value):
-        self.validate_value(value)
-        instance.__storage__[self.name] = hashlib.md5(value).hexdigest()
+        super().__set__(instance, hashlib.md5(value).hexdigest())
+        # self.validate_value(value)
+        # instance.__storage__[self.name] = hashlib.md5(value).hexdigest()
 
     def validate(self, instance):
         if self.required \

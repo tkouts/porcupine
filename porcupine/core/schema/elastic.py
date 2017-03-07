@@ -1,5 +1,6 @@
-from porcupine.datatypes import DataType, Composition, String, Integer, List
+from porcupine.datatypes import DataType, Composition, String, Integer
 from porcupine.utils import system
+from porcupine.core.context import system_override
 
 
 class Elastic:
@@ -13,8 +14,8 @@ class Elastic:
     @type event_handlers: list
     """
     __schema__ = {}
-    __sig__ = 0
-    __sys__ = False
+    __sig__ = ''
+    __is_new__ = False
     event_handlers = []
 
     id = String(readonly=True)
@@ -22,9 +23,8 @@ class Elastic:
     is_deleted = Integer(readonly=True)
     sig = String(readonly=True)
 
-    def __new__(cls, *args, **kwargs):
-        sig = hash(tuple(cls.__dict__.keys()))
-        if cls.__sig__ != sig:
+    def __new__(cls, storage=None):
+        if not cls.__sig__:
             schema = {}
             for attr_name in dir(cls):
                 try:
@@ -35,14 +35,27 @@ class Elastic:
                 except AttributeError:
                     continue
             cls.__schema__ = schema
-            cls.__sig__ = sig
+            cls.__sig__ = system.hash_series(*schema.keys()).hexdigest()
         obj = super(Elastic, cls).__new__(cls)
-        super(Elastic, obj).__setattr__('__storage__', {})
         return obj
 
-    def __init__(self):
-        self.id = system.generate_oid()
-        self.sig = system.hash_series(*self.__schema__.keys()).hexdigest()
+    def __init__(self, storage=None):
+        if storage is None:
+            storage = {}
+        self.__storage__ = storage
+        self.__externals__ = {}
+        self.__snapshot__ = {}
+        if 'id' not in storage:
+            # new item
+            self.__is_new__ = True
+            # initialize storage with default values
+
+            storage['id'] = system.generate_oid()
+            storage['sig'] = self.__class__.__sig__
+        else:
+            # update sig to latest schema
+            with system_override():
+                self.sig = self.__class__.__sig__
 
     def __hash__(self):
         return hash(self.__storage__['id'])

@@ -42,8 +42,15 @@ class Couchbase(AbstractConnector):
         # except (CouchbaseTransientError, CouchbaseNetworkError):
         #     raise DBConnectionError
 
-    async def insert_raw(self, key, value):
+    async def get_raw(self, key, get_lock):
+        result = await self.bucket.get(key, quiet=True)
+        return result.value
+
+    def insert_raw(self, key, value):
         context.txn.insert(key, value)
+
+    def put_external(self, ext_id, value):
+        context.txn.put_external(ext_id, value)
 
     async def close(self):
         pass

@@ -4,140 +4,132 @@ Porcupine external data types
 """
 import os.path
 import shutil
-import io
+# import io
 
 from porcupine import db
-from .common import DataType, String
-from porcupine.utils import system
+from .common import String
+from .datatype import DataType
 
 
-class ExternalStreamValue(object):
-
-    def __init__(self, descriptor, datum, value=None):
-        self._datum = datum
-        self.__value = value
-        self.__descriptor = descriptor
-
-    def read(self):
-        stream = self.__value or db._db.get_external(self._datum['id'])
-        return stream
-
-    def write(self, value):
-        self.__descriptor.validate_value(value)
-        db._db.put_external(self._datum['id'], value)
-        self.__value = value
-        self._datum['size'] = len(value)
-
-    @property
-    def id(self):
-        return self._datum['id']
-
-    @property
-    def size(self):
-        return self._datum['size']
-
-    def __len__(self):
-        return self.size
+# from porcupine.utils import system
 
 
-class ExternalAttribute(DataType):
+# class BlobValue:
+#
+#     def __init__(self, descriptor, instance):
+#         self._descriptor = descriptor
+#         self._instance = instance
+#
+#     async def get(self):
+#         storage = getattr(self._instance, self._descriptor.storage)
+#         name = self._descriptor.name
+#         if name not in storage:
+#             value = await db.connector.get_external('{0}_{1}'.format(
+#                 self._instance.id, name))
+#             storage[name] = value
+#         return storage[name]
+#
+#     async def set(self, value):
+#         # should_snapshot = False
+#         name = self._descriptor.name
+#         if name not in self._instance.__snapshot__:
+#             # do not keep previous value, just trigger on_change
+#             self._instance.__snapshot__[name] = None
+#         DataType.__set__(self._descriptor, self._instance, value)
+
+
+class Blob(DataType):
     """
-    Subclass I{ExternalAttribute} when dealing with large attribute lengths.
-    These kind of attributes are not stored on the same database as
-    all other object attributes.
+    Base class for binary large objects.
     """
     safe_type = bytes
+    allow_none = True
+    storage = '__externals__'
 
-    def __init__(self, default='', **kwargs):
-        super(ExternalAttribute, self).__init__(default, **kwargs)
+    def __init__(self, default=None, **kwargs):
+        super().__init__(default, **kwargs)
+
+    async def fetch(self, instance):
+        storage = getattr(instance, self.storage)
+        name = self.name
+        if name not in storage:
+            value = await db.connector.get_external('{0}_{1}'.format(
+                instance.id, name))
+            # TODO: return default
+            storage[name] = value
+        return storage[name]
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        name = self.name
+        return self.fetch(instance)
 
-        value = None
-        if name not in instance._dict['bag']:
-            instance._dict['bag'][name] = {
-                'id': system.generate_oid(),
-                'size': len(self.default)
-            }
-            value = self.default
-        return ExternalStreamValue(self, instance._dict['bag'][name], value)
-
-    def __set__(self, instance, value):
-        raise AttributeError(
-            'External attributes do not support direct assignment. '
-            'Use the write method instead.')
-
-    def validate(self, instance):
-        if self.required and self.__get__(instance, None).size == 0:
-            raise ValueError(self.__class__.__name__, 'Attribute is mandatory')
+    def snapshot(self, instance, value):
+        if self.name not in instance.__snapshot__:
+            instance.__snapshot__[self.name] = None
 
     def clone(self, instance, memo):
-        duplicate = memo.get('_dup_ext_', False)
-        if duplicate:
-            name = self.name
-            old_id = instance._dict['bag'][name]['id']
-            # generate new id
-            instance._dict['bag'][name]['id'] = system.generate_oid()
-            stream = self.__get__(instance, instance.__class__)
-            stream.write(db._db.get_external(old_id))
+        pass
+
+    def on_change(self, instance, value, old_value):
+        db.connector.put_external(
+            '{0}_{1}'.format(instance.id, self.name), value)
 
     def on_delete(self, instance, value, is_permanent):
         if is_permanent:
-            db._db.delete_external(value.id)
+            db.connector.delete_external(
+                '{0}_{1}'.format(instance.id, self.name))
 
 
-class Text(ExternalAttribute):
+class Text(Blob):
     """Data type to use for large text streams"""
     safe_type = str
 
 
-class FileValue(ExternalStreamValue):
+# class FileValue(ExternalAttributeValue):
+#
+#     @property
+#     def filename(self):
+#         return self._datum['filename']
+#
+#     @filename.setter
+#     def filename(self, filename):
+#         self._datum['filename'] = filename
+#
+#     def get_file(self):
+#         return io.StringIO(self.read())
+#
+#     def load_from_file(self, filename):
+#         """
+#         This method sets the value property of this data type instance
+#         to a stream read from a file that resides on the file system.
+#
+#         @param filename: A valid filename
+#         @type filename: str
+#
+#         @return: None
+#         """
+#         with open(filename, 'rb') as f:
+#             self.write(f.read())
 
-    @property
-    def filename(self):
-        return self._datum['filename']
 
-    @filename.setter
-    def filename(self, filename):
-        self._datum['filename'] = filename
-
-    def get_file(self):
-        return io.StringIO(self.read())
-
-    def load_from_file(self, filename):
-        """
-        This method sets the value property of this data type instance
-        to a stream read from a file that resides on the file system.
-
-        @param filename: A valid filename
-        @type filename: str
-
-        @return: None
-        """
-        with open(filename, 'rb') as f:
-            self.write(f.read())
-
-
-class File(ExternalAttribute):
+class File(Blob):
     """Data type to use for file objects"""
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        name = self.name
-
-        value = None
-        if name not in instance._dict['bag']:
-            instance._dict['bag'][name] = {
-                'id': system.generate_oid(),
-                'size': len(self.default),
-                'filename': ''
-            }
-            value = self.default
-        return FileValue(self, instance._dict['bag'][name], value)
+    # def __get__(self, instance, owner):
+    #     if instance is None:
+    #         return self
+    #     name = self.name
+    #
+    #     value = None
+    #     if name not in instance.__storage__:
+    #         instance.__storage__[name] = {
+    #             'id': system.generate_oid(),
+    #             'size': len(self.default),
+    #             'filename': ''
+    #         }
+    #         value = self.default
+    #     return FileValue(self, instance.__storage__[name], value)
 
 
 class ExternalFileValue(str):
@@ -177,7 +169,7 @@ class ExternalFile(String):
             filename, extension = os.path.splitext(old_filename)
             filename = filename.split('_')[0]
             while os.path.exists(new_filename):
-                new_filename = '{}_{}{}'.format(
+                new_filename = '{0}_{1}{2}'.format(
                     filename, file_counter, extension)
                 file_counter += 1
             shutil.copyfile(old_filename, new_filename)

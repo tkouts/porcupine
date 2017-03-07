@@ -14,7 +14,7 @@ default_settings = {
             ('is_collection', False, True),
         ),
         'type': 'porcupine.db.connectors.Couchbase',
-        'hosts': ['localhost:32772'],
+        'hosts': ['localhost'],
         # 'protocol': 'couchbase',
         'bucket': 'porcupine',
         'password': '',

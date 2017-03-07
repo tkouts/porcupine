@@ -16,20 +16,22 @@ class PContext(Local):
         except AttributeError:
             return None
 
+    @property
+    def is_system_update(self):
+        try:
+            return self.__system_update__
+        except AttributeError:
+            return False
+
 context = PContext()
 
 
 class system_override:
-    def __init__(self, *items):
-        self.items = items
-
     def __enter__(self):
-        for item in self.items:
-            item.__sys__ = True
+        context.__system_update__ = True
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        for item in self.items:
-            item.__sys__ = False
+        context.__system_update__ = False
 
 
 def with_context(co_routine):
