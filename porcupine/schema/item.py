@@ -1,5 +1,6 @@
 import time
 
+from porcupine import db, context
 from porcupine.core.schema.item import GenericItem
 from porcupine.datatypes import RelatorN
 from porcupine.utils import permissions
@@ -26,14 +27,15 @@ class Item(GenericItem):
 
         @return: None
         """
-        old_item = db._db.get_item(self._id)
-        if self._pid is not None:
-            parent = db._db.get_item(self._pid, get_lock=False)
+        # old_item = db._db.get_item(self._id)
+        security = self.__snapshot__.get('security', self.security)
+        if self.p_id is not None:
+            parent = db.connector.get(self.p_id)
         else:
             parent = None
 
         user = context.user
-        user_role = permissions.resolve(old_item, user)
+        user_role = permissions.resolve(security, user)
 
         if user_role > permissions.READER:
             # set security

@@ -3,6 +3,10 @@ import random
 import hashlib
 import functools
 
+from porcupine import db
+from porcupine.core.context import context_cacheable
+
+
 VALID_ID_CHARS = [
     chr(x) for x in
     list(range(ord('a'), ord('z'))) +
@@ -43,10 +47,12 @@ def get_rto_by_name(name):
     is_second_level = False
 
     try:
-        mod = __import__(module, globals(), locals(), [attribute] if attribute else [])
+        mod = __import__(module, globals(), locals(),
+                         [attribute] if attribute else [])
     except ImportError:
         is_second_level = True
-        mod = __import__('.'.join(modules[:-2]), globals(), locals(), [modules[-2]])
+        mod = __import__('.'.join(modules[:-2]), globals(), locals(),
+                         [modules[-2]])
 
     if attribute:
         if is_second_level:
@@ -64,3 +70,27 @@ def hash_series(*args, using='md5'):
             bt.write(arg)
         md5_hash = getattr(hashlib, using)(bt.getvalue())
     return md5_hash
+
+
+@context_cacheable
+async def get_item_state(item_id):
+    return await db.connector.get_partial(
+        item_id, 'p_id', 'acl', 'deleted', snapshot=True)
+
+
+async def resolve_deleted(item):
+    if item.deleted or item.p_id is None:
+        return item.deleted
+    parent_state = await get_item_state(item.p_id)
+    while not parent_state['deleted'] and parent_state['p_id'] is not None:
+        parent_state = await get_item_state(parent_state['p_id'])
+    return parent_state['deleted']
+
+
+async def resolve_acl(item):
+    if item.acl is not None or item.p_id is None:
+        return item.acl
+    parent_state = await get_item_state(item.p_id)
+    while parent_state['acl'] is None and parent_state['p_id'] is not None:
+        parent_state = await get_item_state(parent_state['p_id'])
+    return parent_state['acl']

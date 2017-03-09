@@ -15,7 +15,7 @@ class DataType:
     storage = '__storage__'
 
     def __init__(self, default=None, **kwargs):
-        self.default = default
+        self._default = default
         self.name = None
         if 'required' in kwargs:
             self.required = kwargs['required']
@@ -29,8 +29,9 @@ class DataType:
         if instance is not None:
             if self.readonly and not instance.__is_new__ \
                     and not context.is_system_update:
-                raise TypeError('Attribute "{0}" of "{1}" is readonly'.format(
-                    self.name, instance.__class__.__name__))
+                raise AttributeError(
+                    'Attribute "{0}" of "{1}" is readonly'.format(
+                        self.name, instance.__class__.__name__))
         if self.allow_none and value is None:
             return
         if not isinstance(value, self.safe_type):
@@ -41,36 +42,37 @@ class DataType:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        name = self.name
         storage = getattr(instance, self.storage)
-        if name in storage:
-            return storage[name]
-        else:
-            if isinstance(self.default, (list, dict)):
-                # mutable
-                value = copy.deepcopy(self.default)
-                storage[name] = value
-                return value
-            else:
-                return self.default
+        return storage[self.name]
 
     def __set__(self, instance, value):
         self.validate_value(value, instance)
         self.snapshot(instance, value)
-        getattr(instance, self.storage)[self.name] = value
+        storage = getattr(instance, self.storage)
+        storage[self.name] = value
 
     def __delete__(self, instance):
         if self.name in instance.__storage__:
             del instance.__storage__[self.name]
 
+    def set_default(self, instance):
+        value = self._default
+        if isinstance(value, (list, dict)):
+            value = copy.deepcopy(value)
+        elif isinstance(value, tuple):
+            value = list(value)
+        storage = getattr(instance, self.storage)
+        if self.name not in storage:
+            DataType.snapshot(self, instance, value)
+            storage[self.name] = value
+
     def snapshot(self, instance, value):
         if self.name not in instance.__snapshot__:
             previous_value = getattr(instance, self.storage).get(self.name)
             if previous_value != value:
-                if not instance.__snapshot__:
-                    # first mutation
-                    context.txn.update(instance)
                 instance.__snapshot__[self.name] = previous_value
+        elif instance.__snapshot__[self.name] == value:
+            del instance.__snapshot__[self.name]
 
     def validate(self, instance):
         """
@@ -93,7 +95,9 @@ class DataType:
         pass
 
     def on_change(self, instance, value, old_value):
-        pass
+        if not instance.__is_new__:
+            txn = context.txn
+            txn.mutate(instance, self.name, txn.UPSERT_MUT, value)
 
     def on_delete(self, instance, value, is_permanent):
         pass

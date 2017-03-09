@@ -21,19 +21,20 @@ async def get_item(oid):
     @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
     """
     item = await connector.get(oid)
-    access_level = permissions.resolve(item, context.user)
-    if item is not None and not item.is_deleted \
-            and access_level != permissions.NO_ACCESS:
-        return item
+    if item is not None:
+        access_level = await permissions.resolve(item, context.user)
+        is_deleted = await item.is_deleted
+        if not is_deleted and access_level != permissions.NO_ACCESS:
+            return item
 
 
 async def get_multi(ids):
     items = await connector.get_multi(ids)
     no_access = permissions.NO_ACCESS
-    return [
-        item for item in items
-        if item is not None and not item.is_deleted
-        and permissions.resolve(item, context.user) != no_access]
+    return [item for item in items
+            if item is not None
+            and not await item.is_deleted
+            and await permissions.resolve(item, context.user) != no_access]
 
 
 def transactional(auto_commit=True):
@@ -49,13 +50,15 @@ def transactional(auto_commit=True):
         async def transactional_wrapper(*args, **kwargs):
             if context.txn is None:
                 # top level function
+                import time
+                now = time.time()
                 retries = 0
                 max_retries = connector.TransactionType.txn_max_retries
                 sleep_time = min_sleep_time
                 context.txn = connector.get_transaction()
                 try:
                     while retries < max_retries:
-                        # print 'trying.... %d' % retries
+                        # print('trying.... %d' % retries)
                         # response_ended_exception = None
                         try:
                             args_copy = copy.deepcopy(args)
@@ -80,6 +83,7 @@ def transactional(auto_commit=True):
                                 await context.txn.abort()
                             # if response_ended_exception is not None:
                             #     raise response_ended_exception
+                            print('TXN time', time.time() - now)
                             return val
                         except exceptions.DBDeadlockError:
                             await context.txn.abort()

@@ -1,4 +1,4 @@
-from porcupine.datatypes import DataType, Composition, String, Integer
+from porcupine.datatypes import DataType, Composition, String, Boolean
 from porcupine.utils import system
 from porcupine.core.context import system_override
 
@@ -19,8 +19,8 @@ class Elastic:
     event_handlers = []
 
     id = String(readonly=True)
-    p_id = String(readonly=True)
-    is_deleted = Integer(readonly=True)
+    p_id = String(readonly=True, allow_none=True, default=None)
+    deleted = Boolean(readonly=True)
     sig = String(readonly=True)
 
     def __new__(cls, storage=None):
@@ -48,11 +48,15 @@ class Elastic:
         if 'id' not in storage:
             # new item
             self.__is_new__ = True
-            # initialize storage with default values
-
             storage['id'] = system.generate_oid()
             storage['sig'] = self.__class__.__sig__
-        else:
+            # initialize storage with default values
+            for attr_def in self.__schema__.values():
+                attr_def.set_default(self)
+        elif self.sig != self.__class__.__sig__:
+            # update storage with default values of added attributes
+            for attr_def in self.__schema__.values():
+                attr_def.set_default(self)
             # update sig to latest schema
             with system_override():
                 self.sig = self.__class__.__sig__

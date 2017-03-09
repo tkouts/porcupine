@@ -1,7 +1,6 @@
 import abc
 from porcupine import context, exceptions
 from porcupine.config import settings
-from porcupine.datatypes import Composition, Embedded
 from porcupine.utils import system
 from .persist import DefaultPersistence
 from .join import Join
@@ -20,126 +19,86 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
     def connect(self):
         raise NotImplementedError
 
-    async def _get_item_by_path(self, path_tokens, get_lock):
+    async def _get_item_by_path(self, path_tokens):
         child_id = ''
         child = None
         for name in path_tokens[1:]:
             if name:
-                child = await self.get_child_by_name(child_id, name, get_lock)
+                child = await self.get_child_by_name(child_id, name)
                 if child is None:
                     return None
                 else:
                     child_id = child.id
         return child
 
-    async def _get_nested(self, path_tokens, get_lock, item=None):
-        nested = None
-        if item is None:
-            item = await self.get_raw(path_tokens.pop(0), get_lock)
-        if item is not None:
-            attr_name = path_tokens.pop(0)
-            if attr_name in item.__schema__:
-                attr_def = item.__schema__[attr_name]
-                oid = path_tokens.pop(0)
-                if isinstance(attr_def, Composition):
-                    nested = ([c for c in getattr(item, attr_name) if
-                               c.id.split('.')[-1] == oid] or [None])[0]
-                elif isinstance(attr_def, Embedded):
-                    nested = getattr(item, attr_name)
-        if nested is not None and path_tokens:
-            return await self._get_nested(path_tokens, get_lock, nested)
-        return nested
-
-    async def get(self, object_id, get_lock=False):
+    async def get(self, object_id):
+        if context.txn is not None and object_id in context.txn:
+            return context.txn[object_id]
         if object_id.startswith('/'):
             item = None
             path_tokens = object_id.split('/')
             path_depth = len(path_tokens)
             # /[itemID]?
             if path_depth == 2:
-                if '.' in path_tokens[1]:
-                    # nested composite
-                    item = await self._get_nested(path_tokens[1].split('.'),
-                                                  get_lock)
-                else:
-                    item = await self.get_raw(path_tokens[1], get_lock)
+                item = await self.get_raw(path_tokens[1])
             # /folder1/folder2/item
             if item is None:
-                return await self._get_item_by_path(path_tokens, get_lock)
-        elif '.' in object_id:
-            # nested composite
-            return await self._get_nested(object_id.split('.'), get_lock)
+                return await self._get_item_by_path(path_tokens)
         else:
-            item = await self.get_raw(object_id, get_lock)
+            item = await self.get_raw(object_id)
 
         if item is not None:
             item = self.persist.loads(item)
             return item
 
-    def _put_nested(self, root, nested, path_tokens):
-        composite_index = None
-        raw_root = None
-        attr_name = path_tokens.pop(0)
-        oid = path_tokens.pop(0)
-        attr_value = root.__storage__[attr_name]
-        if isinstance(attr_value, list):
-            # composition
-            for i, composite_dict in enumerate(attr_value):
-                if composite_dict['id'].split('.')[-1] == oid:
-                    raw_root = composite_dict
-                    composite_index = i
-                    break
-        else:
-            # embedded
-            raw_root = root.__storage__[attr_name]
+    async def get_partial(self, object_id, *paths, snapshot=False):
 
-        if path_tokens:
-            self._put_nested(nested, self.persist.loads(raw_root), path_tokens)
-        else:
-            # end of path
-            if composite_index is not None:
-                # composition
-                attr_value[composite_index] = self.persist.dumps(nested)
+        def snapshot_getter(i, p):
+            return i.__snapshot__.get(p, i.__storage__[p])
+
+        def normal_getter(i, p):
+            return i.__storage__[p]
+
+        if context.txn is not None and object_id in context.txn:
+            item = context.txn[object_id]
+            if snapshot:
+                getter = snapshot_getter
             else:
-                # embedded
-                root.__storage__[attr_name] = self.persist.dumps(nested)
+                getter = normal_getter
+            return {path: getter(item, path) for path in paths}
+        return await self.get_partial_raw(object_id, *paths)
 
-    def insert(self, item):
-        # if '.' in item.id:
-        #     # nested composite
-        #     path_tokens = item.id.split('.')
-        #     root = await self.get_raw(path_tokens.pop(0), True)
-        #     self._put_nested(root, item, path_tokens)
-        #     await self.insert_raw(root.id, self.persist.dumps(root))
-        # else:
-        self.insert_raw(item.id, item)
-
-    async def get_multi(self, object_ids, get_lock=True):
+    async def get_multi(self, object_ids):
+        # TODO: fetch from txn
+        loads = self.persist.loads
         if object_ids:
-            return [self.persist.loads(item)
-                    for item in await self.get_multi_raw(object_ids, get_lock)
+            return [loads(item)
+                    for item in await self.get_multi_raw(object_ids)
                     if item is not None]
         return []
 
-    async def delete(self, item):
-        await self.delete_raw(item.id, self.persist.dumps(item))
+    async def exists(self, key):
+        raise NotImplementedError
 
     # item operations
     # @abc.abstractmethod
-    async def get_raw(self, key, get_lock):
+    async def get_raw(self, key):
+        raise NotImplementedError
+
+    async def get_partial_raw(self, key, *paths):
         raise NotImplementedError
 
     # @abc.abstractmethod
-    async def get_multi_raw(self, keys, get_lock):
+    async def get_multi_raw(self, keys):
         raise NotImplementedError
 
     # @abc.abstractmethod
-    async def insert_raw(self, key, value):
-        raise NotImplementedError
+    # async def insert_raw(self, key, value):
+    #     raise NotImplementedError
 
     # @abc.abstractmethod
-    async def delete_raw(self, key, value):
-        raise NotImplementedError
+    # async def delete_raw(self, key, value):
+    #     raise NotImplementedError
 
     # containers
     # @abc.abstractmethod
@@ -150,10 +109,10 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
     async def get_child_id_by_name(self, container_id, name):
         raise NotImplementedError
 
-    async def get_child_by_name(self, container_id, name, get_lock=True):
+    async def get_child_by_name(self, container_id, name):
         child_id = await self.get_child_id_by_name(container_id, name)
         if child_id:
-            return await self.get(child_id, get_lock)
+            return await self.get(child_id)
 
     # atomic operations
     # @abc.abstractmethod
@@ -178,8 +137,8 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     # @abc.abstractmethod
-    async def put_external(self, ext_id, stream):
-        raise NotImplementedError
+    # async def put_external(self, ext_id, stream):
+    #     raise NotImplementedError
 
     # @abc.abstractmethod
     async def delete_external(self, ext_id):

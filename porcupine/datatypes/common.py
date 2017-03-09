@@ -56,7 +56,8 @@ class List(DataType):
     safe_type = list
 
     def __init__(self, default=None, **kwargs):
-        default = default or []
+        if default is None and not kwargs.get('allow_none'):
+            default = []
         super(List, self).__init__(default, **kwargs)
 
     def __get__(self, instance, owner):
@@ -73,7 +74,7 @@ class Dictionary(DataType):
     safe_type = dict
 
     def __init__(self, default=None, **kwargs):
-        if default is None:
+        if default is None and not kwargs.get('allow_none'):
             default = {}
         super(Dictionary, self).__init__(default, **kwargs)
 

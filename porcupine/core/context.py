@@ -1,3 +1,4 @@
+import pylru
 from functools import wraps
 from .aiolocals.local import Local, Context
 
@@ -23,6 +24,15 @@ class PContext(Local):
         except AttributeError:
             return False
 
+    @property
+    def cache(self):
+        try:
+            return self.__cache__
+        except AttributeError:
+            lru_cache = pylru.lrucache(1000)
+            self.__setattr__('__cache__', lru_cache)
+            return lru_cache
+
 context = PContext()
 
 
@@ -45,3 +55,25 @@ def with_context(co_routine):
             return await co_routine(*args, **kwargs)
 
     return context_wrapper
+
+
+def context_cacheable(co_routine):
+    """
+    Caches the result of a coroutine in the context scope
+    :return: asyncio.Task
+    """
+    @wraps(co_routine)
+    async def cache_wrapper(*args):
+        cache_key = (
+            '{0}.{1}'.format(co_routine.__module__,
+                             co_routine.__qualname__),
+            args)
+        # print('CACHE KEY', cache_key)
+        if cache_key in context.cache:
+            # print('CACHE HIT')
+            return context.cache[cache_key]
+        result = await co_routine(*args)
+        context.cache[cache_key] = result
+        return result
+
+    return cache_wrapper

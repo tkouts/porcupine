@@ -27,7 +27,13 @@ class App(Blueprint):
 
     async def before_start(self, app, loop):
         if self.db_blueprint is not None:
-            await self.__initialize_db()
+            app_class_dir = os.path.abspath(
+                os.path.dirname(
+                    sys.modules[self.__class__.__module__].__file__))
+            blueprint_file = os.path.join(app_class_dir, self.db_blueprint)
+            with open(blueprint_file, encoding='utf-8') as f:
+                db_blueprint = yaml.load(f.read())
+            await self.__initialize_db(db_blueprint)
 
     def after_start(self, app, loop):
         pass
@@ -40,22 +46,15 @@ class App(Blueprint):
 
     @with_context
     @transactional()
-    async def __initialize_db(self):
+    async def __initialize_db(self, blueprint):
         from porcupine.schema.system.users import SystemUser
         context.user = SystemUser()
-        app_class_dir = os.path.abspath(
-            os.path.dirname(
-                sys.modules[self.__class__.__module__].__file__))
-        blueprint_file = os.path.join(app_class_dir, self.db_blueprint)
-        with open(blueprint_file, encoding='utf-8') as f:
-            db_blueprint = yaml.load(f.read())
-        for item in db_blueprint.get('items', []):
+        for item in blueprint.get('items', []):
             await self.__process_item(item, None)
 
     async def __process_item(self, item_dict, parent):
-        # print(item_dict['type'], context.data)
         item_id = item_dict.pop('id')
-        item = await db.get_item(item_id)
+        item = await db.connector.get(item_id)
         if item is None:
             item = system.get_rto_by_name(item_dict.pop('type'))()
             item.id = item_id
@@ -66,8 +65,8 @@ class App(Blueprint):
                 setattr(item, attr, value)
 
         if item.__is_new__:
-            item.append_to(parent)
+            await item.append_to(parent)
 
         for child_dict in children:
             await self.__process_item(child_dict, item)
-        print(item, item.__snapshot__)
+        # print(item, item.__snapshot__)

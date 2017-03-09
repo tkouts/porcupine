@@ -23,13 +23,13 @@ class Atomic(DataType):
             return self
         value = db._db.get_atomic(instance.id, self.name)
         if value is None:
-            return self.default
+            return self._default
         else:
             return value
 
     # @db.requires_transactional_context
     def __set__(self, instance, value):
-        if value != self.default:
+        if value != self._default:
             db._db.set_atomic(instance.id, self.name, value)
 
     def clone(self, instance, memo):

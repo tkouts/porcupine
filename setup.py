@@ -28,7 +28,7 @@ setup(
     scripts=['bin/porcupine'],
     platforms='any',
     install_requires=[
-        'sanic>=0.3.0',
+        'sanic>=0.4.1',
         'couchbase>=2.2.1',
         'PyYAML>=3.12',
     ],

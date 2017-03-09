@@ -1,210 +1,115 @@
 # import logging
-import inspect
+import asyncio
+from collections import defaultdict
 from porcupine import exceptions
-# from couchbase.items import Item, ItemOptionDict
-# from couchbase.exceptions import TemporaryFailError, NotFoundError
+import couchbase
+# from couchbase.exceptions import KeyExistsError
+import couchbase.subdocument as sub_doc
 from porcupine.core.db.transaction import AbstractTransaction
-# from porcupine.core.schema.elastic import Elastic
-
-
-class Result(object):
-    def __init__(self, value=None, cas=0):
-        self.value = value
-        self.cas = cas
-        self.is_modified = False
-        self.is_removed = False
 
 
 class Transaction(AbstractTransaction):
-    # lock_ttl = 20
+    UPSERT_MUT = 0
 
     def __init__(self, connector, **options):
         super().__init__(connector, **options)
         self._inserted = {}
         self._externals = {}
         self._deleted = {}
-        self._mutated = {}
-        # self._locks = {}
-        # self._atomic = {}
-        # self._incr = {}
+        self._modified = {}
+        # sub document mutations
+        self._sd = defaultdict(dict)
+        self._appends = defaultdict(str)
         self.done = False
 
-    # def _get_update(self, oid):
-    #     update = self._locks[oid]
-    #     if update.is_removed:
-    #         return Result()
-    #     else:
-    #         return update
+    def __contains__(self, key):
+        return key in self._inserted or key in self._modified \
+               or key in self._deleted or key in self._externals
 
-    # def get(self, object_id):
-    #     if object_id in self._locks:
-    #         return self._get_update(object_id)
-    #     try:
-    #         rv = self.connector.bucket.lock(object_id, ttl=self.lock_ttl)
-    #     except NotFoundError:
-    #         # new item
-    #         return Result()
-    #     except TemporaryFailError:
-    #         logging.warning('Failed to get lock for object %s' % object_id)
-    #         raise exceptions.DBRetryTransaction
-    #
-    #     self._locks[object_id] = Result(value=rv.value, cas=rv.cas)
-    #     return rv
-    #
-    # def get_multi(self, object_ids):
-    #     multi = {}
-    #     for oid in object_ids:
-    #         if oid in self._locks:
-    #             multi[oid] = self._get_update(oid)
-    #     # multi lock
-    #     for_lock = [oid for oid in object_ids if oid not in multi]
-    #     if for_lock:
-    #         try:
-    #             multi_result = self.connector.bucket.lock_multi(
-    #                 for_lock, ttl=self.lock_ttl)
-    #         except TemporaryFailError:
-    #             logging.warning('Failed to get lock for objects: {}'.format(
-    #                 ', '.join(object_ids)))
-    #             raise exceptions.DBRetryTransaction
-    #         for oid in multi_result:
-    #             multi[oid] = multi_result[oid]
-    #             self._locks[oid] = Result(
-    #                 value=multi_result[oid].value,
-    #                 cas=multi_result[oid].cas
-    #             )
-    #     return multi
+    def __getitem__(self, key):
+        if key in self._deleted:
+            return None
+        elif key in self._modified:
+            return self._modified[key]
+        elif key in self._inserted:
+            return self._inserted[key]
+        elif key in self._externals:
+            return self._externals[key]
+        raise KeyError
 
-    # def mark_parent_as_stale(self, item):
-    #     if item['_pid'] is not None:
-    #         atomic_key = '{}_stale'.format(item['_pid'])
-    #         result = self._atomic.setdefault(atomic_key, Result(value=1))
-    #         result.is_modified = True
-    #
-    # def remove_stale_doc(self, item):
-    #     atomic_key = '{}_stale'.format(item['_id'])
-    #     result = self._atomic.setdefault(atomic_key, Result())
-    #     result.is_removed = True
-
-    def insert(self, key, item):
-        if key in self._inserted:
+    def insert(self, item):
+        if item.id in self._inserted:
             raise exceptions.DBAlreadyExists
-        self._inserted[key] = item
+        self._inserted[item.id] = item
 
     def update(self, item):
-        self._mutated[item.id] = item
-        # is_new = False
-        # if object_id is None:
-        #     object_id = item['_id'] or self.connector.root_id
-        # if object_id in self._locks:
-        #     # it is a locked item
-        #     self._locks[object_id].value = item
-        # else:
-        #     # it is a new item
-        #     # we need to make sure it is locked
-        #     r = self.get(object_id)
-        #     if r.cas:
-        #         self._locks[object_id].value = item
-        #     else:
-        #         # first time insert
-        #         is_new = True
-        #         self._locks[object_id] = Result(value=item)
-        # self._locks[object_id].is_modified = True
-        # self._locks[object_id].is_removed = False
-        # if '_owner' in item:
-        #     self.mark_parent_as_stale(item)
-        # return is_new
+        self._modified[item.id] = item
 
-    def put_external(self, ext_id, value):
-        self._externals[ext_id] = value
+    def mutate(self, item, path, mutation_type, value):
+        self._sd[item.id][path] = (mutation_type, value)
 
-    def delete(self, item, object_id=None):
-        if object_id is None:
-            object_id = item['_id']
-        if object_id not in self._locks:
-            # we need to lock
-            r = self.get(object_id)
-            if r.cas:
-                self._locks[object_id].is_removed = True
-                # set stale doc
-                if '_owner' in item:
-                    self.mark_parent_as_stale(item)
-                    # delete stale value
-                    if item['is_collection']:
-                        self.remove_stale_doc(item)
-            else:
-                # it is new or already deleted
-                del self._locks[object_id]
-        else:
-            self._locks[object_id].is_removed = True
-            if self._locks[object_id].cas == 0:
-                del self._locks[object_id]
-            elif '_owner' in item:
-                self.mark_parent_as_stale(item)
-                # delete stale value
-                if item['is_collection']:
-                    self.remove_stale_doc(item)
+    def append(self, key, value):
+        self._appends[key] += value
 
-    # atomic operations
-    # def get_atomic(self, atomic_id):
-    #     if atomic_id in self._atomic:
-    #         return self._atomic[atomic_id].value
-    #
-    #     value = self.connector.get(atomic_id)
-    #     if value is not None:
-    #         self._atomic[atomic_id] = Result(value=value)
-    #
-    #     if atomic_id in self._incr:
-    #         # fallback to default
-    #         value = value or self._incr[atomic_id][1]
-    #         # add delta increments
-    #         value += self._incr[atomic_id][0]
-    #
-    #     return value
-    #
-    # def set_atomic(self, atomic_id, value):
-    #     self._atomic[atomic_id] = Result(value=value)
-    #     self._atomic[atomic_id].is_modified = True
-    #     self._atomic[atomic_id].is_removed = False
-    #
-    # def delete_atomic(self, atomic_id):
-    #     if atomic_id not in self._atomic:
-    #         self._atomic[atomic_id] = Result()
-    #     self._atomic[atomic_id].is_removed = True
-    #
-    # def increment(self, atomic_id, amount, default):
-    #     if atomic_id in self._incr:
-    #         self._incr[atomic_id][0] += amount
+    def put_external(self, key, value):
+        self._externals[key] = value
+
+    # def delete(self, item, object_id=None):
+    #     if object_id is None:
+    #         object_id = item['_id']
+    #     if object_id not in self._locks:
+    #         # we need to lock
+    #         r = self.get(object_id)
+    #         if r.cas:
+    #             self._locks[object_id].is_removed = True
+    #             # set stale doc
+    #             if '_owner' in item:
+    #                 self.mark_parent_as_stale(item)
+    #                 # delete stale value
+    #                 if item['is_collection']:
+    #                     self.remove_stale_doc(item)
+    #         else:
+    #             # it is new or already deleted
+    #             del self._locks[object_id]
     #     else:
-    #         self._incr[atomic_id] = [amount, default]
-
-    # scopes
-    # @staticmethod
-    # def in_scope(scope, item_dict):
-    #     if scope.startswith('.'):
-    #         return scope[1:] in item_dict.get('_pids', [])
-    #     else:
-    #         return scope == item_dict.get('_pid')
-    #
-    # def get_scope(self, scope_id):
-    #     return {k: v for k, v in self._locks.items()
-    #             if type(v.value) == dict
-    #             and self.in_scope(scope_id, v.value) and not v.cas}
+    #         self._locks[object_id].is_removed = True
+    #         if self._locks[object_id].cas == 0:
+    #             del self._locks[object_id]
+    #         elif '_owner' in item:
+    #             self.mark_parent_as_stale(item)
+    #             # delete stale value
+    #             if item['is_collection']:
+    #                 self.remove_stale_doc(item)
 
     async def prepare(self):
         # call changed attributes event handlers
-        for item in self._inserted.values():
+        for item in {**self._inserted, **self._modified}.values():
             for attr, old_value in item.__snapshot__.items():
                 attr_def = item.__schema__[attr]
                 on_change = attr_def.on_change(
                     item, getattr(item, attr_def.storage)[attr], old_value)
-                if inspect.iscoroutine(on_change):
+                if asyncio.iscoroutine(on_change):
                     await on_change
 
-        dumps = self.connector.persist.dumps
+        connector = self.connector
+        dumps = connector.persist.dumps
+
+        # upsertions
         upsertions = {k: dumps(i) for k, i in self._inserted.items()}
         # merge externals
         upsertions.update(self._externals)
-        return upsertions
+
+        # insertions
+        insertions = {}
+        if self._appends:
+            # make sure externals with appends are initialized
+            append_keys = self._appends.keys()
+            tasks = [connector.exists(key) for key in append_keys]
+            completed, _ = await asyncio.wait(tasks)
+            keys_exist = [c.result for c in completed]
+            insertions = {k: '' for k, v in zip(append_keys, keys_exist)
+                          if not v}
+        return insertions, upsertions
 
     async def commit(self):
         """
@@ -212,60 +117,38 @@ class Transaction(AbstractTransaction):
 
         @return: None
         """
+        insertions, upsertions = await self.prepare()
+        bucket = self.connector.bucket
 
-        # import pprint
-        # locks = {k: v.value for k, v in self._locks.items()}
-        # pprint.pprint(locks)
-
-        upsertions = await self.prepare()
         if not self.done:
+            tasks = []
+            # insertions
+            if insertions:
+                tasks.append(bucket.insert_multi(insertions,
+                                                 format=couchbase.FMT_UTF8))
+            # upsertions
             if upsertions:
-                self.connector.bucket.upsert_multi(upsertions)
-            # context.data['stale'] = False
-            # context.data['__cache'] = {}
-            # add new, update existing and remove deleted
-            # update_items = ItemOptionDict()
-            # removed_items = ItemOptionDict()
-            # unlocks = {}
-            # # print 'locks:', len(self._locks)
-            # for k, v in self._locks.items():
-            #     item = Item(k, v.value)
-            #     item.cas = v.cas
-            #     if v.is_removed:
-            #         if v.cas != 0:
-            #             removed_items.add(item)
-            #     else:
-            #         if v.is_modified:
-            #             update_items.add(item)
-            #         else:
-            #             unlocks[k] = v.cas
-            # if unlocks:
-            #     # print 'UNLOCKING: ', unlocks
-            #     try:
-            #         self.connector.bucket.unlock_multi(unlocks)
-            #     except TemporaryFailError:
-            #         pass
-            #
-            # # add atomic updates
-            # for object_id, item in self._atomic.items():
-            #     if item.is_removed:
-            #         removed_items.add(Item(object_id))
-            #     elif item.is_modified:
-            #         update_items.add(Item(object_id, item.value))
-            #
-            # # update docs
-            # if len(update_items) > 0:
-            #     # print 'UPDATING: %d' % len(update_items)
-            #     self.connector.bucket.set_multi(update_items)
-            # # execute deltas
-            # for atomic_id, amount in self._incr.items():
-            #     # print atomic_id, amount
-            #     self.connector.bucket.incr(atomic_id, amount[0],
-            #                                initial=sum(amount))
-            # # remove deleted
-            # if len(removed_items) > 0:
-            #     self.connector.bucket.delete_multi(removed_items, quiet=True)
-            #
+                tasks.append(bucket.upsert_multi(upsertions,
+                                                 format=couchbase.FMT_AUTO))
+            # sub document mutations
+            for item_id, paths in self._sd.items():
+                mutations = []
+                for path, mutation in paths.items():
+                    mutation_type, value = mutation
+                    if mutation_type == self.UPSERT_MUT:
+                        mutations.append(sub_doc.upsert(path, value))
+                tasks.append(bucket.mutate_in(item_id, *mutations))
+            # appends
+            if self._appends:
+                tasks.append(bucket.append_multi(self._appends))
+
+            if tasks:
+                completed, _ = await asyncio.wait(tasks)
+                errors = [task.exception() for task in tasks]
+                if any(errors):
+                    # TODO: log errors
+                    pass
+
             self.done = True
             super().commit()
 
@@ -276,16 +159,5 @@ class Transaction(AbstractTransaction):
         @return: None
         """
         if not self.done:
-            # if 'stale' in context.data:
-            #     del context.data['stale']
-            # unlocks = {k: v.cas for k, v in self._locks.items() if v.cas}
-            # if unlocks:
-            #     try:
-            #         self.connector.bucket.unlock_multi(unlocks)
-            #     except TemporaryFailError:
-            #         pass
-            # self._locks = {}
-            # self._atomic = {}
-            # self._incr = {}
-            # self.done = True
+            self.done = True
             super().abort()

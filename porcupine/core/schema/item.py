@@ -1,9 +1,10 @@
 import datetime
 
 from porcupine import context, exceptions, db
-from porcupine.datatypes import String, DateTime, List, Boolean, Dictionary
+from porcupine.datatypes import String, DateTime, Boolean, Dictionary
 from porcupine.core.context import system_override
 from porcupine.utils import permissions
+from porcupine.utils.system import resolve_acl, resolve_deleted
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable
 
@@ -35,31 +36,29 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     is_collection = False
 
     # system attributes
-    # p_ids = List(readonly=True)
     created = DateTime(readonly=True)
     owner = String(required=True, readonly=True)
     modified_by = String(required=True, readonly=True)
-    is_system = Boolean(readonly=True)
+    sys = Boolean(readonly=True)
     modified = DateTime(required=True, readonly=True)
 
     name = String(required=True)
     description = String()
-    security = Dictionary()
-    inherit_roles = Boolean(True)
+    acl = Dictionary(allow_none=True, default=None)
 
-    def _apply_security(self, parent, is_new, get_children=True):
-        if parent is not None and self.inherit_roles:
-            self.security = parent.security
-        # db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-        # if get_children and self.is_collection and self.children_count and not is_new:
-        #     cursor = db._db.get_children(self._id, deep=db_supports_deep_indexing)
-        #     cursor.enforce_permissions = False
-        #     for child in cursor:
-        #         child._apply_security(self, is_new, get_children=not db_supports_deep_indexing)
-        #         db._db.put_item(child)
-        #     cursor.close()
+    @property
+    def is_deleted(self):
+        return resolve_deleted(self)
 
-    def append_to(self, parent):
+    @property
+    def applied_acl(self):
+        return resolve_acl(self)
+
+    @property
+    def is_system(self):
+        return self.sys
+
+    async def append_to(self, parent):
         """
         Adds the item to the specified container.
 
@@ -74,8 +73,8 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
 
         if parent is not None:
             if isinstance(parent, str):
-                parent = db.connector.get(parent)
-            security = parent.security
+                parent = await db.connector.get(parent)
+            security = await parent.applied_acl
         else:
             # add as root
             security = {}
@@ -83,27 +82,27 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         content_class = self.content_class
 
         user = context.user
-        user_role = permissions.resolve(security, user)
+        user_role = await permissions.resolve(security, user)
         if user_role == permissions.READER:
             raise exceptions.PermissionDenied(
                 'The user does not have write permissions '
                 'on the parent folder.')
         # set security to new item
-        if parent is not None:
-            # if content_class not in parent.containment:
-            #     raise exceptions.ContainmentError(
-            #         'The target container does not accept '
-            #         'objects of type\n"%s".' % content_class)
-
-            if user_role == permissions.COORDINATOR:
-                # user is COORDINATOR
-                self._apply_security(parent, True)
-            else:
-                # user is not COORDINATOR
-                self.inherit_roles = True
-                self.security = parent.security
-        else:
-            self.inherit_roles = False
+        # if parent is not None:
+        #     # if content_class not in parent.containment:
+        #     #     raise exceptions.ContainmentError(
+        #     #         'The target container does not accept '
+        #     #         'objects of type\n"%s".' % content_class)
+        #
+        #     if user_role == permissions.COORDINATOR:
+        #         # user is COORDINATOR
+        #         self._apply_security(parent, True)
+        #     else:
+        #         # user is not COORDINATOR
+        #         self.inherit_roles = True
+        #         self.security = parent.security
+        # else:
+        #     self.inherit_roles = False
 
         self.owner = user.id
         self.created = self.modified = \
@@ -114,7 +113,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         # self.p_ids = parent.p_ids + [parent.id]
 
         # db._db.handle_update(self, None)
-        db.connector.insert(self)
+        context.txn.insert(self)
         if parent is not None:
             with system_override():
                 parent.children.add(self.id)

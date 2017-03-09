@@ -1,4 +1,4 @@
-from porcupine import db
+from porcupine import db, context
 from .external import Text, Blob
 
 
@@ -7,16 +7,21 @@ class Collection:
         self._descriptor = descriptor
         self._instance = instance
 
+    @property
+    def key(self):
+        return '{0}_{1}'.format(self._instance.id, self._descriptor.name)
+
     async def get(self):
         storage = getattr(self._instance, self._descriptor.storage)
         name = self._descriptor.name
         if name not in storage:
             # build set
             uniques = {}
-            if not self._instance.__is_new__:
-                value = await Blob.fetch(self._descriptor, self._instance)
-                if value:
-                    for oid in value.split(' '):
+            # if not self._instance.__is_new__:
+            value = await Blob.fetch(self._descriptor, self._instance)
+            if value:
+                for oid in value.split(' '):
+                    if oid:
                         if oid.startswith('-'):
                             key = oid[1:]
                             if key in uniques:
@@ -26,7 +31,7 @@ class Collection:
             storage[name] = list(uniques.keys())
         return tuple(storage[name])
 
-    async def set(self, value):
+    async def reset(self, value):
         self._descriptor.validate_value(value, self._instance)
         await self._descriptor.snapshot(self._instance, value)
         getattr(self._instance, self._descriptor.storage)[
@@ -40,14 +45,19 @@ class Collection:
             storage = getattr(self._instance, self._descriptor.storage)
             name = self._descriptor.name
             Blob.snapshot(self._descriptor, self._instance, None)
-            storage.setdefault(name, []).append(item_id)
+            storage[name].append(item_id)
+        else:
+            context.txn.append(self.key, ' {0}'.format(item_id))
 
     def remove(self, item_id):
         if self._instance.__is_new__:
             storage = getattr(self._instance, self._descriptor.storage)
             name = self._descriptor.name
+            # add snapshot to trigger on_change
             Blob.snapshot(self._descriptor, self._instance, None)
-            storage.setdefault(name, []).remove(item_id)
+            storage[name].remove(item_id)
+        else:
+            context.txn.append(self.key, ' -{0}'.format(item_id))
 
 
 class ItemCollection(Text):
@@ -65,7 +75,7 @@ class ItemCollection(Text):
     def __set__(self, instance, value):
         raise TypeError(
             'ItemCollection attributes do not support direct assignment. '
-            'Use the "set" method instead.')
+            'Use the "reset" method instead.')
 
     async def snapshot(self, instance, value):
         if self.name not in instance.__snapshot__:
@@ -74,6 +84,6 @@ class ItemCollection(Text):
                 instance.__snapshot__[self.name] = previous_value
 
     async def on_change(self, instance, value, old_value):
-        print('onchange', value, old_value)
-        if instance.__is_new__:
+        # print('onchange', value, old_value)
+        if instance.__is_new__ and value:
             super().on_change(instance, ' '.join(value), None)

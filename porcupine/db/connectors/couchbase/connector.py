@@ -1,6 +1,9 @@
 import random
+import ujson
+from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
+    SubdocPathNotFoundError
 import couchbase.experimental
-from porcupine import context
+# from porcupine import context
 from porcupine.core.db.connector import AbstractConnector
 # from porcupine.exceptions import DBConnectionError
 from .transaction import Transaction
@@ -8,6 +11,9 @@ from .cursor import Cursor
 
 couchbase.experimental.enable()
 from acouchbase.bucket import Bucket
+
+
+couchbase.set_json_converters(ujson.dumps, ujson.loads)
 
 
 class Couchbase(AbstractConnector):
@@ -35,22 +41,26 @@ class Couchbase(AbstractConnector):
         connection_string = '{}://{}/{}'.format(self.protocol,
                                                 ','.join(hosts),
                                                 self.bucket_name)
-        # try:
         self.bucket = Bucket(connection_string,
                              password=self.password)
         await self.bucket.connect()
-        # except (CouchbaseTransientError, CouchbaseNetworkError):
-        #     raise DBConnectionError
 
-    async def get_raw(self, key, get_lock):
+    async def exists(self, key):
+        try:
+            await self.bucket.retrieve_in(key, 'sys')
+        except NotFoundError:
+            return False
+        except (DocumentNotJsonError, SubdocPathNotFoundError):
+            pass
+        return True
+
+    async def get_raw(self, key):
         result = await self.bucket.get(key, quiet=True)
         return result.value
 
-    def insert_raw(self, key, value):
-        context.txn.insert(key, value)
-
-    def put_external(self, ext_id, value):
-        context.txn.put_external(ext_id, value)
+    async def get_partial_raw(self, key, *paths):
+        values = await self.bucket.retrieve_in(key, *paths)
+        return dict(zip(paths, values))
 
     async def close(self):
         pass

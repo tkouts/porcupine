@@ -6,7 +6,7 @@ import os.path
 import shutil
 # import io
 
-from porcupine import db
+from porcupine import db, context
 from .common import String
 from .datatype import DataType
 
@@ -55,8 +55,8 @@ class Blob(DataType):
         if name not in storage:
             value = await db.connector.get_external('{0}_{1}'.format(
                 instance.id, name))
-            # TODO: return default
-            storage[name] = value
+            if value is not None:
+                storage[name] = value
         return storage[name]
 
     def __get__(self, instance, owner):
@@ -72,12 +72,13 @@ class Blob(DataType):
         pass
 
     def on_change(self, instance, value, old_value):
-        db.connector.put_external(
-            '{0}_{1}'.format(instance.id, self.name), value)
+        if value is not None:
+            context.txn.put_external(
+                '{0}_{1}'.format(instance.id, self.name), value)
 
     def on_delete(self, instance, value, is_permanent):
         if is_permanent:
-            db.connector.delete_external(
+            context.txn.delete_external(
                 '{0}_{1}'.format(instance.id, self.name))
 
 
