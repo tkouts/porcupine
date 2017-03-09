@@ -1,6 +1,7 @@
-import time
+import datetime
 
 from porcupine import db, context
+from porcupine.core.context import system_override
 from porcupine.core.schema.item import GenericItem
 from porcupine.datatypes import RelatorN
 from porcupine.utils import permissions
@@ -21,43 +22,46 @@ class Item(GenericItem):
     )
 
     # @db.requires_transactional_context
-    def update(self) -> None:
+    async def update(self) -> None:
         """
         Updates the item.
 
         @return: None
         """
-        # old_item = db._db.get_item(self._id)
-        security = self.__snapshot__.get('security', self.security)
-        if self.p_id is not None:
-            parent = db.connector.get(self.p_id)
-        else:
-            parent = None
-
-        user = context.user
-        user_role = permissions.resolve(security, user)
-
-        if user_role > permissions.READER:
-            # set security
-            if user_role == permissions.COORDINATOR:
-                # user is COORDINATOR
-                if (self.inherit_roles != old_item.inherit_roles) or \
-                        (not self.inherit_roles and
-                         self.security != old_item.security):
-                    self._apply_security(parent, False)
+        if self.__snapshot__:
+            security = await self.applied_acl
+            if self.p_id is not None:
+                parent = await db.connector.get(self.p_id)
             else:
-                # restore previous ACL
-                self.security = old_item.security
-                self.inherit_roles = old_item.inherit_roles
+                parent = None
 
-            self.modified_by = user.name
-            self.modified = time.time()
+            user = context.user
+            user_role = await permissions.resolve(security, user)
 
-            db._db.handle_update(self, old_item)
-            db._db.put_item(self)
-            if parent is not None:
-                parent.modified = self.modified
-            db._db.handle_post_update(self, old_item)
-        else:
-            raise exceptions.PermissionDenied(
-                'The user does not have update permissions.')
+            if user_role > permissions.READER:
+                # set security
+                # if user_role == permissions.COORDINATOR:
+                #     # user is COORDINATOR
+                #     if (self.inherit_roles != old_item.inherit_roles) or \
+                #             (not self.inherit_roles and
+                #              self.security != old_item.security):
+                #         self._apply_security(parent, False)
+                # else:
+                #     # restore previous ACL
+                #     self.security = old_item.security
+                #     self.inherit_roles = old_item.inherit_roles
+
+                with system_override():
+                    self.modified_by = user.name
+                    self.modified = datetime.datetime.utcnow().isoformat()
+
+                    # db._db.handle_update(self, old_item)
+                    # db._db.put_item(self)
+                    context.txn.update(self)
+                    if parent is not None:
+                        parent.modified = self.modified
+                        context.txn.update(parent)
+                    # db._db.handle_post_update(self, old_item)
+            else:
+                raise exceptions.PermissionDenied(
+                    'The user does not have update permissions.')

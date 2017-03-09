@@ -66,6 +66,8 @@ class App(Blueprint):
 
         if item.__is_new__:
             await item.append_to(parent)
+        else:
+            await item.update()
 
         for child_dict in children:
             await self.__process_item(child_dict, item)
