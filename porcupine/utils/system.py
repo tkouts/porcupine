@@ -78,19 +78,17 @@ async def get_item_state(item_id):
         item_id, 'p_id', 'acl', 'deleted', snapshot=True)
 
 
-async def resolve_deleted(item):
-    if item.deleted or item.p_id is None:
-        return item.deleted
-    parent_state = await get_item_state(item.p_id)
-    while not parent_state['deleted'] and parent_state['p_id'] is not None:
-        parent_state = await get_item_state(parent_state['p_id'])
-    return parent_state['deleted']
+@context_cacheable
+async def resolve_deleted(object_id):
+    state = await get_item_state(object_id)
+    while not state['deleted'] and state['p_id'] is not None:
+        state = await get_item_state(state['p_id'])
+    return state['deleted']
 
 
-async def resolve_acl(item):
-    if item.acl is not None or item.p_id is None:
-        return item.acl
-    parent_state = await get_item_state(item.p_id)
-    while parent_state['acl'] is None and parent_state['p_id'] is not None:
-        parent_state = await get_item_state(parent_state['p_id'])
-    return parent_state['acl']
+@context_cacheable
+async def resolve_acl(object_id):
+    state = await get_item_state(object_id)
+    while state['acl'] is None and state['p_id'] is not None:
+        state = await get_item_state(state['p_id'])
+    return state['acl']

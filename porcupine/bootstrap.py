@@ -102,7 +102,7 @@ def run():
 
     # override settings values
     for arg in ('host', 'port', 'workers'):
-        override = hasattr(args, arg) and getattr(args, arg)
+        override = getattr(args, arg, None)
         if override:
             settings[arg] = override
 

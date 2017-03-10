@@ -1,4 +1,5 @@
 import datetime
+import asyncio
 
 from porcupine import context, exceptions, db
 from porcupine.datatypes import String, DateTime, Boolean, Dictionary
@@ -48,11 +49,19 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
 
     @property
     def is_deleted(self):
-        return resolve_deleted(self)
+        if self.deleted or self.p_id is None:
+            future = asyncio.Future()
+            future.set_result(self.deleted)
+            return future
+        return resolve_deleted(self.p_id)
 
     @property
     def applied_acl(self):
-        return resolve_acl(self)
+        if self.acl is not None or self.p_id is None:
+            future = asyncio.Future()
+            future.set_result(self.acl)
+            return future
+        return resolve_acl(self.p_id)
 
     @property
     def is_system(self):
@@ -87,6 +96,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
             raise exceptions.PermissionDenied(
                 'The user does not have write permissions '
                 'on the parent folder.')
+
         # set security to new item
         # if parent is not None:
         #     # if content_class not in parent.containment:

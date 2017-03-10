@@ -68,9 +68,9 @@ def context_cacheable(co_routine):
             '{0}.{1}'.format(co_routine.__module__,
                              co_routine.__qualname__),
             args)
-        # print('CACHE KEY', cache_key)
+        print('CACHE KEY', cache_key)
         if cache_key in context.cache:
-            # print('CACHE HIT')
+            print('CACHE HIT')
             return context.cache[cache_key]
         result = await co_routine(*args)
         context.cache[cache_key] = result

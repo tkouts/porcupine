@@ -1,3 +1,4 @@
+import time
 import asyncio
 import copy
 from functools import wraps
@@ -50,7 +51,6 @@ def transactional(auto_commit=True):
         async def transactional_wrapper(*args, **kwargs):
             if context.txn is None:
                 # top level function
-                import time
                 now = time.time()
                 retries = 0
                 max_retries = connector.TransactionType.txn_max_retries
@@ -59,7 +59,6 @@ def transactional(auto_commit=True):
                 try:
                     while retries < max_retries:
                         # print('trying.... %d' % retries)
-                        # response_ended_exception = None
                         try:
                             args_copy = copy.deepcopy(args)
                             keyword_args_copy = copy.deepcopy(kwargs)
@@ -69,32 +68,21 @@ def transactional(auto_commit=True):
                                 if sleep_time > max_sleep_time:
                                     sleep_time = max_sleep_time + \
                                                  (retries * min_sleep_time)
-                            # try:
                             val = await function(*args_copy,
                                                  **keyword_args_copy)
-                            # except exceptions.ResponseEnd
-                            # as response_ended_exception:
-                            #     pass
-                            # print(context.txn)
                             if auto_commit:
                                 await context.txn.commit()
                             else:
                                 # abort if not committed
                                 await context.txn.abort()
-                            # if response_ended_exception is not None:
-                            #     raise response_ended_exception
                             print('TXN time', time.time() - now)
                             return val
                         except exceptions.DBDeadlockError:
                             await context.txn.abort()
                             retries += 1
                         except:
-                            # abort and raise error
-                            # try:
                             await context.txn.abort()
                             raise
-                            # finally:
-                            #     raise
                     # maximum retries exceeded
                     raise exceptions.DBDeadlockError
                 finally:

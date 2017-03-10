@@ -13,7 +13,7 @@ default_settings = {
             ('name', True, False),
             ('is_collection', False, True),
         ),
-        'type': 'porcupine.db.connectors.Couchbase',
+        'type': 'porcupine.connectors.Couchbase',
         'hosts': ['localhost'],
         # 'protocol': 'couchbase',
         'bucket': 'porcupine',
