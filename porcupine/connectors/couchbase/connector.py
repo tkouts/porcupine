@@ -3,9 +3,7 @@ import ujson
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
     SubdocPathNotFoundError
 import couchbase.experimental
-# from porcupine import context
 from porcupine.core.db.connector import AbstractConnector
-# from porcupine.exceptions import DBConnectionError
 from .transaction import Transaction
 from .cursor import Cursor
 
