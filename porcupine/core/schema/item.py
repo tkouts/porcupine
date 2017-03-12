@@ -77,7 +77,8 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         """
         if self.p_id:
             raise exceptions.DBAlreadyExists(
-                'Object already exists. Use update or move_to instead.')
+                'Object already exists. Use "copy_to" '
+                'or "move_to" methods instead.')
 
         if parent is not None:
             if isinstance(parent, str):
@@ -90,9 +91,9 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         user = context.user
         user_role = await permissions.resolve(security, user)
         if user_role == permissions.READER:
-            raise exceptions.PermissionDenied(
+            raise exceptions.Forbidden(
                 'The user does not have write permissions '
-                'on the parent folder.')
+                'on the parent container.')
 
         self.owner = user.id
         self.created = self.modified = \
@@ -207,5 +208,5 @@ class Item(GenericItem):
                         parent.modified = self.modified
                         context.txn.update(parent)
             else:
-                raise exceptions.PermissionDenied(
+                raise exceptions.Forbidden(
                     'The user does not have update permissions.')

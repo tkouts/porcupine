@@ -1,6 +1,7 @@
 import time
 import copy
 
+from porcupine import exceptions
 from porcupine.datatypes import Embedded, Composition
 from porcupine.utils import system
 from .elastic import Elastic
@@ -195,7 +196,7 @@ class Cloneable(object):
                 target._ni.incr(1)
             target.modified = time.time()
         else:
-            raise exceptions.PermissionDenied(
+            raise exceptions.Forbidden(
                 'The object was not copied.\n'
                 'The user has insufficient permissions.')
 
@@ -295,7 +296,7 @@ class Movable(object):
             if self.is_collection:
                 self._update_pids(path_info)
         else:
-            raise exceptions.PermissionDenied(
+            raise exceptions.Forbidden(
                 'The object was not moved.\n'
                 'The user has insufficient permissions.')
 
@@ -359,7 +360,7 @@ class Removable(object):
             # delete item physically
             self_._delete()
         else:
-            raise exceptions.PermissionDenied(
+            raise exceptions.Forbidden(
                 'The object was not deleted.\n'
                 'The user has insufficient permissions.')
 
@@ -481,6 +482,6 @@ class Removable(object):
             # delete item logically
             self_._recycle()
         else:
-            raise exceptions.PermissionDenied(
+            raise exceptions.Forbidden(
                 'The object was not deleted.\n'
                 'The user has insufficient permissions.')

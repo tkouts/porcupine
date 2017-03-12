@@ -11,7 +11,7 @@ class Acl(Dictionary):
         # print('computed acl is', acl)
         user_role = await permissions.resolve(acl, context.user)
         if user_role < permissions.COORDINATOR:
-            raise exceptions.PermissionDenied(
+            raise exceptions.Forbidden(
                 'The user does not have permissions '
                 'to modify the access control list.')
         super().on_change(instance, value, old_value)
