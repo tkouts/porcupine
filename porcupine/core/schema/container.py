@@ -1,7 +1,7 @@
-from porcupine.core.schema.shortcut import Shortcut
 from porcupine.datatypes import ItemCollection
 from porcupine.core.datatypes.system import Children
 from porcupine.utils import permissions
+from .shortcut import Shortcut
 from .item import Item
 
 

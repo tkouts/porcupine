@@ -4,7 +4,7 @@ indices:
 
 items:
   - id: ROOT
-    type: porcupine.schema.system.RootContainer
+    type: porcupine.apps.schema.root.Root
     name: Root Container
     description: The mother of all
     sys: Yes
@@ -12,27 +12,27 @@ items:
       everyone: 1
     children:
       - id: admintools
-        type: porcupine.schema.system.AdminTools
+        type: porcupine.apps.schema.admintools.AdminTools
         name: Administrative Tools
         sys: Yes
         acl: {}
         children:
           - id: users
-            type: porcupine.schema.system.users.UsersContainer
+            type: porcupine.apps.schema.users.UsersContainer
             name: Users & Groups
             sys: Yes
             children:
               - id: guest
                 name: Guest
                 description: Guest User
-                type: porcupine.schema.system.users.GuestUser
+                type: porcupine.apps.schema.users.GuestUser
                 sys: Yes
               - id: admin
                 name: Administrator
-                type: porcupine.schema.system.users.User
+                type: porcupine.apps.schema.users.User
 
   - id: RB
-    type: porcupine.schema.system.RecycleBin
+    type: porcupine.apps.schema.root.RecycleBin
     name: Recycle Bin
     sys: Yes
     acl: {}

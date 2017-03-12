@@ -1,7 +1,3 @@
-class DBConnectionError(Exception):
-    pass
-
-
 class DBDeadlockError(Exception):
     pass
 

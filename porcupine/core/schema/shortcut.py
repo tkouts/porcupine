@@ -40,7 +40,7 @@ class Shortcut(Item):
 
     # @db.requires_transactional_context
     def append_to(self, parent):
-        if isinstance(parent, (str, bytes)):
+        if isinstance(parent, str):
             parent = db._db.get_item(parent)
 
         content_class = self.get_target_contentclass()

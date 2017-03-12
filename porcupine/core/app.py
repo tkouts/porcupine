@@ -1,11 +1,12 @@
-import os
 import sys
+
+import os
 import yaml
 from sanic import Blueprint
 
 from porcupine import db
-from porcupine.utils import system
 from porcupine.db import transactional
+from porcupine.utils import system
 from .context import context, with_context, system_override
 
 
@@ -47,7 +48,7 @@ class App(Blueprint):
     @with_context
     @transactional()
     async def __initialize_db(self, blueprint):
-        from porcupine.schema.system.users import SystemUser
+        from porcupine.apps.schema.users import SystemUser
         context.user = SystemUser()
         for item in blueprint.get('items', []):
             await self.__process_item(item, None)

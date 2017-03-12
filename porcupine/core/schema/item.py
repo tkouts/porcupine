@@ -126,7 +126,8 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         @return: the parent container object
         @rtype: type
         """
-        return await db.get_item(self.p_id)
+        if self.p_id is not None:
+            return await db.get_item(self.p_id)
 
     def get_ancestor(self, n_levels=1):
         """
