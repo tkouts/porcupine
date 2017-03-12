@@ -2,8 +2,8 @@ import datetime
 import asyncio
 
 from porcupine import context, exceptions, db
-from porcupine.datatypes import String, DateTime, Boolean
-from porcupine.core.datatypes.system import Acl, SchemaSignature
+from porcupine.datatypes import String, DateTime, Boolean, RelatorN
+from porcupine.core.datatypes.system import Acl
 from porcupine.core.context import system_override
 from porcupine.utils import permissions
 from porcupine.utils.system import resolve_acl, resolve_deleted
@@ -20,12 +20,9 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     @type is_collection: bool
     @ivar modified_by: The display name of the last modifier.
     @type modified_by: str
-    @ivar security: The object's security descriptor. This is a dictionary
-                    whose keys are the users' IDs and the values are the roles.
-    @type security: dict
-    @ivar inherit_roles: Indicates if the object's security
-                        descriptor is identical to this of its parent
-    @type inherit_roles: bool
+    :ivar acl: The object's security descriptor. This is a dictionary
+               whose keys are the users' IDs and the values are the roles.
+    @type acl: dict
 
     @ivar modified: The last modification date, handled by the server.
     @type modified: float
@@ -90,31 +87,12 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
             # add as root
             security = {}
 
-        content_class = self.content_class
-
         user = context.user
         user_role = await permissions.resolve(security, user)
         if user_role == permissions.READER:
             raise exceptions.PermissionDenied(
                 'The user does not have write permissions '
                 'on the parent folder.')
-
-        # set security to new item
-        # if parent is not None:
-        #     # if content_class not in parent.containment:
-        #     #     raise exceptions.ContainmentError(
-        #     #         'The target container does not accept '
-        #     #         'objects of type\n"%s".' % content_class)
-        #
-        #     if user_role == permissions.COORDINATOR:
-        #         # user is COORDINATOR
-        #         self._apply_security(parent, True)
-        #     else:
-        #         # user is not COORDINATOR
-        #         self.inherit_roles = True
-        #         self.security = parent.security
-        # else:
-        #     self.inherit_roles = False
 
         self.owner = user.id
         self.created = self.modified = \
@@ -123,7 +101,6 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         if parent is not None:
             self.p_id = parent.id
 
-        # db._db.handle_update(self, None)
         context.txn.insert(self)
         if parent is not None:
             with system_override():
@@ -131,7 +108,6 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
                 if self.is_collection:
                     parent.containers.add(self.id)
                 parent.modified = self.modified
-        # db._db.handle_post_update(self, None)
 
     def is_contained_in(self, item_id: str) -> bool:
         """
@@ -141,28 +117,30 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         @type item_id: str
         @rtype: bool
         """
-        return item_id == self._id or item_id in self._pids
+        return item_id == self.id or item_id in self._pids
 
-    def get_parent(self, get_lock=True):
+    async def get_parent(self):
         """
         Returns the parent container
 
         @return: the parent container object
         @rtype: type
         """
-        return db.get_item(self._pid, get_lock=get_lock)
+        return await db.get_item(self.p_id)
 
-    def get_ancestor(self, n_levels=1, get_lock=True):
+    def get_ancestor(self, n_levels=1):
         """
-        Returns the element that is situated n_levels above the base object in the lookup hierarchy.
+        Returns the element that is situated n_levels above the base object
+        in the hierarchy.
         Raises IndexError if there are not n_levels above the base object.
 
         @return: the requested object
         @rtype: type
         """
-        return db.get_item(self._pids[-n_levels], get_lock=get_lock)
+        # TODO: implement
+        return db.get_item(self._pids[-n_levels])
 
-    def get_all_parents(self):
+    async def get_all_parents(self):
         """
         Returns all the parents of the item traversing the
         hierarchy up to the root folder.
@@ -171,8 +149,8 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         """
         parents = []
         parent = self
-        while parent._pid is not None:
-            parent = parent.get_parent()
+        while parent.p_id is not None:
+            parent = await parent.get_parent()
             if parent is not None:
                 parents.append(parent)
             else:
@@ -181,41 +159,52 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         parents.reverse()
         return ObjectSet(parents)
 
-    # @property
-    # def issystem(self):
-    #     """Indicates if this is a systemic object
-    #
-    #     @rtype: bool
-    #     """
-    #     return self._is_system
-
-    # @property
-    # def owner(self):
-    #     """The object's creator
-    #
-    #     @rtype: type
-    #     """
-    #     return self._owner
-
-    # @property
-    # def created(self):
-    #     """The creation date
-    #
-    #     @rtype: float
-    #     """
-    #     return self._created
-
-    # @property
-    # def parentid(self):
-    #     """The ID of the parent container
-    #
-    #     @rtype: str
-    #     """
-    #     return self._pid
-
-    def full_path(self, include_self=True):
-        parents = db._db.get_multi(self._pids[1:])
+    async def full_path(self, include_self=True):
+        parents = await db.connector.get_multi(self._pids[1:])
         path = '/'.join([p.name for p in parents])
         if include_self and self._pid is not None:
             path = '%s/%s' % (path, self.name)
         return '/%s' % path if not path.startswith('/') else path
+
+
+class Item(GenericItem):
+    """
+    Simple item with update capability.
+
+    Normally, this is the base class of your custom Porcupine Objects.
+    Subclass the L{porcupine.schema.Container} class if you want
+    to create custom containers.
+    """
+    shortcuts = RelatorN(
+        relates_to=('porcupine.schema.Shortcut', ),
+        rel_attr='target',
+        cascade_delete=True,
+    )
+
+    async def update(self) -> None:
+        """
+        Updates the item.
+
+        @return: None
+        """
+        if self.__snapshot__:
+            security = await self.applied_acl
+            if self.p_id is not None:
+                parent = await db.connector.get(self.p_id)
+            else:
+                parent = None
+
+            user = context.user
+            user_role = await permissions.resolve(security, user)
+
+            if user_role > permissions.READER:
+                with system_override():
+                    self.modified_by = user.name
+                    self.modified = datetime.datetime.utcnow().isoformat()
+                    context.txn.update(self)
+                    if parent is not None:
+                        parent.modified = self.modified
+                        context.txn.update(parent)
+            else:
+                raise exceptions.PermissionDenied(
+                    'The user does not have update permissions.')

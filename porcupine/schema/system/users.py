@@ -1,7 +1,7 @@
-from ..item import Item
-from ..container import Container
-from porcupine.datatypes import String, RelatorN, Password, Reference1
 from porcupine.core.datatypes.mutable import Dictionary
+from porcupine.core.schema.container import Container
+from porcupine.datatypes import String, RelatorN, Password, Reference1
+from porcupine.core.schema.item import Item
 
 
 class UsersContainer(Container):

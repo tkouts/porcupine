@@ -4,9 +4,9 @@ Porcupine schema classes
 """
 
 from porcupine.core.schema.composite import Composite
-from .item import Item
-from .container import Container
-from .shortcut import Shortcut
+from porcupine.core.schema.container import Container
+from porcupine.core.schema.item import Item
+from porcupine.core.schema.shortcut import Shortcut
 
 __all__ = [
     'Item',

@@ -1,4 +1,4 @@
-from ..container import Container
+from porcupine.core.schema.container import Container
 
 
 class RootContainer(Container):
