@@ -1,16 +1,16 @@
 """
 Default database object persistence layer
 """
-import marshal
+# import marshal
 from porcupine.utils import system
 
 
 class DefaultPersistence(object):
-    additional = []
+    additional = ()
 
     @staticmethod
     def loads(value):
-        value = marshal.loads(marshal.dumps(value))
+        # value = marshal.loads(marshal.dumps(value))
         content_class = system.get_rto_by_name(value.pop('c/c'))
         item = content_class(storage=value)
         return item

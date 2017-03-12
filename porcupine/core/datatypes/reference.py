@@ -3,7 +3,8 @@ Porcupine reference data types
 ==============================
 """
 from porcupine import db, exceptions
-from .common import String, List
+from .common import String
+from porcupine.core.datatypes.mutable import List
 from .datatype import DataType
 # from porcupine.core.objectSet import ObjectSet
 from porcupine.utils import system

@@ -3,7 +3,7 @@ Porcupine composition data types
 ================================
 """
 from porcupine import db, exceptions
-from .common import List
+from porcupine.core.datatypes.mutable import List
 from .datatype import DataType
 from porcupine.utils import system
 

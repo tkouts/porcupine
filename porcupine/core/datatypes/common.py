@@ -51,34 +51,6 @@ class Boolean(DataType):
         super(Boolean, self).__init__(default, **kwargs)
 
 
-class List(DataType):
-    """List data type"""
-    safe_type = list
-
-    def __init__(self, default=None, **kwargs):
-        if default is None and not kwargs.get('allow_none'):
-            default = []
-        super(List, self).__init__(default, **kwargs)
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        value = super().__get__(instance, owner)
-        if self.readonly:
-            return tuple(value)
-        return value
-
-
-class Dictionary(DataType):
-    """Dictionary data type"""
-    safe_type = dict
-
-    def __init__(self, default=None, **kwargs):
-        if default is None and not kwargs.get('allow_none'):
-            default = {}
-        super(Dictionary, self).__init__(default, **kwargs)
-
-
 class Date(String):
     """Date data type"""
     allow_none = True

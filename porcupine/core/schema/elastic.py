@@ -1,9 +1,26 @@
-from porcupine.datatypes import DataType, Composition, String, Boolean
+from porcupine.datatypes import DataType, Composition, String
+from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.utils import system
 from porcupine.core.context import system_override
 
 
-class Elastic:
+class ElasticMeta(type):
+    def __init__(cls, name, bases, dct):
+        schema = {}
+        for attr_name in dir(cls):
+            try:
+                attr = getattr(cls, attr_name)
+                if isinstance(attr, DataType):
+                    schema[attr_name] = attr
+                    attr.name = attr_name
+            except AttributeError:
+                continue
+        cls.__schema__ = schema
+        cls.__sig__ = system.hash_series(*schema.keys()).hexdigest()
+        super().__init__(name, bases, dct)
+
+
+class Elastic(metaclass=ElasticMeta):
     """
     Base class for all Porcupine objects.
     Accommodates schema updates without requiring database updates.
@@ -20,24 +37,7 @@ class Elastic:
 
     id = String(readonly=True)
     p_id = String(readonly=True, allow_none=True, default=None)
-    deleted = Boolean(readonly=True)
-    sig = String(readonly=True)
-
-    def __new__(cls, storage=None):
-        if not cls.__sig__:
-            schema = {}
-            for attr_name in dir(cls):
-                try:
-                    attr = getattr(cls, attr_name)
-                    if isinstance(attr, DataType):
-                        schema[attr_name] = attr
-                        attr.name = attr_name
-                except AttributeError:
-                    continue
-            cls.__schema__ = schema
-            cls.__sig__ = system.hash_series(*schema.keys()).hexdigest()
-        obj = super(Elastic, cls).__new__(cls)
-        return obj
+    sig = SchemaSignature()
 
     def __init__(self, storage=None):
         if storage is None:
@@ -65,7 +65,7 @@ class Elastic:
         return hash(self.__storage__['id'])
 
     def __repr__(self):
-        return str(self.__storage__)
+        return repr(self.__storage__)
 
     @property
     def parent_id(self):

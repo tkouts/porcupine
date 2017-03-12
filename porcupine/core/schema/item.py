@@ -2,7 +2,8 @@ import datetime
 import asyncio
 
 from porcupine import context, exceptions, db
-from porcupine.datatypes import String, DateTime, Boolean, Dictionary
+from porcupine.datatypes import String, DateTime, Boolean
+from porcupine.core.datatypes.system import Acl, SchemaSignature
 from porcupine.core.context import system_override
 from porcupine.utils import permissions
 from porcupine.utils.system import resolve_acl, resolve_deleted
@@ -42,10 +43,11 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     modified_by = String(required=True, readonly=True)
     sys = Boolean(readonly=True)
     modified = DateTime(required=True, readonly=True)
+    deleted = Boolean(readonly=True)
 
     name = String(required=True)
     description = String()
-    acl = Dictionary(allow_none=True, default=None)
+    acl = Acl(default=None)
 
     @property
     def is_deleted(self):
@@ -120,7 +122,6 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         self.modified_by = user.name
         if parent is not None:
             self.p_id = parent.id
-        # self.p_ids = parent.p_ids + [parent.id]
 
         # db._db.handle_update(self, None)
         context.txn.insert(self)

@@ -1,4 +1,5 @@
 import copy
+import collections
 from porcupine import context
 
 
@@ -57,7 +58,8 @@ class DataType:
 
     def set_default(self, instance):
         value = self._default
-        if isinstance(value, (list, dict)):
+        if isinstance(value, (collections.MutableMapping,
+                              collections.MutableSequence)):
             value = copy.deepcopy(value)
         elif isinstance(value, tuple):
             value = list(value)

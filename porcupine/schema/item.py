@@ -39,18 +39,6 @@ class Item(GenericItem):
             user_role = await permissions.resolve(security, user)
 
             if user_role > permissions.READER:
-                # set security
-                # if user_role == permissions.COORDINATOR:
-                #     # user is COORDINATOR
-                #     if (self.inherit_roles != old_item.inherit_roles) or \
-                #             (not self.inherit_roles and
-                #              self.security != old_item.security):
-                #         self._apply_security(parent, False)
-                # else:
-                #     # restore previous ACL
-                #     self.security = old_item.security
-                #     self.inherit_roles = old_item.inherit_roles
-
                 with system_override():
                     self.modified_by = user.name
                     self.modified = datetime.datetime.utcnow().isoformat()

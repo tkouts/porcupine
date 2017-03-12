@@ -24,13 +24,12 @@ class Composite(Elastic):
     name = String(required=True)
 
     @property
-    def security(self) -> dict:
-        """The object's security descriptor.
-        A proxy to the descriptor of the enclosing object.
+    def applied_acl(self):
+        return system.resolve_acl(self.p_id[1:])
 
-        @rtype: dict
-        """
-        return db._db.get_item(self.p_id[1:]).security
+    @property
+    def is_deleted(self):
+        return system.resolve_deleted(self.p_id[1:])
 
     def clone(self, memo=None):
         """
