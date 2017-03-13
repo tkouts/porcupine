@@ -2,13 +2,12 @@ from porcupine import context, exceptions
 from porcupine.utils import permissions
 from .mutable import Dictionary
 from .common import String
-from .collection import ItemCollection
+from .collection import ItemCollection, Collection
 
 
 class Acl(Dictionary):
     async def on_change(self, instance, value, old_value):
         acl = await instance.applied_acl
-        # print('computed acl is', acl)
         user_role = await permissions.resolve(acl, context.user)
         if user_role < permissions.COORDINATOR:
             raise exceptions.Forbidden(
@@ -22,4 +21,7 @@ class SchemaSignature(String):
 
 
 class Children(ItemCollection):
-    pass
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return Collection(self, instance, instance.containment)

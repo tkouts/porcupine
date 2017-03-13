@@ -6,14 +6,6 @@ from porcupine.datatypes import String, RelatorN, Password, Reference1, \
     Dictionary
 
 
-class UsersContainer(Container):
-    """
-    Users Folder
-    ============
-    This is the container of all users and groups.
-    """
-
-
 class SystemUser(Item):
     """
     System User
@@ -22,16 +14,17 @@ class SystemUser(Item):
     Use this identity for performing actions not initiated by users.
     This user has no security restrictions.
     """
-    # def __init__(self):
-    #     super().__init__()
-    #     self.id = 'system'
-    #     self.name = 'SYSTEM'
-    #     self.description = 'System User'
+    def __init__(self, storage=None):
+        super().__init__(storage)
+        if self.__is_new__:
+            self.id = 'system'
+            self.name = 'SYSTEM'
+            self.description = 'System User'
 
     @staticmethod
     def is_admin():
         """
-        System User is an administative account.
+        System User is an administrative account.
 
         @return: C{True}
         """
@@ -52,7 +45,6 @@ class GenericUser(Item):
     :type policies:
         L{Policies<org.innoscript.desktop.schema.properties.Policies>}
     """
-    full_name = String()
     member_of = RelatorN(
         relates_to=('org.innoscript.desktop.schema.security.Group', ),
         rel_attr='members')
@@ -69,7 +61,7 @@ class GenericUser(Item):
 
         @rtype: bool
         """
-        return group.id in self.memberof
+        return group.id in self.member_of
 
     def is_admin(self):
         """
@@ -77,7 +69,7 @@ class GenericUser(Item):
 
         @rtype: bool
         """
-        return 'administrators' in self.memberof
+        return 'administrators' in self.member_of
 
 
 class GuestUser(GenericUser):
@@ -86,8 +78,8 @@ class GuestUser(GenericUser):
     ==========
     This user instance is assigned by the session manager
     to all newly created sessions.
-    This is configurable. See the C{sessionmanager} section
-    of C{porcupine.conf}.
+    This is configurable. See the C{session_manager} section
+    of C{porcupine.yaml}.
     """
     # def __init__(self, storage=None):
     #     super().__init__(storage=storage)
@@ -108,8 +100,10 @@ class User(GenericUser):
     @ivar settings: User specific preferences.
     @type settings: L{Dictionary<porcupine.dt.Dictionary>}
     """
-    password = Password(required=True)
+    first_name = String()
+    last_name = String()
     email = String()
+    password = Password(required=True)
     settings = Dictionary()
     personal_folder = Reference1()
     # event_handlers = GenericUser.event_handlers +
@@ -129,3 +123,12 @@ class User(GenericUser):
         md = hashlib.md5(password)
         hex_digest = md.hexdigest()
         return hex_digest == self.password
+
+
+class UsersContainer(Container):
+    """
+    Users Folder
+    ============
+    This is the container of all users and groups.
+    """
+    containment = (GenericUser, )

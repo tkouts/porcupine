@@ -15,6 +15,7 @@ class ElasticMeta(type):
                     attr.name = attr_name
             except AttributeError:
                 continue
+        # print(cls.__dict__)
         cls.__schema__ = schema
         cls.__sig__ = system.hash_series(*schema.keys()).hexdigest()
         super().__init__(name, bases, dct)
@@ -34,6 +35,7 @@ class Elastic(metaclass=ElasticMeta):
     __sig__ = ''
     __is_new__ = False
     event_handlers = []
+    is_collection = False
 
     id = String(readonly=True)
     p_id = String(readonly=True, allow_none=True, default=None)

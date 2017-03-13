@@ -32,8 +32,6 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     @type description: L{String<porcupine.dt.String>}
     @type created: float
     """
-    is_collection = False
-
     # system attributes
     created = DateTime(readonly=True)
     owner = String(required=True, readonly=True)
@@ -75,7 +73,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         @type parent: str OR L{Container}
         @return: None
         """
-        if self.p_id:
+        if not self.__is_new__:
             raise exceptions.DBAlreadyExists(
                 'Object already exists. Use "copy_to" '
                 'or "move_to" methods instead.')
@@ -105,9 +103,9 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         context.txn.insert(self)
         if parent is not None:
             with system_override():
-                parent.children.add(self.id)
+                parent.children.add(self)
                 if self.is_collection:
-                    parent.containers.add(self.id)
+                    parent.containers.add(self)
                 parent.modified = self.modified
 
     def is_contained_in(self, item_id: str) -> bool:

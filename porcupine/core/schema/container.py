@@ -16,7 +16,7 @@ class Container(Item):
     @type containment: tuple
     @type is_collection: bool
     """
-    containment = ('porcupine.schema.Shortcut',)
+    containment = (Shortcut, )
     is_collection = True
 
     children = Children()
