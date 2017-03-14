@@ -173,7 +173,7 @@ class ReferenceN(Text):
 
     def __set__(self, instance, value):
         raise TypeError(
-            'MultiReference attributes do not support direct assignment. '
+            'ReferenceN attributes do not support direct assignment. '
             'Use the "reset" method instead.')
 
     async def snapshot(self, instance, value):
