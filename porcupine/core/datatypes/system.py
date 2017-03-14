@@ -2,7 +2,7 @@ from porcupine import context, exceptions
 from porcupine.utils import permissions
 from .mutable import Dictionary
 from .common import String
-from .collection import ReferenceN, ItemCollection
+from .reference import ReferenceN, ItemCollection
 
 
 class Acl(Dictionary):
