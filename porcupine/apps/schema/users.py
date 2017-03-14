@@ -46,11 +46,11 @@ class GenericUser(Item):
         L{Policies<org.innoscript.desktop.schema.properties.Policies>}
     """
     member_of = RelatorN(
-        relates_to=('org.innoscript.desktop.schema.security.Group', ),
+        accepts=('org.innoscript.desktop.schema.security.Group', ),
         rel_attr='members')
     policies = RelatorN(
-        relates_to=('org.innoscript.desktop.schema.security.Policy', ),
-        rel_attr='policyGranted')
+        accepts=('org.innoscript.desktop.schema.security.Policy', ),
+        rel_attr='granted_to')
 
     def is_member_of(self, group):
         """
@@ -70,22 +70,6 @@ class GenericUser(Item):
         @rtype: bool
         """
         return 'administrators' in self.member_of
-
-
-class GuestUser(GenericUser):
-    """
-    Guest User
-    ==========
-    This user instance is assigned by the session manager
-    to all newly created sessions.
-    This is configurable. See the C{session_manager} section
-    of C{porcupine.yaml}.
-    """
-    # def __init__(self, storage=None):
-    #     super().__init__(storage=storage)
-    #     self.id = 'guest'
-    #     self.name = 'Guest'
-    #     self.description = 'Guest User'
 
 
 class User(GenericUser):

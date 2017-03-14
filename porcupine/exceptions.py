@@ -1,4 +1,4 @@
-from sanic.exceptions import SanicException, InvalidUsage
+from sanic.exceptions import SanicException, InvalidUsage, NotFound
 
 
 class Conflict(SanicException):

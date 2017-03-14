@@ -11,16 +11,11 @@ from .context import context, with_context, system_override
 
 
 class App(Blueprint):
+    name = None
     db_blueprint = None
 
-    @classmethod
-    def install(cls):
-        from porcupine.bootstrap import sanic
-        app = cls()
-        sanic.blueprint(app)
-
-    def __init__(self, name):
-        super().__init__(name)
+    def __init__(self):
+        super().__init__(self.name)
         self.listeners['before_server_start'].append(self.before_start)
         self.listeners['after_server_start'].append(self.after_start)
         self.listeners['before_server_stop'].append(self.before_stop)

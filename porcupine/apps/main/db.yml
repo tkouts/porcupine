@@ -25,10 +25,16 @@ items:
               - id: guest
                 name: Guest
                 description: Guest User
-                type: porcupine.apps.schema.users.GuestUser
+                type: porcupine.apps.schema.users.GenericUser
+                sys: Yes
+              - id: system
+                name: SYSTEM
+                description: System User
+                type: porcupine.apps.schema.users.SystemUser
                 sys: Yes
               - id: admin
                 name: Administrator
+                password: admin
                 type: porcupine.apps.schema.users.User
 
   - id: RB

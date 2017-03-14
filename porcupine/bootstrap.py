@@ -9,11 +9,12 @@ from sanic import Sanic
 
 from . import __version__
 from .config import settings
+from .core.router import ContextRouter
 from .log import setup_daemon_logging
-from porcupine.apps.main import Porcupine
+from porcupine.apps.main import main
 
 PID_FILE = '.pid'
-sanic = Sanic()
+sanic = Sanic(router=ContextRouter())
 
 
 def set_pid():
@@ -72,8 +73,10 @@ def start(args):
             sys.exit()
 
     logging.info('Starting Porcupine %s', __version__)
-    # register main app
-    Porcupine.install()
+    # register apps
+    apps = [main]
+    for app in apps:
+        sanic.blueprint(app, url_prefix=app.name)
     sanic.run(host=settings['host'],
               port=settings['port'],
               workers=settings['workers'])

@@ -69,7 +69,6 @@ class Reference1(String):
 
 
 class ItemCollection:
-
     def __init__(self, descriptor, instance, accepts):
         self._descriptor = descriptor
         self._instance = instance
@@ -148,15 +147,6 @@ class ReferenceN(Text):
             self.accepts = kwargs['accepts']
         self.accepts_resolved = False
 
-    # def validate_value(self, value, instance):
-    #     if not self.accepts_resolved:
-    #         self.accepts = tuple([
-    #             system.get_rto_by_name(x) if isinstance(x, str) else x
-    #             for x in self.accepts
-    #         ])
-    #         self.accepts_resolved = True
-    #     super().validate_value(value, instance)
-
     def __get__(self, instance, owner):
         if instance is None:
             return self
@@ -167,9 +157,6 @@ class ReferenceN(Text):
             ])
             self.accepts_resolved = True
         return ItemCollection(self, instance, self.accepts)
-
-    # def accepts(self, item, instance):
-    #     pass
 
     def __set__(self, instance, value):
         raise TypeError(

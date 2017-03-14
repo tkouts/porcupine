@@ -85,7 +85,8 @@ class Password(String):
     empty = hashlib.md5(''.encode()).hexdigest()
 
     def __set__(self, instance, value):
-        super().__set__(instance, hashlib.md5(value).hexdigest())
+        super().__set__(instance,
+                        hashlib.md5(value.encode('utf-8')).hexdigest())
         # self.validate_value(value)
         # instance.__storage__[self.name] = hashlib.md5(value).hexdigest()
 

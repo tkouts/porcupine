@@ -34,6 +34,8 @@ class Elastic(metaclass=ElasticMeta):
     __schema__ = {}
     __sig__ = ''
     __is_new__ = False
+    # __slots__ = ['__storage__', '__externals__', '__snapshot__']
+
     event_handlers = []
     is_collection = False
 
@@ -68,6 +70,9 @@ class Elastic(metaclass=ElasticMeta):
 
     def __repr__(self):
         return repr(self.__storage__)
+
+    def toDict(self):
+        return self.__storage__
 
     @property
     def parent_id(self):

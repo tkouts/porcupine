@@ -1,3 +1,4 @@
+import asyncio
 import pylru
 from functools import wraps
 from .aiolocals.local import Local, Context
@@ -44,15 +45,18 @@ class system_override:
         context.__system_update__ = False
 
 
-def with_context(co_routine):
+def with_context(func):
     """
     Creates the security context
     :return: asyncio.Task
     """
-    @wraps(co_routine)
+    @wraps(func)
     async def context_wrapper(*args, **kwargs):
         with Context():
-            return await co_routine(*args, **kwargs)
+            result = func(*args, **kwargs)
+            if asyncio.iscoroutine(result):
+                return await result
+            return result
 
     return context_wrapper
 
