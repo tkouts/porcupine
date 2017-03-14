@@ -1,17 +1,79 @@
 from porcupine import db, context, exceptions
 from porcupine.utils import system
 from .external import Text
+from .common import String
 
 
-class Collection:
+class ItemReference(str):
+    async def item(self):
+        """
+        This method returns the object that this data type
+        instance references. If the current user has no read
+        permission on the referenced item or it has been deleted
+        then it returns None.
+
+        @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
+        @return: The referenced object, otherwise None
+        """
+        item = None
+        if self:
+            item = await db.get_item(self)
+        return item
+
+
+class Reference1(String):
+    """
+    This data type is used whenever an item loosely references
+    at most one other item. Using this data type, the referenced item
+    B{IS NOT} aware of the items that reference it.
+
+    @cvar relates_to: a list of strings containing all the permitted content
+                    classes that the instances of this type can reference.
+    """
+    allow_none = True
+    accepts = ()
+
+    def __init__(self, default=None, **kwargs):
+        self.safe_type_resolved = False
+        if 'accepts' in kwargs:
+            self.accepts = kwargs['accepts']
+        super().__init__(default, **kwargs)
+
+    def validate_value(self, value, instance):
+        if not self.safe_type_resolved:
+            self.safe_type = tuple([
+                system.get_rto_by_name(x) if isinstance(x, str) else x
+                for x in self.accepts
+            ])
+            self.safe_type_resolved = True
+        super().validate_value(value, instance)
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        value = super().__get__(instance, owner)
+        if value:
+            value = ItemReference(value)
+        return value
+
+    def __set__(self, instance, value):
+        self.validate_value(value, instance)
+        self.snapshot(instance, value.id)
+        storage = getattr(instance, self.storage)
+        storage[self.name] = value.id
+
+    def clone(self, instance, memo):
+        if '_id_map_' in memo:
+            value = super().__get__(instance, None)
+            super().__set__(instance, memo['_id_map_'].get(value, value))
+
+
+class ItemCollection:
+
     def __init__(self, descriptor, instance, accepts):
         self._descriptor = descriptor
         self._instance = instance
-        # resolve accepted types
-        self._accepts = tuple([
-            system.get_rto_by_name(x) if isinstance(x, str) else x
-            for x in accepts
-        ])
+        self._accepts = accepts
 
     @property
     def key(self):
@@ -75,7 +137,7 @@ class Collection:
             context.txn.append(self.key, ' -{0}'.format(item.id))
 
 
-class ItemCollection(Text):
+class ReferenceN(Text):
     safe_type = tuple
     allow_none = False
     accepts = ()
@@ -84,15 +146,34 @@ class ItemCollection(Text):
         super().__init__(default, **kwargs)
         if 'accepts' in kwargs:
             self.accepts = kwargs['accepts']
+        self.accepts_resolved = False
+
+    # def validate_value(self, value, instance):
+    #     if not self.accepts_resolved:
+    #         self.accepts = tuple([
+    #             system.get_rto_by_name(x) if isinstance(x, str) else x
+    #             for x in self.accepts
+    #         ])
+    #         self.accepts_resolved = True
+    #     super().validate_value(value, instance)
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return Collection(self, instance, self.accepts)
+        if not self.accepts_resolved:
+            self.accepts = tuple([
+                system.get_rto_by_name(x) if isinstance(x, str) else x
+                for x in self.accepts
+            ])
+            self.accepts_resolved = True
+        return ItemCollection(self, instance, self.accepts)
+
+    # def accepts(self, item, instance):
+    #     pass
 
     def __set__(self, instance, value):
         raise TypeError(
-            'ItemCollection attributes do not support direct assignment. '
+            'MultiReference attributes do not support direct assignment. '
             'Use the "reset" method instead.')
 
     async def snapshot(self, instance, value):

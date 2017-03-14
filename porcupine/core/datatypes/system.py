@@ -2,7 +2,7 @@ from porcupine import context, exceptions
 from porcupine.utils import permissions
 from .mutable import Dictionary
 from .common import String
-from .collection import ItemCollection, Collection
+from .collection import ReferenceN, ItemCollection
 
 
 class Acl(Dictionary):
@@ -20,8 +20,17 @@ class SchemaSignature(String):
     readonly = True
 
 
-class Children(ItemCollection):
+class Children(ReferenceN):
+    readonly = True
+
     def __get__(self, instance, owner):
         if instance is None:
+            # create a separate instance per owner
+            # with accepting the container's allowed types
+            if self.name not in owner.__dict__:
+                children = Children(default=self._default,
+                                    accepts=owner.containment)
+                setattr(owner, 'children', children)
+                return children
             return self
-        return Collection(self, instance, instance.containment)
+        return super().__get__(instance, owner)

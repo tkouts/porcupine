@@ -12,7 +12,7 @@ class String(DataType):
     safe_type = str
 
     def __init__(self, default='', **kwargs):
-        super(String, self).__init__(default, **kwargs)
+        super().__init__(default, **kwargs)
 
 
 class Integer(DataType):
@@ -24,7 +24,7 @@ class Integer(DataType):
     safe_type = int
 
     def __init__(self, default=0, **kwargs):
-        super(Integer, self).__init__(default, **kwargs)
+        super().__init__(default, **kwargs)
 
 
 class Float(DataType):
@@ -36,7 +36,7 @@ class Float(DataType):
     safe_type = float
 
     def __init__(self, default=0.0, **kwargs):
-        super(Float, self).__init__(default, **kwargs)
+        super().__init__(default, **kwargs)
 
 
 class Boolean(DataType):
@@ -48,7 +48,7 @@ class Boolean(DataType):
     safe_type = bool
 
     def __init__(self, default=False, **kwargs):
-        super(Boolean, self).__init__(default, **kwargs)
+        super().__init__(default, **kwargs)
 
 
 class Date(String):
@@ -56,7 +56,7 @@ class Date(String):
     allow_none = True
 
     def __init__(self, default=None, **kwargs):
-        super(Date, self).__init__(default, **kwargs)
+        super().__init__(default, **kwargs)
 
     # def __get__(self, instance, owner):
     #     if instance is None:
@@ -91,6 +91,6 @@ class Password(String):
 
     def validate(self, instance):
         if self.required \
-                and self.__get__(instance, instance.__class__) == self.empty:
+                and self.__get__(instance, None) == self.empty:
             raise ValueError('Attribute "{}" of "{}" is mandatory.'.format(
                 self.name, instance.__class__.__name__))

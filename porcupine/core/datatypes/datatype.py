@@ -31,7 +31,7 @@ class DataType:
             if self.readonly and not instance.__is_new__ \
                     and not context.is_system_update:
                 raise AttributeError(
-                    'Attribute "{0}" of "{1}" is readonly'.format(
+                    'Attribute {0} of {1} is readonly'.format(
                         self.name, instance.__class__.__name__))
         if self.allow_none and value is None:
             return

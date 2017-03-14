@@ -3,142 +3,144 @@ Porcupine reference data types
 ==============================
 """
 from porcupine import db, exceptions
-from .common import String
-from porcupine.core.datatypes.mutable import List
+# from .common import String
+# from porcupine.core.datatypes.mutable import List
+from .collection import Reference1, ReferenceN, ItemCollection, \
+    ItemReference
 from .datatype import DataType
 # from porcupine.core.objectSet import ObjectSet
 from porcupine.utils import system
 
 
-class SingleReference(str):
+# class SingleReference(str):
+#
+#     def get_item(self):
+#         """
+#         This method returns the object that this data type
+#         instance references. If the current user has no read
+#         permission on the referenced item or it has been deleted
+#         then it returns None.
+#
+#         @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
+#         @return: The referenced object, otherwise None
+#         """
+#         item = None
+#         if self:
+#             item = db.get_item(self)
+#         return item
+#
+#
+# class Reference1(String):
+#     """
+#     This data type is used whenever an item losely references
+#     at most one other item. Using this data type, the referenced item
+#     B{IS NOT} aware of the items that reference it.
+#
+#     @cvar relates_to: a list of strings containing all the permitted content
+#                     classes that the instances of this type can reference.
+#     """
+#     safe_type = str
+#     allow_none = True
+#     relates_to = ()
+#
+#     def __init__(self, default=None, **kwargs):
+#         super(Reference1, self).__init__(default, **kwargs)
+#         if 'relates_to' in kwargs:
+#             self.relates_to = kwargs['relates_to']
+#
+#     def __get__(self, instance, owner):
+#         if instance is None:
+#             return self
+#         value = super(Reference1, self).__get__(instance, owner)
+#         if value:
+#             value = SingleReference(value)
+#             return value
+#
+#     def clone(self, instance, memo):
+#         if '_id_map_' in memo:
+#             value = super(Reference1, self).__get__(
+#                 instance, instance.__class__)
+#             super(Reference1, self).__set__(
+#                 instance, memo['_id_map_'].get(value, value))
+#
+#
+# class MultiReference(object):
+#     def __init__(self, id_list):
+#         self.__value = id_list
+#
+#     def __getattr__(self, item):
+#         return getattr(self.__value, item)
+#
+#     def __len__(self):
+#         return len(self.__value)
+#
+#     def __nonzero__(self):
+#         return len(self.__value)
+#
+#     def __getitem__(self, key):
+#         return self.__value[key]
+#
+#     def __add__(self, other):
+#         return self.__value + other
+#
+#     def _fetch(self, get_lock):
+#         items = []
+#         top_level = [oid for oid in self.__value if '.' not in oid]
+#         items += db.get_multi(top_level, get_lock=get_lock)
+#         embedded = [oid for oid in self.__value if '.' in oid]
+#         items += filter(None, [db.get_item(oid, get_lock) for oid in embedded])
+#         return items
+#
+#     def get_items(self, get_lock=True):
+#         """
+#         This method returns the items that this
+#         instance references.
+#
+#         @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
+#         """
+#         return ObjectSet(self._fetch(get_lock))
+#
+#
+# class ReferenceN(List):
+#     """
+#     This data type is used whenever an item losely references
+#     none, one or more than one items. Using this data type,
+#     the referenced items B{ARE NOT} aware of the items that reference them.
+#
+#     @cvar relates_to: a list of strings containing all the permitted content
+#                       classes that the instances of this type can reference.
+#     """
+#     relates_to = ()
+#
+#     def __init__(self, default=None, **kwargs):
+#         if default is None:
+#             default = []
+#         super(ReferenceN, self).__init__(default, **kwargs)
+#         if 'relates_to' in kwargs:
+#             self.relates_to = kwargs['relates_to']
+#
+#     def __get__(self, instance, owner):
+#         if instance is None:
+#             return self
+#         value = super(ReferenceN, self).__get__(instance, owner)
+#         return MultiReference(value)
+#
+#     def clone(self, instance, memo):
+#         if '_id_map_' in memo:
+#             value = super(ReferenceN, self).__get__(
+#                 instance, instance.__class__)
+#             super(ReferenceN, self).__set__(
+#                 instance, [memo['_id_map_'].get(oid, oid) for oid in value])
 
-    def get_item(self):
-        """
-        This method returns the object that this data type
-        instance references. If the current user has no read
-        permission on the referenced item or it has been deleted
-        then it returns None.
 
-        @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
-        @return: The referenced object, otherwise None
-        """
-        item = None
-        if self:
-            item = db.get_item(self)
-        return item
+class RelatorItemReference(ItemReference):
+    descriptor = None
 
-
-class Reference1(String):
-    """
-    This data type is used whenever an item losely references
-    at most one other item. Using this data type, the referenced item
-    B{IS NOT} aware of the items that reference it.
-
-    @cvar relates_to: a list of strings containing all the permitted content
-                    classes that the instances of this type can reference.
-    """
-    safe_type = str
-    allow_none = True
-    relates_to = ()
-
-    def __init__(self, default=None, **kwargs):
-        super(Reference1, self).__init__(default, **kwargs)
-        if 'relates_to' in kwargs:
-            self.relates_to = kwargs['relates_to']
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        value = super(Reference1, self).__get__(instance, owner)
-        if value:
-            value = SingleReference(value)
-            return value
-
-    def clone(self, instance, memo):
-        if '_id_map_' in memo:
-            value = super(Reference1, self).__get__(
-                instance, instance.__class__)
-            super(Reference1, self).__set__(
-                instance, memo['_id_map_'].get(value, value))
-
-
-class MultiReference(object):
-    def __init__(self, id_list):
-        self.__value = id_list
-
-    def __getattr__(self, item):
-        return getattr(self.__value, item)
-
-    def __len__(self):
-        return len(self.__value)
-
-    def __nonzero__(self):
-        return len(self.__value)
-
-    def __getitem__(self, key):
-        return self.__value[key]
-
-    def __add__(self, other):
-        return self.__value + other
-
-    def _fetch(self, get_lock):
-        items = []
-        top_level = [oid for oid in self.__value if '.' not in oid]
-        items += db.get_multi(top_level, get_lock=get_lock)
-        embedded = [oid for oid in self.__value if '.' in oid]
-        items += filter(None, [db.get_item(oid, get_lock) for oid in embedded])
-        return items
-
-    def get_items(self, get_lock=True):
-        """
-        This method returns the items that this
-        instance references.
-
-        @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
-        """
-        return ObjectSet(self._fetch(get_lock))
-
-
-class ReferenceN(List):
-    """
-    This data type is used whenever an item losely references
-    none, one or more than one items. Using this data type,
-    the referenced items B{ARE NOT} aware of the items that reference them.
-
-    @cvar relates_to: a list of strings containing all the permitted content
-                      classes that the instances of this type can reference.
-    """
-    relates_to = ()
-
-    def __init__(self, default=None, **kwargs):
-        if default is None:
-            default = []
-        super(ReferenceN, self).__init__(default, **kwargs)
-        if 'relates_to' in kwargs:
-            self.relates_to = kwargs['relates_to']
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        value = super(ReferenceN, self).__get__(instance, owner)
-        return MultiReference(value)
-
-    def clone(self, instance, memo):
-        if '_id_map_' in memo:
-            value = super(ReferenceN, self).__get__(
-                instance, instance.__class__)
-            super(ReferenceN, self).__set__(
-                instance, [memo['_id_map_'].get(oid, oid) for oid in value])
-
-
-class RelatorSingleReference(SingleReference):
-
-    def get_item(self, get_lock=True):
-        item = super(RelatorSingleReference, self).get_item(get_lock=get_lock)
-        if not item or self.descriptor.rel_attr not in item.__props__:
+    async def item(self):
+        item = await super().item()
+        if not item or self.descriptor.rel_attr not in item.__schema__:
             return None
-        else:
-            return item
+        return item
 
 
 class Relator1(Reference1):
@@ -166,7 +168,7 @@ class Relator1(Reference1):
     respects_references = False
 
     def __init__(self, default=None, **kwargs):
-        super(Relator1, self).__init__(default, **kwargs)
+        super().__init__(default, **kwargs)
         if 'rel_attr' in kwargs:
             self.rel_attr = kwargs['rel_attr']
         if 'cascade_delete' in kwargs:
@@ -177,14 +179,12 @@ class Relator1(Reference1):
     def __get__(self, instance, owner):
         if instance is None:
             return self
-
         value = DataType.__get__(self, instance, owner)
         if not value:
             return None
-        else:
-            value = RelatorSingleReference(value)
-            value.descriptor = self
-            return value
+        value = RelatorItemReference(value)
+        value.descriptor = self
+        return value
 
     def on_create(self, instance, value):
         self.on_update(instance, value, None)
@@ -253,16 +253,16 @@ class Relator1(Reference1):
                 db._db.put_item(ref_item)
 
 
-class RelatorMultiReference(MultiReference):
-    def __init__(self, id_list, descriptor):
-        super(RelatorMultiReference, self).__init__(id_list)
-        self.descriptor = descriptor
+class RelatorItemCollection(ItemCollection):
+    # def __init__(self, id_list, descriptor):
+    #     super(RelatorMultiReference, self).__init__(id_list)
+    #     self.descriptor = descriptor
 
-    def get_items(self, get_lock=True):
-        items = self._fetch(get_lock)
+    async def items(self):
+        items = await super().items()
         return ObjectSet([
             item for item in items
-            if self.descriptor.rel_attr in item.__props__])
+            if self._descriptor.rel_attr in item.__props__])
 
 
 class RelatorN(ReferenceN):
@@ -290,10 +290,8 @@ class RelatorN(ReferenceN):
     cascade_delete = False
     respects_references = False
 
-    def __init__(self, default=None, **kwargs):
-        if default is None:
-            default = []
-        super(RelatorN, self).__init__(default, **kwargs)
+    def __init__(self, default=(), **kwargs):
+        super().__init__(default, **kwargs)
         if 'rel_attr' in kwargs:
             self.rel_attr = kwargs['rel_attr']
         if 'cascade_delete' in kwargs:
@@ -304,8 +302,8 @@ class RelatorN(ReferenceN):
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        value = DataType.__get__(self, instance, owner)
-        return RelatorMultiReference(value, self)
+        # value = DataType.__get__(self, instance, owner)
+        return RelatorItemCollection(self, instance, self.accepts)
 
     def on_create(self, instance, value):
         self.on_update(instance, value, None)

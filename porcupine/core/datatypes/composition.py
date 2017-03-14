@@ -205,7 +205,7 @@ class Embedded(DataType):
         value = DataType.__get__(self, instance, owner)
         if value is None:
             return None
-        elif isinstance(value, basestring):
+        elif isinstance(value, str):
             value = instance._dict['bag'][self.name] = db._db.get_item(value)
         elif isinstance(value, dict):
             # nested
