@@ -106,3 +106,7 @@ class DataType:
 
     def on_undelete(self, instance, value):
         pass
+
+    # HTTP views
+    def get(self, request, instance):
+        return getattr(instance, self.name)

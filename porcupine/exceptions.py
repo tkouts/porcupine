@@ -17,6 +17,10 @@ class Forbidden(SanicException):
     status_code = 403
 
 
+class MethodNotAllowed(SanicException):
+    status_code = 405
+
+
 class ContainmentError(InvalidUsage):
     def __init__(self, target_item, attribute, source_item):
         super().__init__(

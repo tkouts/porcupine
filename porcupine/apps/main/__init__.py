@@ -1,4 +1,5 @@
 import logging
+import asyncio
 
 from sanic.response import json
 
@@ -30,8 +31,27 @@ main = Porcupine()
 @main.route('/<item_id>')
 @main.route('/<item_id>/<member>')
 async def request_handler(request, item_id, member=None):
+    print(request.args)
     item = await db.connector.get(item_id)
     if item is not None:
-        return json(item)
+        if member is None:
+            handler = getattr(item, request.method.lower(), None)
+            if handler is None:
+                raise exceptions.MethodNotAllowed('Method not allowed')
+            result = handler(request)
+            if asyncio.iscoroutine(result):
+                return json(await result)
+            return json(result)
+        elif member in item.__schema__:
+            handler = getattr(item.__schema__[member],
+                              request.method.lower(),
+                              None)
+            if handler is None:
+                raise exceptions.MethodNotAllowed('Method not allowed')
+            result = handler(request, item)
+            if asyncio.iscoroutine(result):
+                return json(await result)
+            return json(result)
+
     raise exceptions.NotFound(
-        'The resource {0} does not exist'.format(item_id))
+        'The resource {0} does not exist'.format(request.url))

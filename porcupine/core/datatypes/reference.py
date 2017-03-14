@@ -173,3 +173,6 @@ class ReferenceN(Text):
         # print('onchange', value, old_value)
         if instance.__is_new__ and value:
             super().on_change(instance, ' '.join(value), None)
+
+    async def get(self, request, instance):
+        return await getattr(instance, self.name).get()

@@ -77,6 +77,11 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
                     if item is not None]
         return []
 
+    async def get_external(self, ext_id):
+        if context.txn is not None and ext_id in context.txn:
+            return context.txn[ext_id]
+        return await self.get_raw(ext_id)
+
     async def exists(self, key):
         raise NotImplementedError
 
@@ -129,11 +134,6 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
 
     # @abc.abstractmethod
     async def increment_atomic(self, object_id, name, amount, default):
-        raise NotImplementedError
-
-    # external data types
-    # @abc.abstractmethod
-    async def get_external(self, ext_id):
         raise NotImplementedError
 
     # @abc.abstractmethod

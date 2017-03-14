@@ -104,6 +104,10 @@ class Elastic(metaclass=ElasticMeta):
             result.update(kwargs)
         return result
 
+    # HTTP views
+    def get(self, request):
+        return self
+
     def update_schema(self):
         schema = self.__schema__
         new_sig = hash(tuple(schema.keys()))
