@@ -28,8 +28,8 @@ class Porcupine(App):
 main = Porcupine()
 
 
-@main.route('/<item_id>')
-@main.route('/<item_id>/<member>')
+@main.route('/<item_id>', methods=frozenset({'GET', 'POST'}))
+@main.route('/<item_id>/<member>', methods=frozenset({'GET', 'PUT'}))
 async def request_handler(request, item_id, member=None):
     item = await db.get_item(item_id, quiet=False)
     if member is None and request.url.endswith('/') and item.is_collection:

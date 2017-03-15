@@ -1,3 +1,4 @@
+from porcupine import db
 from porcupine.datatypes import DataType, Composition, String
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.utils import system
@@ -71,10 +72,11 @@ class Elastic(metaclass=ElasticMeta):
     def __repr__(self):
         return repr(self.__storage__)
 
-    def toDict(self):
+    def to_dict(self):
         return {attr: value for attr, value in self.__storage__.items()
                 if attr in self.__schema__
                 and not self.__schema__[attr].protected}
+    toDict = to_dict
 
     @property
     def parent_id(self):
@@ -109,6 +111,12 @@ class Elastic(metaclass=ElasticMeta):
     # HTTP views
     def get(self, request):
         return self
+
+    @db.transactional()
+    async def post(self, request):
+        for attr, value in request.json.items():
+            setattr(self, attr, value)
+        await self.update()
 
     def update_schema(self):
         schema = self.__schema__

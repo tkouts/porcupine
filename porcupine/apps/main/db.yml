@@ -33,7 +33,7 @@ items:
                 type: porcupine.apps.schema.users.SystemUser
                 sys: Yes
               - id: admin
-                name: Administrator
+                name: admin
                 password: admin
                 type: porcupine.apps.schema.users.User
 

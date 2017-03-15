@@ -3,6 +3,9 @@ import asyncio
 import copy
 from functools import wraps
 
+from sanic.request import Request
+from sanic.blueprints import Blueprint
+
 from porcupine import context
 from porcupine import exceptions
 from porcupine.utils import permissions
@@ -51,9 +54,9 @@ async def get_multi(ids):
 
 
 def transactional(auto_commit=True):
-
     min_sleep_time = 0.010
     max_sleep_time = 0.288
+    do_not_copy_types = (Request, Blueprint)
 
     def transactional_decorator(function):
         """
@@ -65,15 +68,24 @@ def transactional(auto_commit=True):
                 # top level function
                 now = time.time()
                 retries = 0
-                max_retries = connector.TransactionType.txn_max_retries
                 sleep_time = min_sleep_time
                 context.txn = connector.get_transaction()
+                max_retries = context.txn.txn_max_retries
                 try:
                     while retries < max_retries:
                         # print('trying.... %d' % retries)
                         try:
-                            args_copy = copy.deepcopy(args)
-                            keyword_args_copy = copy.deepcopy(kwargs)
+                            args_copy = [
+                                copy.deepcopy(arg)
+                                if not isinstance(arg, do_not_copy_types)
+                                else arg
+                                for arg in args]
+                            keyword_args_copy = {
+                                name: copy.deepcopy(value)
+                                if not isinstance(value, do_not_copy_types)
+                                else value
+                                for name, value in kwargs.items()
+                            }
                             if retries > 0:
                                 await asyncio.sleep(sleep_time)
                                 sleep_time *= 2

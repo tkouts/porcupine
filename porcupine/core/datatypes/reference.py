@@ -174,8 +174,8 @@ class ReferenceN(Text):
         if instance.__is_new__ and value:
             super().on_change(instance, ' '.join(value), None)
 
-    async def get(self, request, instance, resolve=False):
-        resolve = resolve or 'resolve' in request.args
-        if resolve:
+    async def get(self, request, instance, expand=False):
+        expand = expand or 'expand' in request.args
+        if expand:
             return await getattr(instance, self.name).items()
         return await getattr(instance, self.name).get()

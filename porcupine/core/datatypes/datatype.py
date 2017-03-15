@@ -1,6 +1,7 @@
 import copy
 import collections
-from porcupine import context
+from porcupine import context, db
+from porcupine.exceptions import InvalidUsage
 
 
 class DataType:
@@ -28,15 +29,16 @@ class DataType:
         if instance is not None:
             if self.readonly and not instance.__is_new__ \
                     and not context.is_system_update:
-                raise AttributeError(
+                raise InvalidUsage(
                     'Attribute {0} of {1} is readonly'.format(
                         self.name, instance.__class__.__name__))
         if self.allow_none and value is None:
             return
         if not isinstance(value, self.safe_type):
-            raise TypeError('Unsupported type "{}" for "{}"'.format(
-                value.__class__.__name__,
-                self.name or self.__class__.__name__))
+            raise InvalidUsage(
+                'Unsupported type {} for {}'.format(
+                    value.__class__.__name__,
+                    self.name or self.__class__.__name__))
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -88,13 +90,15 @@ class DataType:
         @return: None
         """
         if self.required and not self.__get__(instance, None):
-            raise ValueError('Attribute "{}" of "{}" is mandatory.'.format(
-                self.name, instance.__class__.__name__))
+            raise InvalidUsage(
+                'Attribute {0} of {1} is mandatory.'.format(
+                    self.name, instance.__class__.__name__))
 
     def clone(self, instance, memo):
         pass
 
     def on_change(self, instance, value, old_value):
+        self.validate(instance)
         if not instance.__is_new__:
             txn = context.txn
             txn.mutate(instance, self.name, txn.UPSERT_MUT, value)
@@ -108,3 +112,8 @@ class DataType:
     # HTTP views
     def get(self, request, instance):
         return getattr(instance, self.name)
+
+    @db.transactional()
+    async def put(self, request, instance):
+        setattr(instance, self.name, request.json)
+        await instance.update()

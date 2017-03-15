@@ -206,5 +206,4 @@ class Item(GenericItem):
                         parent.modified = self.modified
                         context.txn.update(parent)
             else:
-                raise exceptions.Forbidden(
-                    'The user does not have update permissions.')
+                raise exceptions.Forbidden('Forbidden')

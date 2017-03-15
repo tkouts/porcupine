@@ -2,7 +2,7 @@ from porcupine import context, exceptions
 from porcupine.utils import permissions
 from .mutable import Dictionary
 from .common import String
-from .reference import ReferenceN, ItemCollection
+from .reference import ReferenceN
 
 
 class Acl(Dictionary):
@@ -36,5 +36,5 @@ class Children(ReferenceN):
             return self
         return super().__get__(instance, owner)
 
-    async def get(self, request, instance, resolve=False):
+    async def get(self, request, instance, expand=True):
         return await super().get(request, instance, True)
