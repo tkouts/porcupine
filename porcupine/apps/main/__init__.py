@@ -42,7 +42,7 @@ async def request_handler(request, item_id, member=None):
         if asyncio.iscoroutine(result):
             return json(await result)
         return json(result)
-    elif member in item.__schema__:
+    elif member in item.__schema__ and not item.__schema__[member].protected:
         handler = getattr(item.__schema__[member],
                           request.method.lower(),
                           None)

@@ -83,6 +83,7 @@ class Password(String):
     of the assigned string value.
     """
     empty = hashlib.md5(''.encode()).hexdigest()
+    protected = True
 
     def __set__(self, instance, value):
         super().__set__(instance,

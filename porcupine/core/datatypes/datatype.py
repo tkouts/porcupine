@@ -12,18 +12,16 @@ class DataType:
     required = False
     allow_none = False
     readonly = False
+    protected = False
     safe_type = object
     storage = '__storage__'
 
     def __init__(self, default=None, **kwargs):
         self._default = default
         self.name = None
-        if 'required' in kwargs:
-            self.required = kwargs['required']
-        if 'allow_none' in kwargs:
-            self.allow_none = kwargs['allow_none']
-        if 'readonly' in kwargs:
-            self.readonly = kwargs['readonly']
+        for arg in ('required', 'allow_none', 'readonly', 'protected'):
+            if arg in kwargs:
+                setattr(self, arg, kwargs[arg])
         self.validate_value(default, None)
 
     def validate_value(self, value, instance):

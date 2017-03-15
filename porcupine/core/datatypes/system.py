@@ -18,6 +18,7 @@ class Acl(Dictionary):
 
 class SchemaSignature(String):
     readonly = True
+    protected = True
 
 
 class Children(ReferenceN):

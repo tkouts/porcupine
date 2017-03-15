@@ -72,7 +72,9 @@ class Elastic(metaclass=ElasticMeta):
         return repr(self.__storage__)
 
     def toDict(self):
-        return self.__storage__
+        return {attr: value for attr, value in self.__storage__.items()
+                if attr in self.__schema__
+                and not self.__schema__[attr].protected}
 
     @property
     def parent_id(self):
