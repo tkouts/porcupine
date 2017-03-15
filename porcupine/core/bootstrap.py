@@ -7,11 +7,11 @@ import logging
 
 from sanic import Sanic
 
-from . import __version__
-from .config import settings
-from .core.router import ContextRouter
-from .log import setup_daemon_logging
+from porcupine import __version__
+from porcupine.config import settings
+from porcupine.log import setup_daemon_logging
 from porcupine.apps.main import main
+from .router import ContextRouter
 
 PID_FILE = '.pid'
 sanic = Sanic(router=ContextRouter())
