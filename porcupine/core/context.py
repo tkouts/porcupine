@@ -28,6 +28,10 @@ class PContext(Local):
             self.__setattr__('__cache__', lru_cache)
             return lru_cache
 
+    def reset(self):
+        self.cache.clear()
+
+
 context = PContext()
 
 
@@ -39,20 +43,30 @@ class system_override:
         context.__sys__ = False
 
 
-def with_context(func):
-    """
-    Creates the security context
-    :return: asyncio.Task
-    """
-    @wraps(func)
-    async def context_wrapper(*args, **kwargs):
-        with Context():
-            result = func(*args, **kwargs)
-            if asyncio.iscoroutine(result):
-                return await result
-            return result
+def with_context(identity):
+    from porcupine import db
 
-    return context_wrapper
+    def decorator(func):
+        """
+        Creates the security context
+        :return: asyncio.Task
+        """
+        @wraps(func)
+        async def context_wrapper(*args, **kwargs):
+            with Context():
+                user = identity
+                if isinstance(identity, str):
+                    user = await db.connector.get(identity)
+                context.user = user
+                try:
+                    result = func(*args, **kwargs)
+                    if asyncio.iscoroutine(result):
+                        return await result
+                    return result
+                finally:
+                    context.reset()
+        return context_wrapper
+    return decorator
 
 
 def context_cacheable(co_routine):
@@ -66,9 +80,9 @@ def context_cacheable(co_routine):
             '{0}.{1}'.format(co_routine.__module__,
                              co_routine.__qualname__),
             args)
-        print('CACHE KEY', cache_key)
+        # print('CACHE KEY', cache_key)
         if cache_key in context.cache:
-            print('CACHE HIT')
+            # print('CACHE HIT')
             return context.cache[cache_key]
         result = await co_routine(*args)
         context.cache[cache_key] = result

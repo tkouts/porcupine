@@ -31,27 +31,27 @@ main = Porcupine()
 @main.route('/<item_id>')
 @main.route('/<item_id>/<member>')
 async def request_handler(request, item_id, member=None):
-    print(request.args)
-    item = await db.connector.get(item_id)
-    if item is not None:
-        if member is None:
-            handler = getattr(item, request.method.lower(), None)
-            if handler is None:
-                raise exceptions.MethodNotAllowed('Method not allowed')
-            result = handler(request)
-            if asyncio.iscoroutine(result):
-                return json(await result)
-            return json(result)
-        elif member in item.__schema__:
-            handler = getattr(item.__schema__[member],
-                              request.method.lower(),
-                              None)
-            if handler is None:
-                raise exceptions.MethodNotAllowed('Method not allowed')
-            result = handler(request, item)
-            if asyncio.iscoroutine(result):
-                return json(await result)
-            return json(result)
+    item = await db.get_item(item_id, quiet=False)
+    if member is None and request.url.endswith('/') and item.is_collection:
+        member = 'children'
+    if member is None:
+        handler = getattr(item, request.method.lower(), None)
+        if handler is None:
+            raise exceptions.MethodNotAllowed('Method not allowed')
+        result = handler(request)
+        if asyncio.iscoroutine(result):
+            return json(await result)
+        return json(result)
+    elif member in item.__schema__:
+        handler = getattr(item.__schema__[member],
+                          request.method.lower(),
+                          None)
+        if handler is None:
+            raise exceptions.MethodNotAllowed('Method not allowed')
+        result = handler(request, item)
+        if asyncio.iscoroutine(result):
+            return json(await result)
+        return json(result)
 
     raise exceptions.NotFound(
         'The resource {0} does not exist'.format(request.url))

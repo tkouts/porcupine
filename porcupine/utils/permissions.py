@@ -20,19 +20,19 @@ COORDINATOR = 8
 #     return get_role(item.security, user)
 
 
-async def resolve(security_descriptor, user_or_group):
+async def resolve(acl, user_or_group):
     # print(security_descriptor, user_or_group)
-    if user_or_group.is_admin():
+    if await user_or_group.is_admin():
         return COORDINATOR
-    if user_or_group.id in security_descriptor:
-        return security_descriptor[user_or_group.id]
+    if user_or_group.id in acl:
+        return acl[user_or_group.id]
     member_of = ['everyone']
     member_of.extend(await user_or_group.member_of.get())
     if hasattr(user_or_group, 'authenticate'):
-        member_of.extend(['authusers'])
+        member_of.append('authusers')
     # resolve nested groups membership
     member_of.extend(await resolve_membership(tuple(member_of)))
-    perms = [security_descriptor.get(group_id, NO_ACCESS)
+    perms = [acl.get(group_id, NO_ACCESS)
              for group_id in member_of] or [NO_ACCESS]
     return max(perms)
 

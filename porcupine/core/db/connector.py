@@ -19,33 +19,33 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
     def connect(self):
         raise NotImplementedError
 
-    async def _get_item_by_path(self, path_tokens):
-        child_id = ''
-        child = None
-        for name in path_tokens[1:]:
-            if name:
-                child = await self.get_child_by_name(child_id, name)
-                if child is None:
-                    return None
-                else:
-                    child_id = child.id
-        return child
+    # async def _get_item_by_path(self, path_tokens):
+    #     child_id = ''
+    #     child = None
+    #     for name in path_tokens[1:]:
+    #         if name:
+    #             child = await self.get_child_by_name(child_id, name)
+    #             if child is None:
+    #                 return None
+    #             else:
+    #                 child_id = child.id
+    #     return child
 
-    async def get(self, object_id):
+    async def get(self, object_id, quiet=True):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
-        if object_id.startswith('/'):
-            item = None
-            path_tokens = object_id.split('/')
-            path_depth = len(path_tokens)
-            # /[itemID]?
-            if path_depth == 2:
-                item = await self.get_raw(path_tokens[1])
-            # /folder1/folder2/item
-            if item is None:
-                return await self._get_item_by_path(path_tokens)
-        else:
-            item = await self.get_raw(object_id)
+        # if object_id.startswith('/'):
+        #     item = None
+        #     path_tokens = object_id.split('/')
+        #     path_depth = len(path_tokens)
+        #     # /[itemID]?
+        #     if path_depth == 2:
+        #         item = await self.get_raw(path_tokens[1])
+        #     # /folder1/folder2/item
+        #     if item is None:
+        #         return await self._get_item_by_path(path_tokens)
+        # else:
+        item = await self.get_raw(object_id, quiet=quiet)
 
         if item is not None:
             item = self.persist.loads(item)
@@ -87,7 +87,7 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
 
     # item operations
     # @abc.abstractmethod
-    async def get_raw(self, key):
+    async def get_raw(self, key, quiet=True):
         raise NotImplementedError
 
     async def get_partial_raw(self, key, *paths):

@@ -55,8 +55,8 @@ class Blob(DataType):
         if name not in storage:
             value = await db.connector.get_external('{0}_{1}'.format(
                 instance.id, name))
-            if value is not None:
-                storage[name] = value
+            # if value is not None:
+            storage[name] = value
         return storage[name]
 
     def __get__(self, instance, owner):

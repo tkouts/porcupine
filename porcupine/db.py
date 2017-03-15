@@ -10,23 +10,34 @@ from porcupine.utils import permissions
 connector = None
 
 
-async def get_item(oid):
+async def get_item(item_id, quiet=True):
     """
     Fetches an object from the database.
     If the user has no read permissions on the object
     or the item has been deleted then C{None} is returned.
 
-    @param oid: The object's ID or the object's full path.
-    @type oid: str
+    :param item_id: The object's ID or the object's full path.
+    :type item_id: str
 
-    @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
+    :param quiet: Do not raise exceptions if the item
+        does not exist or the user has no read permission.
+    :type quiet: bool
+
+    :rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
     """
-    item = await connector.get(oid)
+    item = await connector.get(item_id, quiet=quiet)
     if item is not None:
-        access_level = await permissions.resolve(item, context.user)
         is_deleted = await item.is_deleted
-        if not is_deleted and access_level != permissions.NO_ACCESS:
-            return item
+        if not is_deleted:
+            acl = await item.applied_acl
+            access_level = await permissions.resolve(acl, context.user)
+            if access_level != permissions.NO_ACCESS:
+                return item
+            elif not quiet:
+                raise exceptions.Forbidden('Forbidden')
+        elif not quiet:
+            raise exceptions.NotFound(
+                'The resource {0} does not exist'.format(item_id))
 
 
 async def get_multi(ids):
@@ -35,7 +46,8 @@ async def get_multi(ids):
     return [item for item in items
             if item is not None
             and not await item.is_deleted
-            and await permissions.resolve(item, context.user) != no_access]
+            and await permissions.resolve(
+                await item.applied_acl, context.user) != no_access]
 
 
 def transactional(auto_commit=True):

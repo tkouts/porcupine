@@ -34,3 +34,6 @@ class Children(ReferenceN):
                 return children
             return self
         return super().__get__(instance, owner)
+
+    async def get(self, request, instance, resolve=False):
+        return await super().get(request, instance, True)

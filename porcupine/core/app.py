@@ -8,6 +8,7 @@ from porcupine import db
 from porcupine.db import transactional
 from porcupine.utils import system
 from .context import context, with_context, system_override
+from porcupine.apps.schema.users import SystemUser
 
 
 class App(Blueprint):
@@ -40,11 +41,9 @@ class App(Blueprint):
     def after_stop(self, app, loop):
         pass
 
-    @with_context
+    @with_context(SystemUser())
     @transactional()
     async def __initialize_db(self, blueprint):
-        from porcupine.apps.schema.users import SystemUser
-        context.user = SystemUser()
         for item in blueprint.get('items', []):
             await self.__process_item(item, None)
 

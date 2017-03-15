@@ -22,7 +22,7 @@ class SystemUser(Item):
             self.description = 'System User'
 
     @staticmethod
-    def is_admin():
+    async def is_admin():
         """
         System User is an administrative account.
 
@@ -63,13 +63,13 @@ class GenericUser(Item):
         """
         return group.id in self.member_of
 
-    def is_admin(self):
+    async def is_admin(self):
         """
         Checks if the user is direct member of the administrators group.
 
         @rtype: bool
         """
-        return 'administrators' in self.member_of
+        return 'administrators' in await self.member_of.get()
 
 
 class User(GenericUser):

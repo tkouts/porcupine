@@ -3,6 +3,7 @@ import ujson
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
     SubdocPathNotFoundError
 import couchbase.experimental
+from porcupine import exceptions
 from porcupine.core.db.connector import AbstractConnector
 from .transaction import Transaction
 from .cursor import Cursor
@@ -52,9 +53,18 @@ class Couchbase(AbstractConnector):
             pass
         return True
 
-    async def get_raw(self, key):
-        result = await self.bucket.get(key, quiet=True)
+    async def get_raw(self, key, quiet=True):
+        try:
+            result = await self.bucket.get(key, quiet=quiet)
+        except NotFoundError:
+            raise exceptions.NotFound(
+                'The resource {0} does not exist'.format(key))
         return result.value
+
+    async def get_multi_raw(self, keys):
+        multi = await self.bucket.get_multi(keys, quiet=True)
+        return [multi[key].value for key in keys
+                if multi[key].value]
 
     async def get_partial_raw(self, key, *paths):
         values = await self.bucket.retrieve_in(key, *paths)
