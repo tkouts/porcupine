@@ -1,7 +1,7 @@
 import copy
 import collections
 from porcupine import context, db
-from porcupine.exceptions import InvalidUsage
+from porcupine.exceptions import InvalidUsage, ValidationError
 
 
 class DataType:
@@ -90,7 +90,7 @@ class DataType:
         @return: None
         """
         if self.required and not self.__get__(instance, None):
-            raise InvalidUsage(
+            raise ValidationError(
                 'Attribute {0} of {1} is mandatory.'.format(
                     self.name, instance.__class__.__name__))
 

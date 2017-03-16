@@ -1,4 +1,5 @@
-from porcupine import db
+from porcupine import db, exceptions
+from porcupine.contract import contract
 from porcupine.datatypes import DataType, Composition, String
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.utils import system
@@ -108,13 +109,18 @@ class Elastic(metaclass=ElasticMeta):
             result.update(kwargs)
         return result
 
-    # HTTP views
     def get(self, request):
         return self
 
+    @contract(accepts=dict)
     @db.transactional()
     async def post(self, request):
         for attr, value in request.json.items():
+            if attr not in self.__schema__:
+                raise exceptions.InvalidUsage(
+                    'The resource {0} has no attribute named {1}'.format(
+                        self.id, attr
+                    ))
             setattr(self, attr, value)
         await self.update()
 

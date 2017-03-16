@@ -21,6 +21,14 @@ class MethodNotAllowed(SanicException):
     status_code = 405
 
 
+class ValidationError(InvalidUsage):
+    pass
+
+
+class UnprocessableEntity(SanicException):
+    status_code = 422
+
+
 class ContainmentError(InvalidUsage):
     def __init__(self, target_item, attribute, source_item):
         super().__init__(
