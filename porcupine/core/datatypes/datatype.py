@@ -27,8 +27,12 @@ class DataType:
 
     def validate_value(self, value, instance):
         if instance is not None:
-            if self.readonly and not instance.__is_new__ \
-                    and not context.is_system_update:
+            try:
+                is_system_update = context.is_system_update
+            except ValueError:
+                # running outside the event loop, assume yes
+                is_system_update = True
+            if self.readonly and not is_system_update:
                 raise InvalidUsage(
                     'Attribute {0} of {1} is readonly'.format(
                         self.name, instance.__class__.__name__))
@@ -36,7 +40,7 @@ class DataType:
             return
         if not isinstance(value, self.safe_type):
             raise InvalidUsage(
-                'Unsupported type {} for {}'.format(
+                'Unsupported type {0} for {1}'.format(
                     value.__class__.__name__,
                     self.name or self.__class__.__name__))
 

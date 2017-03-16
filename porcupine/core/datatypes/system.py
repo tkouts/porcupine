@@ -1,5 +1,8 @@
-from porcupine import context, exceptions
-from porcupine.utils import permissions
+from sanic.response import text
+
+from porcupine import context, exceptions, db, server
+from porcupine.contract import is_new_item
+from porcupine.utils import permissions, system
 from .mutable import Dictionary
 from .common import String
 from .reference import ReferenceN
@@ -38,3 +41,18 @@ class Children(ReferenceN):
 
     async def get(self, request, instance, expand=True):
         return await super().get(request, instance, True)
+
+    @is_new_item()
+    @db.transactional()
+    async def post(self, request, instance):
+        item_dict = request.json
+        item_type = system.get_rto_by_name(item_dict.pop('type'))
+        new_item = item_type()
+        for attr, value in item_dict.items():
+            setattr(new_item, attr, value)
+        await new_item.append_to(instance)
+        location = server.url_for('resources.resource_handler',
+                                  item_id=new_item.id)
+        return text('', status=201, headers={
+            'Location': location
+        })

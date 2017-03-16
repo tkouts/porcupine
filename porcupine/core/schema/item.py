@@ -93,20 +93,21 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
                 'The user does not have write permissions '
                 'on the parent container.')
 
-        self.owner = user.id
-        self.created = self.modified = \
-            datetime.datetime.utcnow().isoformat()
-        self.modified_by = user.name
-        if parent is not None:
-            self.p_id = parent.id
+        with system_override():
+            self.owner = user.id
+            self.created = self.modified = \
+                datetime.datetime.utcnow().isoformat()
+            self.modified_by = user.name
+            if parent is not None:
+                self.p_id = parent.id
 
-        context.txn.insert(self)
-        if parent is not None:
-            with system_override():
+            context.txn.insert(self)
+            if parent is not None:
                 parent.children.add(self)
                 if self.is_collection:
                     parent.containers.add(self)
                 parent.modified = self.modified
+                context.txn.update(parent)
 
     def is_contained_in(self, item_id: str) -> bool:
         """

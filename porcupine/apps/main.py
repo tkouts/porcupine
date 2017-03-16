@@ -1,7 +1,7 @@
 import logging
 import asyncio
 
-from sanic.response import json
+from sanic.response import json, HTTPResponse
 
 from porcupine import App
 from porcupine import db, exceptions
@@ -29,18 +29,21 @@ main = Porcupine()
 
 
 @main.route('/<item_id>', methods=frozenset({'GET', 'POST'}))
-@main.route('/<item_id>/<member>', methods=frozenset({'GET', 'PUT'}))
-async def request_handler(request, item_id, member=None):
+async def resource_handler(request, item_id):
     item = await db.get_item(item_id, quiet=False)
-    if member is None:
-        handler = getattr(item, request.method.lower(), None)
-        if handler is None:
-            raise exceptions.MethodNotAllowed('Method not allowed')
-        result = handler(request)
-        if asyncio.iscoroutine(result):
-            return json(await result)
-        return json(result)
-    elif member in item.__schema__ and not item.__schema__[member].protected:
+    handler = getattr(item, request.method.lower(), None)
+    if handler is None:
+        raise exceptions.MethodNotAllowed('Method not allowed')
+    result = handler(request)
+    if asyncio.iscoroutine(result):
+        result = await result
+    return result if isinstance(result, HTTPResponse) else json(result)
+
+
+@main.route('/<item_id>/<member>', methods=frozenset({'GET', 'PUT', 'POST'}))
+async def member_handler(request, item_id, member):
+    item = await db.get_item(item_id, quiet=False)
+    if member in item.__schema__ and not item.__schema__[member].protected:
         handler = getattr(item.__schema__[member],
                           request.method.lower(),
                           None)
@@ -48,8 +51,8 @@ async def request_handler(request, item_id, member=None):
             raise exceptions.MethodNotAllowed('Method not allowed')
         result = handler(request, item)
         if asyncio.iscoroutine(result):
-            return json(await result)
-        return json(result)
+            result = await result
+        return result if isinstance(result, HTTPResponse) else json(result)
 
     raise exceptions.NotFound(
         'The resource {0} does not exist'.format(request.url))

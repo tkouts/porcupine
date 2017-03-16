@@ -1,20 +1,18 @@
-import os
-import sys
-import signal
-import time
 import argparse
 import logging
+import signal
+import sys
+import time
 
-from sanic import Sanic
+import os
 
 from porcupine import __version__
-from porcupine.config import settings
-from porcupine.log import setup_daemon_logging
 from porcupine.apps.main import main
-from .router import ContextRouter
+from porcupine.config import settings
+from .log import setup_daemon_logging
+from .server import server
 
 PID_FILE = '.pid'
-sanic = Sanic(router=ContextRouter())
 
 
 def set_pid():
@@ -78,11 +76,11 @@ def start(args):
     # register apps
     apps = [main]
     for app in apps:
-        sanic.blueprint(app, url_prefix=app.name)
-    sanic.run(host=settings['host'],
-              port=settings['port'],
-              workers=settings['workers'],
-              debug=args.debug)
+        server.blueprint(app, url_prefix=app.name)
+    server.run(host=settings['host'],
+               port=settings['port'],
+               workers=settings['workers'],
+               debug=args.debug)
 
 
 def run():
