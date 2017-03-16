@@ -54,6 +54,8 @@ class Children(ReferenceN):
         await new_item.append_to(instance)
         location = server.url_for('resources.resource_handler',
                                   item_id=new_item.id)
-        return json(new_item.id, status=201, headers={
-            'Location': location
-        })
+        return json(new_item.id,
+                    status=201,
+                    headers={
+                        'Location': location
+                    })

@@ -7,10 +7,10 @@ from porcupine.core.context import system_override
 
 
 class ElasticMeta(type):
-    slots = ('__storage__', '__ext', '__snap', '__is_new__')
 
     def __new__(mcs, name, bases, dct):
-        dct['__slots__'] = ElasticMeta.slots
+        if '__slots__' not in dct:
+            dct['__slots__'] = ()
         return super().__new__(mcs, name, bases, dct)
 
     def __init__(cls, name, bases, dct):
@@ -28,19 +28,11 @@ class ElasticMeta(type):
         super().__init__(name, bases, dct)
 
 
-# class ElasticBase:
-#     __slots__ = ('__storage__', '__externals__', '__snapshot__', '__is_new__')
-#
-#     def __init__(self, storage=None):
-#         if storage is None:
-#             storage = {}
-#         self.__storage__ = storage
-#         self.__externals__ = {}
-#         self.__snapshot__ = {}
-#         self.__is_new__ = False
+class ElasticSlotsBase:
+    __slots__ = ('__storage__', '_ext', '_snap', '__is_new__')
 
 
-class Elastic(metaclass=ElasticMeta):
+class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     """
     Base class for all Porcupine objects.
     Accommodates schema updates without requiring database updates.
@@ -64,8 +56,8 @@ class Elastic(metaclass=ElasticMeta):
         if storage is None:
             storage = {}
         self.__storage__ = storage
-        self.__ext = None
-        self.__snap = None
+        self._ext = None
+        self._snap = None
         self.__is_new__ = False
 
         if 'id' not in storage:
@@ -98,15 +90,15 @@ class Elastic(metaclass=ElasticMeta):
 
     @property
     def __snapshot__(self):
-        if self.__snap is None:
-            self.__snap = {}
-        return self.__snap
+        if self._snap is None:
+            self._snap = {}
+        return self._snap
 
     @property
     def __externals__(self):
-        if self.__ext is None:
-            self.__ext = {}
-        return self.__ext
+        if self._ext is None:
+            self._ext = {}
+        return self._ext
 
     @property
     def parent_id(self):
