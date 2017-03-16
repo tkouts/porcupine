@@ -14,6 +14,7 @@ class Cloneable(object):
     Adding I{Cloneable} to the base classes of a class
     makes instances of this class cloneable, allowing item copying.
     """
+    __slots__ = ()
 
     @staticmethod
     def _prepare_id_map(item, id_map, is_root=False):
@@ -208,6 +209,7 @@ class Movable(object):
     Adding I{Movable} to the base classes of a class
     makes instances of this class movable, allowing item moving.
     """
+    __slots__ = ()
 
     def _update_pids(self, path_info):
         db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
@@ -311,6 +313,7 @@ class Removable(object):
     deleted - (moved to a L{RecycleBin} instance) - or physically
     deleted.
     """
+    __slots__ = ()
 
     def _delete(self, _update_parent=True):
         """

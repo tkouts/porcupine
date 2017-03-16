@@ -1,4 +1,4 @@
-from sanic.response import text
+from sanic.response import json
 
 from porcupine import context, exceptions, db, server
 from porcupine.contract import is_new_item
@@ -46,6 +46,7 @@ class Children(ReferenceN):
     @db.transactional()
     async def post(self, request, instance):
         item_dict = request.json
+        # TODO: handle invalid type exception
         item_type = system.get_rto_by_name(item_dict.pop('type'))
         new_item = item_type()
         for attr, value in item_dict.items():
@@ -53,6 +54,6 @@ class Children(ReferenceN):
         await new_item.append_to(instance)
         location = server.url_for('resources.resource_handler',
                                   item_id=new_item.id)
-        return text('', status=201, headers={
+        return json(new_item.id, status=201, headers={
             'Location': location
         })

@@ -7,6 +7,12 @@ from porcupine.core.context import system_override
 
 
 class ElasticMeta(type):
+    slots = ('__storage__', '__ext', '__snap', '__is_new__')
+
+    def __new__(mcs, name, bases, dct):
+        dct['__slots__'] = ElasticMeta.slots
+        return super().__new__(mcs, name, bases, dct)
+
     def __init__(cls, name, bases, dct):
         schema = {}
         for attr_name in dir(cls):
@@ -17,10 +23,21 @@ class ElasticMeta(type):
                     attr.name = attr_name
             except AttributeError:
                 continue
-        # print(cls.__dict__)
         cls.__schema__ = schema
         cls.__sig__ = system.hash_series(*schema.keys()).hexdigest()
         super().__init__(name, bases, dct)
+
+
+# class ElasticBase:
+#     __slots__ = ('__storage__', '__externals__', '__snapshot__', '__is_new__')
+#
+#     def __init__(self, storage=None):
+#         if storage is None:
+#             storage = {}
+#         self.__storage__ = storage
+#         self.__externals__ = {}
+#         self.__snapshot__ = {}
+#         self.__is_new__ = False
 
 
 class Elastic(metaclass=ElasticMeta):
@@ -35,8 +52,6 @@ class Elastic(metaclass=ElasticMeta):
     """
     __schema__ = {}
     __sig__ = ''
-    __is_new__ = False
-    # __slots__ = ['__storage__', '__externals__', '__snapshot__']
 
     event_handlers = []
     is_collection = False
@@ -49,8 +64,10 @@ class Elastic(metaclass=ElasticMeta):
         if storage is None:
             storage = {}
         self.__storage__ = storage
-        self.__externals__ = {}
-        self.__snapshot__ = {}
+        self.__ext = None
+        self.__snap = None
+        self.__is_new__ = False
+
         if 'id' not in storage:
             # new item
             self.__is_new__ = True
@@ -78,6 +95,18 @@ class Elastic(metaclass=ElasticMeta):
                 if attr in self.__schema__
                 and not self.__schema__[attr].protected}
     toDict = to_dict
+
+    @property
+    def __snapshot__(self):
+        if self.__snap is None:
+            self.__snap = {}
+        return self.__snap
+
+    @property
+    def __externals__(self):
+        if self.__ext is None:
+            self.__ext = {}
+        return self.__ext
 
     @property
     def parent_id(self):

@@ -49,9 +49,10 @@ class App(Blueprint):
 
     async def __process_item(self, item_dict, parent):
         item_id = item_dict.pop('id')
+        item_type = item_dict.pop('type')
         item = await db.connector.get(item_id)
         if item is None:
-            item = system.get_rto_by_name(item_dict.pop('type'))()
+            item = system.get_rto_by_name(item_type)()
             item.id = item_id
         children = item_dict.pop('children', [])
 

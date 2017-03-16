@@ -80,7 +80,7 @@ class DataType:
         elif instance.__snapshot__[self.name] == value:
             del instance.__snapshot__[self.name]
 
-    def validate(self, instance):
+    def validate(self, value):
         """
         Data type validation method.
 
@@ -88,21 +88,20 @@ class DataType:
         instance attribute of an object, whenever this object
         is appended or updated.
 
-        @raise ValueError:
-            if the data type is mandatory and is empty.
+        @raise ValidationError:
+            if the data type is mandatory and value is empty.
 
         @return: None
         """
-        if self.required and not self.__get__(instance, None):
+        if self.required and not value:
             raise ValidationError(
-                'Attribute {0} of {1} is mandatory.'.format(
-                    self.name, instance.__class__.__name__))
+                'Attribute {0} is mandatory.'.format(self.name))
 
     def clone(self, instance, memo):
         pass
 
     def on_change(self, instance, value, old_value):
-        self.validate(instance)
+        self.validate(value)
         if not instance.__is_new__:
             txn = context.txn
             txn.mutate(instance, self.name, txn.UPSERT_MUT, value)
