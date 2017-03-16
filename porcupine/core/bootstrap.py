@@ -59,6 +59,8 @@ def stop():
 
 
 def start(args):
+    if args.debug:
+        settings['log']['level'] = logging.DEBUG
     if args.daemon:
         pid = fork()
         if pid:
@@ -79,7 +81,8 @@ def start(args):
         sanic.blueprint(app, url_prefix=app.name)
     sanic.run(host=settings['host'],
               port=settings['port'],
-              workers=settings['workers'])
+              workers=settings['workers'],
+              debug=args.debug)
 
 
 def run():
@@ -100,6 +103,9 @@ def run():
                         action='store_true')
     parser.add_argument('--graceful',
                         help='restart porcupine',
+                        action='store_true')
+    parser.add_argument('--debug',
+                        help='enable debug mode',
                         action='store_true')
     args = parser.parse_args()
 
