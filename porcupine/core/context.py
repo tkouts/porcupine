@@ -20,16 +20,18 @@ class PContext(Local):
             return False
 
     @property
-    def cache(self):
+    def caches(self):
         try:
-            return self.__cache__
+            return self.__caches__
         except AttributeError:
-            lru_cache = pylru.lrucache(1000)
-            self.__setattr__('__cache__', lru_cache)
-            return lru_cache
+            caches = {}
+            self.__setattr__('__caches__', caches)
+            return caches
 
     def reset(self):
-        self.cache.clear()
+        # clear caches
+        for cache in self.caches.values():
+            cache.clear()
 
 
 context = PContext()
@@ -69,23 +71,27 @@ def with_context(identity):
     return decorator
 
 
-def context_cacheable(co_routine):
+def context_cacheable(size=100):
     """
     Caches the result of a coroutine in the context scope
     :return: asyncio.Task
     """
-    @wraps(co_routine)
-    async def cache_wrapper(*args):
-        cache_key = (
-            '{0}.{1}'.format(co_routine.__module__,
-                             co_routine.__qualname__),
-            args)
-        # print('CACHE KEY', cache_key)
-        if cache_key in context.cache:
-            # print('CACHE HIT')
-            return context.cache[cache_key]
-        result = await co_routine(*args)
-        context.cache[cache_key] = result
-        return result
-
-    return cache_wrapper
+    def cache_decorator(co_routine):
+        @wraps(co_routine)
+        async def cache_wrapper(*args):
+            # initialize cache
+            cache_name = '{0}.{1}'.format(co_routine.__module__,
+                                          co_routine.__qualname__)
+            if cache_name not in context.caches:
+                context.caches[cache_name] = pylru.lrucache(size)
+            cache = context.caches[cache_name]
+            cache_key = args
+            # print('CACHE KEY', cache_key)
+            if cache_key in cache:
+                # print('CACHE HIT')
+                return cache[cache_key]
+            result = await co_routine(*args)
+            cache[cache_key] = result
+            return result
+        return cache_wrapper
+    return cache_decorator

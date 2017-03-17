@@ -72,13 +72,13 @@ def hash_series(*args, using='md5'):
     return md5_hash
 
 
-@context_cacheable
+@context_cacheable(1000)
 async def get_item_state(item_id):
     return await db.connector.get_partial(
         item_id, 'p_id', 'acl', 'deleted', 'sys', snapshot=True)
 
 
-@context_cacheable
+@context_cacheable(100)
 async def resolve_deleted(item_id):
     state = await get_item_state(item_id)
     while not state['deleted'] and state['p_id'] is not None:
@@ -88,7 +88,7 @@ async def resolve_deleted(item_id):
     return state['deleted']
 
 
-@context_cacheable
+@context_cacheable(100)
 async def resolve_acl(object_id):
     state = await get_item_state(object_id)
     while state['acl'] is None and state['p_id'] is not None:

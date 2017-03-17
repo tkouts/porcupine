@@ -37,9 +37,8 @@ async def resolve(acl, user_or_group):
     return max(perms)
 
 
-@context_cacheable
+@context_cacheable(1000)
 async def resolve_membership(group_ids):
-    # from porcupine import db
     extended_membership = []
     groups = await db.connector.get_multi(group_ids)
     for group in groups:
