@@ -1,12 +1,14 @@
-import random
 import ujson
+
+import couchbase.experimental
+import random
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
     SubdocPathNotFoundError
-import couchbase.experimental
+
 from porcupine import exceptions
-from porcupine.core.db.connector import AbstractConnector
-from .transaction import Transaction
+from porcupine.core.abstract.db.connector import AbstractConnector
 from .cursor import Cursor
+from .transaction import Transaction
 
 couchbase.experimental.enable()
 from acouchbase.bucket import Bucket

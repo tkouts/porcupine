@@ -1,7 +1,7 @@
 from couchbase.exceptions import NotFoundError
 from couchbase.views.params import *
 
-from porcupine.core.db.cursor import AbstractCursor
+from porcupine.core.abstract.db.cursor import AbstractCursor
 
 
 class Cursor(AbstractCursor):
