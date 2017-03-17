@@ -137,12 +137,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @db.transactional()
     async def post(self, request):
         for attr, value in request.json.items():
-            if attr not in self.__schema__:
-                raise exceptions.InvalidUsage(
-                    'The resource {0} has no attribute named {1}'.format(
-                        self.id, attr
-                    ))
-            setattr(self, attr, value)
+            try:
+                setattr(self, attr, value)
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
         await self.update()
 
     def update_schema(self):

@@ -1,7 +1,6 @@
 import copy
 import collections
-from porcupine import context, db
-from porcupine.exceptions import InvalidUsage, ValidationError
+from porcupine import context, db, exceptions
 
 
 class DataType:
@@ -33,13 +32,13 @@ class DataType:
                 # running outside the event loop, assume yes
                 is_system_update = True
             if self.readonly and not is_system_update:
-                raise InvalidUsage(
+                raise AttributeError(
                     'Attribute {0} of {1} is readonly'.format(
                         self.name, instance.__class__.__name__))
         if self.allow_none and value is None:
             return
         if not isinstance(value, self.safe_type):
-            raise InvalidUsage(
+            raise TypeError(
                 'Unsupported type {0} for {1}'.format(
                     value.__class__.__name__,
                     self.name or self.__class__.__name__))
@@ -94,7 +93,7 @@ class DataType:
         @return: None
         """
         if self.required and not value:
-            raise ValidationError(
+            raise ValueError(
                 'Attribute {0} is mandatory.'.format(self.name))
 
     def clone(self, instance, memo):
@@ -118,5 +117,8 @@ class DataType:
 
     @db.transactional()
     async def put(self, request, instance):
-        setattr(instance, self.name, request.json)
+        try:
+            setattr(instance, self.name, request.json)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
         await instance.update()

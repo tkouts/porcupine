@@ -86,10 +86,13 @@ class Transaction(AbstractTransaction):
         for item in {**self._inserted, **self._modified}.values():
             for attr, old_value in item.__snapshot__.items():
                 attr_def = item.__schema__[attr]
-                on_change = attr_def.on_change(
-                    item, getattr(item, attr_def.storage)[attr], old_value)
-                if asyncio.iscoroutine(on_change):
-                    await on_change
+                try:
+                    on_change = attr_def.on_change(
+                        item, getattr(item, attr_def.storage)[attr], old_value)
+                    if asyncio.iscoroutine(on_change):
+                        await on_change
+                except exceptions.AttributeSetError as e:
+                    raise exceptions.InvalidUsage(str(e))
 
         connector = self.connector
         dumps = connector.persist.dumps

@@ -43,8 +43,8 @@ async def resource_handler(request, item_id):
 @main.route('/<item_id>/<member>', methods=frozenset({'GET', 'PUT', 'POST'}))
 async def member_handler(request, item_id, member):
     item = await db.get_item(item_id, quiet=False)
-    if member in item.__schema__ and not item.__schema__[member].protected:
-        handler = getattr(item.__schema__[member],
+    if hasattr(item.__class__, member):
+        handler = getattr(getattr(item.__class__, member),
                           request.method.lower(),
                           None)
         if handler is None:

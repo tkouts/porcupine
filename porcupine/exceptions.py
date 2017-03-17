@@ -1,12 +1,11 @@
-from sanic.exceptions import SanicException, InvalidUsage, \
-    NotFound, ServerError
+from sanic.exceptions import SanicException, InvalidUsage, NotFound, ServerError
 
 
 class Conflict(SanicException):
     status_code = 409
 
 
-class DBDeadlockError(Conflict):
+class DBDeadlockError(ServerError):
     pass
 
 
@@ -22,16 +21,15 @@ class MethodNotAllowed(SanicException):
     status_code = 405
 
 
-class ValidationError(InvalidUsage):
-    pass
-
-
 class UnprocessableEntity(SanicException):
     status_code = 422
 
 
-class ContainmentError(InvalidUsage):
+class ContainmentError(TypeError):
     def __init__(self, target_item, attribute, source_item):
         super().__init__(
             'Attribute {0} of {1} does not accept objects of {2}'.format(
                 attribute, target_item.name, source_item.content_class))
+
+
+AttributeSetError = (AttributeError, ValueError, TypeError)
