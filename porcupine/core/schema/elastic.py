@@ -76,8 +76,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             with system_override():
                 self.sig = self.__class__.__sig__
 
-    def __hash__(self):
-        return hash(self.__storage__['id'])
+    # def __hash__(self):
+    #     return hash(self.__storage__['id'])
 
     def __repr__(self):
         return repr(self.__storage__)
@@ -86,6 +86,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         return {attr: value for attr, value in self.__storage__.items()
                 if attr in self.__schema__
                 and not self.__schema__[attr].protected}
+
+    # json serializer
     toDict = to_dict
 
     @property

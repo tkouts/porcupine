@@ -310,7 +310,7 @@ class Removable(object):
     Adding I{Removable} to the base classes of a class
     makes instances of this type removable.
     Instances of this type can be either logically
-    deleted - (moved to a L{RecycleBin} instance) - or physically
+    deleted (moved to a L{RecycleBin} instance) or physically
     deleted.
     """
     __slots__ = ()

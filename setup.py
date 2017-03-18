@@ -31,7 +31,7 @@ setup(
         'sanic>=0.4.1',
         'couchbase>=2.2.1',
         'PyYAML>=3.12',
-        'pylru>=1.0.9',
+        'lru-dict>=1.1.6',
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

@@ -87,7 +87,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
             security = {}
 
         user = context.user
-        user_role = await permissions.resolve(security, user)
+        user_role = await permissions.resolve_acl(security, user)
         if user_role == permissions.READER:
             raise exceptions.Forbidden(
                 'The user does not have write permissions '
@@ -189,14 +189,13 @@ class Item(GenericItem):
         @return: None
         """
         if self.__snapshot__:
-            security = await self.applied_acl
             if self.p_id is not None:
                 parent = await db.connector.get(self.p_id)
             else:
                 parent = None
 
             user = context.user
-            user_role = await permissions.resolve(security, user)
+            user_role = await permissions.resolve_acl(self, user)
 
             if user_role > permissions.READER:
                 with system_override():

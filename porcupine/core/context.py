@@ -1,5 +1,5 @@
 import asyncio
-import pylru
+from lru import LRU
 from functools import wraps
 from .aiolocals.local import Local, Context
 
@@ -83,7 +83,7 @@ def context_cacheable(size=100):
             cache_name = '{0}.{1}'.format(co_routine.__module__,
                                           co_routine.__qualname__)
             if cache_name not in context.caches:
-                context.caches[cache_name] = pylru.lrucache(size)
+                context.caches[cache_name] = LRU(size)
             cache = context.caches[cache_name]
             cache_key = args
             # print('CACHE KEY', cache_key)

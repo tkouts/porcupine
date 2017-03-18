@@ -65,8 +65,7 @@ class Couchbase(AbstractConnector):
 
     async def get_multi_raw(self, keys):
         multi = await self.bucket.get_multi(keys, quiet=True)
-        return [multi[key].value for key in keys
-                if multi[key].value]
+        return [multi[key].value for key in keys]
 
     async def get_partial_raw(self, key, *paths):
         values = await self.bucket.retrieve_in(key, *paths)

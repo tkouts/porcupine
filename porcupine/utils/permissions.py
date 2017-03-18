@@ -16,11 +16,11 @@ CONTENT_CO = 4
 COORDINATOR = 8
 
 
-# def resolve(item, user):
-#     return get_role(item.security, user)
+async def resolve(item, user):
+    return await resolve_acl(await item.applied_acl, user)
 
 
-async def resolve(acl, user_or_group):
+async def resolve_acl(acl, user_or_group):
     # print(security_descriptor, user_or_group)
     if await user_or_group.is_admin():
         return COORDINATOR
