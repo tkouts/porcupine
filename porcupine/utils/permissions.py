@@ -26,25 +26,34 @@ async def resolve_acl(acl, user_or_group):
         return COORDINATOR
     if user_or_group.id in acl:
         return acl[user_or_group.id]
-    member_of = ['everyone']
-    member_of.extend(await user_or_group.member_of.get())
+
+    # get membership
+    member_of = set(await user_or_group.member_of.get())
+
+    if member_of:
+        # resolve nested groups membership
+        member_of.update(await resolve_membership(frozenset(member_of)))
+
+    # add dynamic groups
+    member_of.add('everyone')
     if hasattr(user_or_group, 'authenticate'):
-        member_of.append('authusers')
-    # resolve nested groups membership
-    member_of.extend(await resolve_membership(tuple(member_of)))
+        member_of.add('authusers')
+
     perms = [acl.get(group_id, NO_ACCESS)
-             for group_id in member_of] or [NO_ACCESS]
+             for group_id in member_of]
+    if not perms:
+        return NO_ACCESS
     return max(perms)
 
 
 @context_cacheable(1000)
 async def resolve_membership(group_ids):
-    extended_membership = []
+    extended_membership = set()
     groups = await db.connector.get_multi(group_ids)
     for group in groups:
-        extended_membership += [group_id for group_id in group.member_of
-                                if group_id not in group_ids]
+        extended_membership.update({
+            group_id for group_id in await group.member_of.get()})
     if extended_membership:
-        extended_membership += await resolve_membership(
-            tuple(set(extended_membership)))
+        extended_membership.update(
+            await resolve_membership(frozenset(extended_membership)))
     return extended_membership
