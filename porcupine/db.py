@@ -1,4 +1,3 @@
-import time
 import asyncio
 import copy
 from functools import wraps
@@ -64,7 +63,6 @@ def transactional(auto_commit=True):
         async def transactional_wrapper(*args, **kwargs):
             if context.txn is None:
                 # top level function
-                now = time.time()
                 retries = 0
                 sleep_time = min_sleep_time
                 context.txn = connector.get_transaction()
@@ -97,7 +95,6 @@ def transactional(auto_commit=True):
                             else:
                                 # abort if not committed
                                 await context.txn.abort()
-                            print('TXN time', time.time() - now)
                             return val
                         except exceptions.DBDeadlockError:
                             await context.txn.abort()

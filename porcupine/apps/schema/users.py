@@ -17,7 +17,8 @@ class SystemUser(Item):
     def __init__(self, storage=None):
         super().__init__(storage)
         if self.__is_new__:
-            self.id = 'system'
+            # direct assignment of id. don't try this at home!
+            self.__storage__['id'] = 'system'
             self.name = 'SYSTEM'
             self.description = 'System User'
 

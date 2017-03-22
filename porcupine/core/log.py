@@ -23,7 +23,7 @@ def logger_thread():
         logger.handle(record)
 
 
-def setup_logging(daemon, multiprocess):
+def setup(daemon, multiprocess):
     root = logging.getLogger()
     formatter = logging.Formatter(log_settings['format'])
     if daemon:
@@ -44,7 +44,7 @@ def setup_logging(daemon, multiprocess):
         mp_log_thread.start()
 
 
-def setup_mp_logging(*args):
+def setup_mp(*args):
     qh = logging.handlers.QueueHandler(mp_log_queue)
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
@@ -52,7 +52,7 @@ def setup_mp_logging(*args):
     root.addHandler(qh)
 
 
-def shutdown_logging():
+def shutdown():
     if mp_log_queue is not None:
         mp_log_queue.put(None)
         mp_log_thread.join()

@@ -35,7 +35,7 @@ default_settings = {
         'level': 20,
         'max_bytes': 0,
         'backups': 3,
-        'format': '%(asctime)s [%(levelname)s] %(message)s',
+        'format': '%(asctime)s %(processName)s [%(levelname)s] %(message)s',
         # 'mp_format': '%(asctime)s [%(levelname)s/%(processName)s] %(message)s'
     }
 }

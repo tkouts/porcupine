@@ -48,7 +48,7 @@ class Couchbase(AbstractConnector):
 
     async def exists(self, key):
         try:
-            await self.bucket.retrieve_in(key, 'sys')
+            await self.bucket.retrieve_in(key, '/')
         except NotFoundError:
             return False
         except (DocumentNotJsonError, SubdocPathNotFoundError):

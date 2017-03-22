@@ -54,7 +54,8 @@ class App(Blueprint):
         item = await db.connector.get(item_id)
         if item is None:
             item = system.get_rto_by_name(item_type)()
-            item.id = item_id
+            # restore id in dict so it is set
+            item_dict['id'] = item_id
 
         with system_override():
             for attr, value in item_dict.items():

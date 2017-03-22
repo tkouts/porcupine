@@ -91,8 +91,6 @@ class Password(String):
         # self.validate_value(value)
         # instance.__storage__[self.name] = hashlib.md5(value).hexdigest()
 
-    def validate(self, instance):
-        if self.required \
-                and self.__get__(instance, None) == self.empty:
-            raise ValueError('Attribute "{}" of "{}" is mandatory.'.format(
-                self.name, instance.__class__.__name__))
+    def validate(self, value):
+        if self.required and value == self.empty:
+            raise ValueError('Attribute {0} is mandatory.'.format(self.name))

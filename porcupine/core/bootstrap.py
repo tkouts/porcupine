@@ -6,7 +6,7 @@ import asyncio
 from porcupine import __version__
 from porcupine.apps.resources import resources
 from porcupine.config import settings
-from .log import setup_logging, porcupine_log, shutdown_logging, setup_mp_logging
+from . import log
 from .server import server
 from .services import services
 from .daemon import Daemon
@@ -15,7 +15,7 @@ PID_FILE = '/tmp/porcupine.pid'
 
 
 def run_server(debug=False, loop=None):
-    porcupine_log.info('Starting Porcupine %s', __version__)
+    log.porcupine_log.info('Starting Porcupine %s', __version__)
     server.run(host=settings['host'],
                port=settings['port'],
                workers=settings['workers'],
@@ -38,17 +38,18 @@ def start(args):
         settings['log']['level'] = logging.DEBUG
 
     is_multi_process = settings['workers'] > 1
-    setup_logging(args.daemon, is_multi_process)
+    log.setup(args.daemon, is_multi_process)
 
     before_start = server.listeners['before_server_start']
     if is_multi_process:
-        before_start.append(setup_mp_logging)
+        before_start.append(log.setup_mp)
 
     # register services blueprint
     server.blueprint(services)
 
     # locate apps
     apps = [resources]
+    # register apps
     for app in apps:
         server.blueprint(app, url_prefix=app.name)
 
@@ -66,7 +67,7 @@ def start(args):
         else:
             run_server(debug=args.debug)
     finally:
-        shutdown_logging()
+        log.shutdown()
 
 
 def run():
