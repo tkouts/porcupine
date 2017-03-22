@@ -2,32 +2,19 @@ import asyncio
 
 from sanic.response import json, HTTPResponse
 
-from porcupine import App, log
+from porcupine import App
 from porcupine import db, exceptions
-from porcupine.config import settings
-from porcupine.utils import system
 
 
-class Porcupine(App):
+class Resources(App):
+    """Exposes all items over HTTP using a simple REST API"""
     name = 'resources'
     db_blueprint = 'db.yml'
 
-    async def before_start(self, app, loop):
-        # connect to database
-        log.info('Opening database')
-        connector_type = system.get_rto_by_name(settings['db']['type'])
-        db.connector = connector_type()
-        await db.connector.connect()
-        await super().before_start(app, loop)
-
-    async def after_stop(self, app, loop):
-        # close database
-        await db.connector.close()
-
-main = Porcupine()
+resources = Resources()
 
 
-@main.route('/<item_id>', methods=frozenset({'GET', 'POST'}))
+@resources.route('/<item_id>', methods=frozenset({'GET', 'POST'}))
 async def resource_handler(request, item_id):
     item = await db.get_item(item_id, quiet=False)
     handler = getattr(item, request.method.lower(), None)
@@ -39,7 +26,7 @@ async def resource_handler(request, item_id):
     return result if isinstance(result, HTTPResponse) else json(result)
 
 
-@main.route('/<item_id>/<member>', methods=frozenset({'GET', 'PUT', 'POST'}))
+@resources.route('/<item_id>/<member>', methods=frozenset({'GET', 'PUT', 'POST'}))
 async def member_handler(request, item_id, member):
     item = await db.get_item(item_id, quiet=False)
     if hasattr(item.__class__, member):

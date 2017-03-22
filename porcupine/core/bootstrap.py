@@ -4,38 +4,33 @@ import sys
 import asyncio
 
 from porcupine import __version__
-from porcupine.apps.main import main
+from porcupine.apps.resources import resources
 from porcupine.config import settings
 from .log import setup_logging, porcupine_log, shutdown_logging, setup_mp_logging
 from .server import server
+from .services import services
 from .daemon import Daemon
 
 PID_FILE = '/tmp/porcupine.pid'
 
 
-def run_server(apps, before_start, debug, loop=None):
+def run_server(debug=False, loop=None):
     porcupine_log.info('Starting Porcupine %s', __version__)
-    for app in apps:
-        server.blueprint(app, url_prefix=app.name)
-
     server.run(host=settings['host'],
                port=settings['port'],
                workers=settings['workers'],
-               before_start=before_start,
                loop=loop,
                debug=debug)
 
 
 class PorcupineDaemon(Daemon):
-    def __init__(self, apps, before_start=(), debug=False):
+    def __init__(self, debug=False):
         super().__init__(PID_FILE)
-        self.apps = apps
-        self.before_start = before_start
         self.debug = debug
 
     def run(self):
         loop = asyncio.get_event_loop()
-        run_server(self.apps, self.before_start, self.debug, loop=loop)
+        run_server(self.debug, loop=loop)
 
 
 def start(args):
@@ -45,15 +40,22 @@ def start(args):
     is_multi_process = settings['workers'] > 1
     setup_logging(args.daemon, is_multi_process)
 
-    before_start = []
+    before_start = server.listeners['before_server_start']
     if is_multi_process:
         before_start.append(setup_mp_logging)
+
+    # register services blueprint
+    server.blueprint(services)
+
     # locate apps
-    apps = [main]
+    apps = [resources]
+    for app in apps:
+        server.blueprint(app, url_prefix=app.name)
+
     try:
         if args.daemon or args.stop or args.graceful:
             # daemon commands
-            daemon = PorcupineDaemon(apps, before_start, args.debug)
+            daemon = PorcupineDaemon(debug=args.debug)
             if args.daemon:
                 daemon.start()
             elif args.stop:
@@ -62,7 +64,7 @@ def start(args):
                 daemon.restart()
             sys.exit()
         else:
-            run_server(apps, before_start, args.debug)
+            run_server(debug=args.debug)
     finally:
         shutdown_logging()
 
