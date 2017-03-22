@@ -75,7 +75,8 @@ def hash_series(*args, using='md5'):
 @context_cacheable(1000)
 async def get_item_state(item_id):
     return await db.connector.get_partial(
-        item_id, 'p_id', 'acl', 'deleted', 'sys', snapshot=True)
+        item_id, 'p_id', 'acl', 'deleted', 'sys',
+        snapshot=True)
 
 
 @context_cacheable(100)

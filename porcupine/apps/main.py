@@ -1,9 +1,8 @@
-import logging
 import asyncio
 
 from sanic.response import json, HTTPResponse
 
-from porcupine import App
+from porcupine import App, log
 from porcupine import db, exceptions
 from porcupine.config import settings
 from porcupine.utils import system
@@ -15,7 +14,7 @@ class Porcupine(App):
 
     async def before_start(self, app, loop):
         # connect to database
-        logging.info('Opening database')
+        log.info('Opening database')
         connector_type = system.get_rto_by_name(settings['db']['type'])
         db.connector = connector_type()
         await db.connector.connect()

@@ -1,49 +1,30 @@
-from functools import wraps
+import asyncio
+import couchbase.experimental
+couchbase.experimental.enable()
+from acouchbase.bucket import Bucket
+from sanic.response import json
+from sanic import Sanic
+
+app = Sanic(__name__)
+
+bucket = None
+
+async def connect(*args):
+    global bucket
+    connection_string = 'couchbase://localhost/porcupine'
+    bucket = Bucket(connection_string,
+                    password='')
+    await bucket.connect()
 
 
-class MutableWatcher(type):
-    mutating_members = []
-
-    def __init__(cls, name, bases, dct):
-        print('INITI')
-        for member_name in cls.mutating_members:
-            member = getattr(cls, member_name)
-            setattr(cls, member_name, MutableWatcher.snapshot(member))
-        super().__init__(name, bases, dct)
-
-    @staticmethod
-    def snapshot(method):
-        @wraps(method)
-        def mutation_watcher(self, *args, **kwargs):
-            print('method call', *args)
-            return method(self, *args, **kwargs)
-        return mutation_watcher
+@app.route('/')
+async def hello(request):
+    # print(os.getpid())
+    await bucket.get('system')
+    await bucket.get('users')  # , 'p_id', 'acl', 'deleted', 'sys')
+    return json(await bucket.get('admin'))
 
 
-class Dict(list, metaclass=MutableWatcher):
-    mutating_members = ['__setitem__']
-
-    def __init__(self, instance, seq=()):
-        self._instance = instance
-        super().__init__(seq)
-
-    # def __getattribute__(self, item):
-    #     print(item)
-    #     return getattr(super(), item)
-
-    # def __setitem__(self, key, value):
-    #     print('setting', key)
-    #     super().__setitem__(key, value)
-
-
-a = Dict(None, [1])
-
-# b = Dict(None, 2)
-
-# Dict.fromkeys(['1', '2'])
-
-# a.update({'sdfsdf': 1})
-a[0] = 1
-# a.setdefault('sdfsdf', 1)
-
-print(a._instance)
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    app.run(workers=2, before_start=[connect])

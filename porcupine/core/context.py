@@ -30,8 +30,11 @@ class PContext(Local):
 
     def reset(self):
         # clear caches
-        for cache in self.caches.values():
-            cache.clear()
+        # for cache in self.caches.values():
+        #     cache.clear()
+        setattr(self, '__caches__', {})
+        setattr(self, 'user', None)
+        setattr(self, 'txn', None)
 
 
 context = PContext()
@@ -45,7 +48,7 @@ class system_override:
         context.__sys__ = False
 
 
-def with_context(identity):
+def with_context(identity=None):
     from porcupine import db
 
     def decorator(func):
@@ -57,7 +60,7 @@ def with_context(identity):
         async def context_wrapper(*args, **kwargs):
             with Context():
                 user = identity
-                if isinstance(identity, str):
+                if identity is not None and isinstance(identity, str):
                     user = await db.connector.get(identity)
                 context.user = user
                 try:

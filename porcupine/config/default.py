@@ -3,16 +3,11 @@ default_settings = {
     'port': 8000,
     'workers': 1,
     'daemon': False,
-    'temp_folder': 'tmp',
+    'temp_folder': '/tmp',
     'db': {
         # how many times a transaction is retried
         # before an error is raised
         # 'txn_max_retries': 16,
-        # tuples of (field_name, unique per container, immutable)
-        'indices': (
-            ('name', True, False),
-            ('is_collection', False, True),
-        ),
         'type': 'porcupine.connectors.Couchbase',
         'hosts': ['localhost'],
         # 'protocol': 'couchbase',
@@ -42,16 +37,5 @@ default_settings = {
         'backups': 3,
         'format': '%(asctime)s [%(levelname)s] %(message)s',
         # 'mp_format': '%(asctime)s [%(levelname)s/%(processName)s] %(message)s'
-    },
-    'mime_types': (
-        ('.quix', 'text/xml'),
-        ('.wmv', 'video/x-ms-wmv'),
-        ('.asf', 'video/x-ms-asf'),
-        ('.flv', 'video/flv'),
-        ('.flv', 'video/x-flv'),
-        ('.3gp', 'video/3gpp'),
-        ('.mp4', 'video/mp4'),
-        ('.ogg', 'application/ogg'),
-        ('.jar', 'application/java-archive')
-    )
+    }
 }

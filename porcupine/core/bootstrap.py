@@ -1,86 +1,70 @@
 import argparse
 import logging
-import signal
 import sys
-import time
-
-import os
+import asyncio
 
 from porcupine import __version__
 from porcupine.apps.main import main
 from porcupine.config import settings
-from .log import setup_daemon_logging
+from .log import setup_logging, porcupine_log, shutdown_logging, setup_mp_logging
 from .server import server
+from .daemon import Daemon
 
-PID_FILE = '.pid'
-
-
-def set_pid():
-    with open(PID_FILE, 'w') as pid_file:
-        pid_file.write(str(os.getpgid(os.getpid())))
+PID_FILE = '/tmp/porcupine.pid'
 
 
-def get_pid():
-    with open(PID_FILE, 'r') as pid_file:
-        return int(pid_file.read())
+def run_server(apps, before_start, debug, loop=None):
+    porcupine_log.info('Starting Porcupine %s', __version__)
+    for app in apps:
+        server.blueprint(app, url_prefix=app.name)
+
+    server.run(host=settings['host'],
+               port=settings['port'],
+               workers=settings['workers'],
+               before_start=before_start,
+               loop=loop,
+               debug=debug)
 
 
-def fork():
-    setup_daemon_logging()
-    out = open('/dev/null', 'w')
-    sys.stdout = out
-    sys.stderr = out
-    pid = os.fork()
-    if pid:
-        set_pid()
-    return pid
+class PorcupineDaemon(Daemon):
+    def __init__(self, apps, before_start=(), debug=False):
+        super().__init__(PID_FILE)
+        self.apps = apps
+        self.before_start = before_start
+        self.debug = debug
 
-
-def stop():
-    try:
-        pid = get_pid()
-    except IOError:
-        return
-    try:
-        os.killpg(pid, signal.SIGINT)
-    except OSError:
-        # porcupine is not running
-        pass
-    else:
-        # wait for process to be killed
-        while True:
-            try:
-                os.killpg(pid, 0)
-                time.sleep(0.1)
-            except OSError:
-                break
+    def run(self):
+        loop = asyncio.get_event_loop()
+        run_server(self.apps, self.before_start, self.debug, loop=loop)
 
 
 def start(args):
     if args.debug:
         settings['log']['level'] = logging.DEBUG
-    if args.daemon:
-        pid = fork()
-        if pid:
-            sys.exit()
-    elif args.stop:
-        stop()
-        sys.exit()
-    elif args.graceful:
-        stop()
-        pid = fork()
-        if pid:
-            sys.exit()
 
-    logging.info('Starting Porcupine %s', __version__)
-    # register apps
+    is_multi_process = settings['workers'] > 1
+    setup_logging(args.daemon, is_multi_process)
+
+    before_start = []
+    if is_multi_process:
+        before_start.append(setup_mp_logging)
+    # locate apps
     apps = [main]
-    for app in apps:
-        server.blueprint(app, url_prefix=app.name)
-    server.run(host=settings['host'],
-               port=settings['port'],
-               workers=settings['workers'],
-               debug=args.debug)
+    try:
+        if args.daemon or args.stop or args.graceful:
+            # daemon commands
+            daemon = PorcupineDaemon(apps, before_start, args.debug)
+            if args.daemon:
+                daemon.start()
+            elif args.stop:
+                daemon.stop()
+            elif args.graceful:
+                daemon.restart()
+            sys.exit()
+        else:
+            run_server(apps, before_start, args.debug)
+    finally:
+        shutdown_logging()
 
 
 def run():
@@ -108,9 +92,9 @@ def run():
     args = parser.parse_args()
 
     # override settings values
-    for arg in ('host', 'port', 'workers'):
+    for arg in ('host', 'port', 'workers', 'daemon'):
         override = getattr(args, arg, None)
         if override:
             settings[arg] = override
-
+    # start the server
     start(args)

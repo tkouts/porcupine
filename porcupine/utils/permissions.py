@@ -22,25 +22,27 @@ async def resolve(item, user):
 
 async def resolve_acl(acl, user_or_group):
     # print(security_descriptor, user_or_group)
-    if await user_or_group.is_admin():
-        return COORDINATOR
-    if user_or_group.id in acl:
-        return acl[user_or_group.id]
+    member_of = set()
+    if user_or_group is not None:
+        if await user_or_group.is_admin():
+            return COORDINATOR
+        if user_or_group.id in acl:
+            return acl[user_or_group.id]
 
-    # get membership
-    member_of = set(await user_or_group.member_of.get())
+        # get membership
+        member_of.update(set(await user_or_group.member_of.get()))
 
-    if member_of:
-        # resolve nested groups membership
-        member_of.update(await resolve_membership(frozenset(member_of)))
+        if member_of:
+            # resolve nested groups membership
+            member_of.update(await resolve_membership(frozenset(member_of)))
 
-    # add dynamic groups
+        if hasattr(user_or_group, 'authenticate'):
+            member_of.add('authusers')
+
+    # add everyone
     member_of.add('everyone')
-    if hasattr(user_or_group, 'authenticate'):
-        member_of.add('authusers')
 
-    perms = [acl.get(group_id, NO_ACCESS)
-             for group_id in member_of]
+    perms = [acl.get(group_id, NO_ACCESS) for group_id in member_of]
     if not perms:
         return NO_ACCESS
     return max(perms)
