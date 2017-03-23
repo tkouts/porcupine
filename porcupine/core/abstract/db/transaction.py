@@ -58,17 +58,32 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
         self._externals[key] = value
 
     async def prepare(self):
-        # call changed attributes event handlers
-        for item in {**self._inserted, **self._modified}.values():
-            for attr, old_value in item.__snapshot__.items():
-                attr_def = item.__schema__[attr]
-                try:
-                    on_change = attr_def.on_change(
-                        item, getattr(item, attr_def.storage)[attr], old_value)
-                    if asyncio.iscoroutine(on_change):
-                        await on_change
-                except exceptions.AttributeSetError as e:
-                    raise exceptions.InvalidUsage(str(e))
+        # call changed attributes event handlers till snapshots are drained
+        while True:
+            all_items = {**self._inserted, **self._modified}
+            snapshots = {item.id: item.__snapshot__
+                         for item in all_items.values()
+                         if item.__snapshot__}
+            # clear snapshots
+            for item_id in snapshots:
+                all_items[item_id].__snapshot__ = {}
+            # print(snapshots)
+            if snapshots:
+                for item_id, snapshot in snapshots.items():
+                    item = all_items[item_id]
+                    for attr, old_value in snapshot.items():
+                        attr_def = item.__schema__[attr]
+                        try:
+                            on_change = attr_def.on_change(
+                                item,
+                                getattr(item, attr_def.storage)[attr],
+                                old_value)
+                            if asyncio.iscoroutine(on_change):
+                                await on_change
+                        except exceptions.AttributeSetError as e:
+                            raise exceptions.InvalidUsage(str(e))
+            else:
+                break
 
         connector = self.connector
         dumps = connector.persist.dumps
@@ -82,12 +97,12 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
         insertions = {}
         if self._appends:
             # make sure externals with appends are initialized
-            append_keys = self._appends.keys()
+            append_keys = list(self._appends.keys())
             tasks = [connector.exists(key) for key in append_keys]
             completed, _ = await asyncio.wait(tasks)
-            keys_exist = [c.result for c in completed]
-            insertions = {k: '' for k, v in zip(append_keys, keys_exist)
-                          if not v}
+            keys_exist = [c.result() for c in completed]
+            insertions = {key: '' for key, exists in keys_exist
+                          if not exists}
         return insertions, upsertions
 
     @abc.abstractmethod
