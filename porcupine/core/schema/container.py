@@ -20,7 +20,10 @@ class Container(Item):
     is_collection = True
 
     children = Children()
-    containers = ReferenceN(readonly=True)
+    containers = ReferenceN(
+        accepts=('porcupine.core.schema.container.Container', ),
+        readonly=True
+    )
 
     def child_exists(self, name):
         """
