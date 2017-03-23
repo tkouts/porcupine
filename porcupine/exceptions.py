@@ -28,8 +28,9 @@ class UnprocessableEntity(SanicException):
 class ContainmentError(TypeError):
     def __init__(self, target_item, attribute, source_item):
         super().__init__(
-            'Attribute {0} of {1} does not accept objects of {2}'.format(
-                attribute, target_item.name, source_item.content_class))
+            "Attribute '{0}' of '{1}' does not accept objects of '{2}'".format(
+                attribute, target_item.__class__.name,
+                source_item.content_class))
 
 
 AttributeSetError = (AttributeError, ValueError, TypeError)
