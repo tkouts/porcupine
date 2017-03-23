@@ -1,7 +1,29 @@
-from porcupine import db, context, exceptions
+from porcupine import db, context
+from porcupine.exceptions import ContainmentError
 from porcupine.utils import system
 from .external import Text
 from .common import String
+
+
+class Acceptable:
+    accepts = ()
+
+    def __init__(self, **kwargs):
+        self.accepts_resolved = False
+        if 'accepts' in kwargs:
+            self.accepts = kwargs['accepts']
+
+    @property
+    def allowed_types(self):
+        if not self.accepts_resolved:
+            self.accepts = tuple([
+                system.get_rto_by_name(x) if isinstance(x, str) else x
+                for x in self.accepts
+            ])
+        return self.accepts
+
+    def accepts_item(self, item):
+        return isinstance(item, self.allowed_types)
 
 
 class ItemReference(str):
@@ -21,7 +43,7 @@ class ItemReference(str):
         return item
 
 
-class Reference1(String):
+class Reference1(String, Acceptable):
     """
     This data type is used whenever an item loosely references
     at most one other item. Using this data type, the referenced item
@@ -31,21 +53,14 @@ class Reference1(String):
                     classes that the instances of this type can reference.
     """
     allow_none = True
-    accepts = ()
 
     def __init__(self, default=None, **kwargs):
-        self.safe_type_resolved = False
-        if 'accepts' in kwargs:
-            self.accepts = kwargs['accepts']
         super().__init__(default, **kwargs)
+        Acceptable.__init__(self, **kwargs)
 
     def validate_value(self, value, instance):
-        if not self.safe_type_resolved:
-            self.safe_type = tuple([
-                system.get_rto_by_name(x) if isinstance(x, str) else x
-                for x in self.accepts
-            ])
-            self.safe_type_resolved = True
+        if value is not None and not self.accepts_item(value):
+            raise ContainmentError(instance, self.name, value)
         super().validate_value(value, instance)
 
     def __get__(self, instance, owner):
@@ -69,10 +84,9 @@ class Reference1(String):
 
 
 class ItemCollection:
-    def __init__(self, descriptor, instance, accepts):
+    def __init__(self, descriptor, instance):
         self._descriptor = descriptor
         self._instance = instance
-        self._accepts = accepts
 
     @property
     def key(self):
@@ -82,46 +96,23 @@ class ItemCollection:
         storage = getattr(self._instance, self._descriptor.storage)
         name = self._descriptor.name
         if name not in storage:
-            # build set
-            uniques = {}
-            # if not self._instance.__is_new__:
-            value = await Text.fetch(self._descriptor, self._instance)
-            if value:
-                for oid in value.split(' '):
-                    if oid:
-                        if oid.startswith('-'):
-                            key = oid[1:]
-                            if key in uniques:
-                                del uniques[key]
-                        else:
-                            uniques[oid] = None
-            storage[name] = list(uniques.keys())
+            await self._descriptor.fetch(self._instance)
         return tuple(storage[name])
-
-    async def reset(self, value):
-        self._descriptor.validate_value(value, self._instance)
-        await self._descriptor.snapshot(self._instance, value)
-        getattr(self._instance, self._descriptor.storage)[
-            self._descriptor.name] = value
 
     async def items(self):
         return await db.get_multi(await self.get())
 
-    def accepts(self, item):
-        if self._accepts and context.user.id != 'system':
-            return isinstance(item, self._accepts)
-        return True
-
     def add(self, item):
-        if not self.accepts(item):
-            raise exceptions.ContainmentError(self._instance,
-                                              self._descriptor.name,
-                                              item)
+        if not self._descriptor.accepts_item(item):
+            raise ContainmentError(self._instance,
+                                   self._descriptor.name,
+                                   item)
         if self._instance.__is_new__:
             storage = getattr(self._instance, self._descriptor.storage)
             name = self._descriptor.name
-            Text.snapshot(self._descriptor, self._instance, None)
-            storage[name].append(item.id)
+            if item.id not in storage[name]:
+                self._descriptor.snapshot(self._instance, None)
+                storage[name].append(item.id)
         else:
             context.txn.append(self.key, ' {0}'.format(item.id))
 
@@ -129,50 +120,81 @@ class ItemCollection:
         if self._instance.__is_new__:
             storage = getattr(self._instance, self._descriptor.storage)
             name = self._descriptor.name
-            # add snapshot to trigger on_change
-            Text.snapshot(self._descriptor, self._instance, None)
-            storage[name].remove(item.id)
+            if item.id in storage[name]:
+                # add snapshot to trigger on_change
+                self._descriptor.snapshot(self._instance, None)
+                storage[name].remove(item.id)
         else:
             context.txn.append(self.key, ' -{0}'.format(item.id))
 
 
-class ReferenceN(Text):
-    safe_type = tuple
+class ReferenceN(Text, Acceptable):
+    safe_type = (list, tuple)
     allow_none = False
-    accepts = ()
 
     def __init__(self, default=(), **kwargs):
         super().__init__(default, **kwargs)
-        if 'accepts' in kwargs:
-            self.accepts = kwargs['accepts']
-        self.accepts_resolved = False
+        Acceptable.__init__(self, **kwargs)
+
+    async def fetch(self, instance, set_storage=True):
+        # build set
+        uniques = {}
+        value = await super().fetch(instance, set_storage=False)
+        # print('raw value is', value)
+        if value:
+            for oid in value.split(' '):
+                if oid:
+                    if oid.startswith('-'):
+                        key = oid[1:]
+                        if key in uniques:
+                            del uniques[key]
+                    else:
+                        uniques[oid] = None
+            value = list(uniques.keys())
+        else:
+            value = []
+        if set_storage:
+            storage = getattr(instance, self.storage)
+            storage[self.name] = value
+        return value
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        if not self.accepts_resolved:
-            self.accepts = tuple([
-                system.get_rto_by_name(x) if isinstance(x, str) else x
-                for x in self.accepts
-            ])
-            self.accepts_resolved = True
-        return ItemCollection(self, instance, self.accepts)
-
-    def __set__(self, instance, value):
-        raise TypeError(
-            'ReferenceN attributes do not support direct assignment. '
-            'Use the "reset" method instead.')
-
-    async def snapshot(self, instance, value):
-        if self.name not in instance.__snapshot__:
-            previous_value = await self.__get__(instance, None).get()
-            if previous_value != tuple(value):
-                instance.__snapshot__[self.name] = previous_value
+        return ItemCollection(self, instance)
 
     async def on_change(self, instance, value, old_value):
-        # print('onchange', value, old_value)
-        if instance.__is_new__ and value:
-            super().on_change(instance, ' '.join(value), None)
+        # old_value is always None
+        if instance.__is_new__:
+            ref_items = await db.get_multi(value)
+            # check containment
+            for item in ref_items:
+                if not self.accepts_item(item):
+                    raise ContainmentError(instance, self.name, item)
+            if ref_items:
+                # write external
+                super().on_change(instance,
+                                  ' '.join([i.id for i in ref_items]),
+                                  old_value)
+            return ref_items, []
+        # need to compute deltas
+        old_ids = await self.fetch(instance, set_storage=False)
+        new_value = frozenset(value)
+        # compute old value leaving out non-accessible items
+        ref_items = await db.get_multi(old_ids)
+        old_value = frozenset([i.id for i in ref_items])
+        added_ids = new_value.difference(old_value)
+        removed_ids = old_value.difference(new_value)
+        added = await db.get_multi(added_ids)
+        removed = await db.get_multi(removed_ids)
+        item_collection = getattr(instance, self.name)
+        for item in added:
+            if not self.accepts_item(item):
+                raise ContainmentError(instance, self.name, item)
+            item_collection.add(item)
+        for item in removed:
+            item_collection.remove(item)
+        return added, removed
 
     async def get(self, request, instance, expand=False):
         expand = expand or 'expand' in request.args

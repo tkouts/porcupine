@@ -254,15 +254,10 @@ class Relator1(Reference1):
 
 
 class RelatorItemCollection(ItemCollection):
-    # def __init__(self, id_list, descriptor):
-    #     super(RelatorMultiReference, self).__init__(id_list)
-    #     self.descriptor = descriptor
-
     async def items(self):
         items = await super().items()
-        return ObjectSet([
-            item for item in items
-            if self._descriptor.rel_attr in item.__props__])
+        return [item for item in items
+                if self._descriptor.rel_attr in item.__schema__]
 
 
 class RelatorN(ReferenceN):
@@ -302,44 +297,23 @@ class RelatorN(ReferenceN):
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        # value = DataType.__get__(self, instance, owner)
-        return RelatorItemCollection(self, instance, self.accepts)
+        return RelatorItemCollection(self, instance)
 
-    def on_create(self, instance, value):
-        self.on_update(instance, value, None)
+    def add_reference(self, instance, item):
+        if not self.accepts_item(item):
+            raise exceptions.ContainmentError(instance,
+                                              self.name, item)
+        getattr(item, self.rel_attr).add(instance)
 
-    def on_update(self, instance, value, old_value):
-        value_set = set(value)
-        # remove duplicates
-        setattr(instance, self.name, list(value_set))
-        old_value_set = set(old_value or [])
+    def remove_reference(self, instance, item):
+        getattr(item, self.rel_attr).remove(instance)
 
-        if value_set != old_value_set:
-            # compute old references that cannot be accessed
-            # due to security restrictions
-            # these should remain intact
-            if old_value:
-                # TODO: optimize using get_multi
-                no_access_list = [oid for oid in old_value
-                                  if db.get_item(oid, get_lock=False) is None]
-            else:
-                no_access_list = []
-
-            if no_access_list:
-                # update current value set
-                value_set = value_set.union(no_access_list)
-                # update attribute
-                setattr(instance, self.name, list(value_set))
-
-            if value_set != old_value_set:
-                # calculate added references
-                ids_added = list(value_set - old_value_set)
-                if ids_added:
-                    self._add_references(value, ids_added, instance.id)
-                # calculate removed references
-                ids_removed = list(old_value_set - value_set)
-                if ids_removed:
-                    self._remove_references(ids_removed, instance.id)
+    async def on_change(self, instance, value, old_value):
+        added, removed = await super().on_change(instance, value, old_value)
+        for item in added:
+            self.add_reference(instance, item)
+        for item in removed:
+            self.remove_reference(instance, item)
 
     def on_delete(self, instance, value, is_permanent):
         if not instance._is_deleted:
@@ -360,44 +334,44 @@ class RelatorN(ReferenceN):
         if self.cascade_delete:
             [db._db.get_item(oid)._undelete() for oid in value]
 
-    def _add_references(self, attr, ids, oid):
-        allowed_ref_types = tuple(
-            [misc.get_rto_by_name(cc) for cc in self.relates_to])
-        for id in ids:
-            ref_item = db._db.get_item(id)
-            if ref_item is not None \
-                    and isinstance(ref_item, allowed_ref_types):
-                ref_attr = getattr(ref_item, self.rel_attr)
-                ref_attr_def = ref_item.__props__[self.rel_attr]
-                reference_added = False
-                if isinstance(ref_attr_def, RelatorN) and oid not in ref_attr:
-                    ref_attr.append(oid)
-                    reference_added = True
-                elif isinstance(ref_attr_def, Relator1) and oid != ref_attr:
-                    setattr(ref_item, self.rel_attr, oid)
-                    reference_added = True
-                if reference_added:
-                    # ref_item._update_schema()
-                    ref_attr_def.validate(ref_item)
-                    db._db.put_item(ref_item)
-            else:
-                attr.remove(id)
-
-    def _remove_references(self, ids, oid):
-        # remove references
-        for id in ids:
-            ref_item = db._db.get_item(id)
-            if ref_item is not None:
-                ref_attr = getattr(ref_item, self.rel_attr)
-                ref_attr_def = ref_item.__props__[self.rel_attr]
-                reference_removed = False
-                if isinstance(ref_attr_def, RelatorN) and oid in ref_attr:
-                    ref_attr.remove(oid)
-                    reference_removed = True
-                elif isinstance(ref_attr_def, Relator1) \
-                        and ref_attr is not None:
-                    setattr(ref_item, self.rel_attr, None)
-                    reference_removed = True
-                if reference_removed:
-                    ref_attr_def.validate(ref_item)
-                    db._db.put_item(ref_item)
+    # def _add_references(self, attr, ids, oid):
+    #     allowed_ref_types = tuple(
+    #         [misc.get_rto_by_name(cc) for cc in self.relates_to])
+    #     for id in ids:
+    #         ref_item = db._db.get_item(id)
+    #         if ref_item is not None \
+    #                 and isinstance(ref_item, allowed_ref_types):
+    #             ref_attr = getattr(ref_item, self.rel_attr)
+    #             ref_attr_def = ref_item.__props__[self.rel_attr]
+    #             reference_added = False
+    #             if isinstance(ref_attr_def, RelatorN) and oid not in ref_attr:
+    #                 ref_attr.append(oid)
+    #                 reference_added = True
+    #             elif isinstance(ref_attr_def, Relator1) and oid != ref_attr:
+    #                 setattr(ref_item, self.rel_attr, oid)
+    #                 reference_added = True
+    #             if reference_added:
+    #                 # ref_item._update_schema()
+    #                 ref_attr_def.validate(ref_item)
+    #                 db._db.put_item(ref_item)
+    #         else:
+    #             attr.remove(id)
+    #
+    # def _remove_references(self, ids, oid):
+    #     # remove references
+    #     for id in ids:
+    #         ref_item = db._db.get_item(id)
+    #         if ref_item is not None:
+    #             ref_attr = getattr(ref_item, self.rel_attr)
+    #             ref_attr_def = ref_item.__props__[self.rel_attr]
+    #             reference_removed = False
+    #             if isinstance(ref_attr_def, RelatorN) and oid in ref_attr:
+    #                 ref_attr.remove(oid)
+    #                 reference_removed = True
+    #             elif isinstance(ref_attr_def, Relator1) \
+    #                     and ref_attr is not None:
+    #                 setattr(ref_item, self.rel_attr, None)
+    #                 reference_removed = True
+    #             if reference_removed:
+    #                 ref_attr_def.validate(ref_item)
+    #                 db._db.put_item(ref_item)

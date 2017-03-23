@@ -4,7 +4,7 @@ Porcupine external data types
 """
 import os.path
 import shutil
-# import io
+import asyncio
 
 from porcupine import db, context
 from .common import String
@@ -49,19 +49,23 @@ class Blob(DataType):
     def __init__(self, default=None, **kwargs):
         super().__init__(default, **kwargs)
 
-    async def fetch(self, instance):
-        storage = getattr(instance, self.storage)
+    async def fetch(self, instance, set_storage=True):
         name = self.name
-        if name not in storage:
-            value = await db.connector.get_external('{0}_{1}'.format(
-                instance.id, name))
-            # if value is not None:
+        value = await db.connector.get_external('{0}_{1}'.format(
+            instance.id, name))
+        if set_storage:
+            storage = getattr(instance, self.storage)
             storage[name] = value
-        return storage[name]
+        return value
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
+        storage = getattr(instance, self.storage)
+        if self.name in storage:
+            future = asyncio.Future()
+            future.set_result(storage[self.name])
+            return future
         return self.fetch(instance)
 
     def snapshot(self, instance, value):
