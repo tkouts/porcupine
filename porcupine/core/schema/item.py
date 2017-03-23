@@ -195,7 +195,7 @@ class Item(GenericItem):
                 parent = None
 
             user = context.user
-            user_role = await permissions.resolve_acl(self, user)
+            user_role = await permissions.resolve(self, user)
 
             if user_role > permissions.READER:
                 with system_override():
