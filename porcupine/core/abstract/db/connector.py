@@ -69,13 +69,22 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
         return await self.get_partial_raw(object_id, *paths)
 
     async def get_multi(self, object_ids):
-        # TODO: fetch from txn
         loads = self.persist.loads
+        result = []
+        if context.txn is not None:
+            txn = context.txn
+            result.extend([context.txn[object_id]
+                           for object_id in object_ids
+                           if object_id in txn])
+            object_ids = [object_id for object_id in object_ids
+                          if object_id not in txn]
         if object_ids:
-            return [loads(item)
-                    for item in await self.get_multi_raw(object_ids)
-                    if item is not None]
-        return []
+            result.extend([
+                loads(item)
+                for item in await self.get_multi_raw(object_ids)
+                if item is not None
+            ])
+        return result
 
     async def get_external(self, ext_id):
         if context.txn is not None and ext_id in context.txn:
