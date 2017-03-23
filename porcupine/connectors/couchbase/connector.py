@@ -50,10 +50,10 @@ class Couchbase(AbstractConnector):
         try:
             await self.bucket.retrieve_in(key, '/')
         except NotFoundError:
-            return False
+            return key, False
         except (DocumentNotJsonError, SubdocPathNotFoundError):
             pass
-        return True
+        return key, True
 
     async def get_raw(self, key, quiet=True):
         try:
