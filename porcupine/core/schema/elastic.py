@@ -29,7 +29,7 @@ class ElasticMeta(type):
 
 
 class ElasticSlotsBase:
-    __slots__ = ('__storage__', '_ext', '_snap', '__is_new__')
+    __slots__ = ('__storage__', '__externals__', '__snapshot__', '__is_new__')
 
 
 class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
@@ -56,8 +56,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         if storage is None:
             storage = {}
         self.__storage__ = storage
-        self._ext = None
-        self._snap = None
+        self.__externals__ = {}
+        self.__snapshot__ = {}
         self.__is_new__ = False
 
         if 'id' not in storage:
@@ -90,17 +90,17 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     # json serializer
     toDict = to_dict
 
-    @property
-    def __snapshot__(self):
-        if self._snap is None:
-            self._snap = {}
-        return self._snap
-
-    @property
-    def __externals__(self):
-        if self._ext is None:
-            self._ext = {}
-        return self._ext
+    # @property
+    # def __snapshot__(self):
+    #     if self._snap is None:
+    #         self._snap = {}
+    #     return self._snap
+    #
+    # @property
+    # def __externals__(self):
+    #     if self._ext is None:
+    #         self._ext = {}
+    #     return self._ext
 
     @property
     def parent_id(self):
