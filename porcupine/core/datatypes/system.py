@@ -40,6 +40,12 @@ class Children(ReferenceN):
             return self
         return super().__get__(instance, owner)
 
+    def accepts_item(self, item):
+        if context.user.id == 'system':
+            # allow for system
+            return True
+        return super().accepts_item(item)
+
     async def get(self, request, instance, expand=True):
         return await super().get(request, instance, True)
 
