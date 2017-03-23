@@ -25,7 +25,7 @@ items:
               - id: guest
                 name: Guest
                 description: Guest User
-                type: porcupine.apps.schema.users.GenericUser
+                type: porcupine.apps.schema.users.Membership
                 sys: Yes
               - id: system
                 name: SYSTEM
@@ -36,6 +36,17 @@ items:
                 name: admin
                 password: admin
                 type: porcupine.apps.schema.users.User
+              - id: everyone
+                name: Everyone Group
+                type: porcupine.apps.schema.groups.EveryoneGroup
+              - id: authusers
+                name: Authenticated Users
+                type: porcupine.apps.schema.groups.AuthUsersGroup
+              - id: administrators
+                name: Administrators
+                type: porcupine.apps.schema.groups.Group
+                members:
+                  - admin
 
   - id: RB
     type: porcupine.apps.schema.root.RecycleBin

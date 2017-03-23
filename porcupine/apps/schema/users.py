@@ -32,28 +32,27 @@ class SystemUser(Item):
         return True
 
 
-class GenericUser(Item):
-    """Generic User object
+class Membership(Item):
+    """Generic Membership object
 
-    :ivar full_name: The user's full name.
-    :type full_name: L{String<porcupine.datatypes.String>}
-
-    :cvar member_of: The list of groups that this user belongs to.
+    :cvar member_of: The list of groups that the membership belongs to.
     :type member_of:
         L{MemberOf<org.innoscript.desktop.schema.properties.MemberOf>}
 
-    :cvar policies: The list of policies assigned to this user.
+    :cvar policies: The list of policies assigned to this membership.
     :type policies:
         L{Policies<org.innoscript.desktop.schema.properties.Policies>}
     """
     member_of = RelatorN(
-        accepts=('org.innoscript.desktop.schema.security.Group', ),
+        accepts=('porcupine.apps.schema.groups.Group', ),
         rel_attr='members')
     policies = RelatorN(
-        accepts=('org.innoscript.desktop.schema.security.Policy', ),
+        accepts=(
+            # 'org.innoscript.desktop.schema.security.Policy',
+        ),
         rel_attr='granted_to')
 
-    def is_member_of(self, group):
+    async def is_member_of(self, group):
         """
         Checks if the user is member of the given group.
 
@@ -62,7 +61,7 @@ class GenericUser(Item):
 
         @rtype: bool
         """
-        return group.id in self.member_of
+        return group.id in await self.member_of.get()
 
     async def is_admin(self):
         """
@@ -73,7 +72,7 @@ class GenericUser(Item):
         return 'administrators' in await self.member_of.get()
 
 
-class User(GenericUser):
+class User(Membership):
     """Porcupine User object
 
     @ivar password: The user's password.
@@ -116,4 +115,4 @@ class UsersContainer(Container):
     ============
     This is the container of all users and groups.
     """
-    containment = (GenericUser, )
+    containment = (Membership, )
