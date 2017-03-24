@@ -1,4 +1,5 @@
 import abc
+
 from porcupine import context, exceptions
 from porcupine.config import settings
 from porcupine.utils import system
@@ -6,8 +7,9 @@ from .persist import DefaultPersistence
 from .join import Join
 
 
-class AbstractConnector(object, metaclass=abc.ABCMeta):
+class AbstractConnector(metaclass=abc.ABCMeta):
     settings = settings['db']
+    multi_fetch_chunk_size = 600
     indexes = {}
     active_txns = 0
     root_id = ''
@@ -69,22 +71,28 @@ class AbstractConnector(object, metaclass=abc.ABCMeta):
         return await self.get_partial_raw(object_id, *paths)
 
     async def get_multi(self, object_ids):
+
+        def chunks(l, n):
+            """Yield successive n-sized chunks from l."""
+            for i in range(0, len(l), n):
+                yield l[i:i + n]
+
         loads = self.persist.loads
-        result = []
         if context.txn is not None:
             txn = context.txn
-            result.extend([context.txn[object_id]
-                           for object_id in object_ids
-                           if object_id in txn])
+            in_txn = ([context.txn[object_id]
+                       for object_id in object_ids
+                       if object_id in txn])
+            for item in in_txn:
+                yield item
             object_ids = [object_id for object_id in object_ids
                           if object_id not in txn]
         if object_ids:
-            result.extend([
-                loads(item)
-                for item in await self.get_multi_raw(object_ids)
-                if item is not None
-            ])
-        return result
+            for chunk in chunks(object_ids, self.multi_fetch_chunk_size):
+                batch = await self.get_multi_raw(chunk)
+                for raw_item in batch:
+                    if raw_item is not None:
+                        yield loads(raw_item)
 
     async def get_external(self, ext_id):
         if context.txn is not None and ext_id in context.txn:
