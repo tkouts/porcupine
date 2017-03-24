@@ -138,19 +138,9 @@ class ReferenceN(Text, Acceptable):
 
     async def fetch(self, instance, set_storage=True):
         # build set
-        uniques = {}
         value = await super().fetch(instance, set_storage=False)
-        # print('raw value is', value)
         if value:
-            for oid in value.split(' '):
-                if oid:
-                    if oid.startswith('-'):
-                        key = oid[1:]
-                        if key in uniques:
-                            del uniques[key]
-                    else:
-                        uniques[oid] = None
-            value = list(uniques.keys())
+            value = system.resolve_set(value)
         else:
             value = []
         if set_storage:
@@ -180,6 +170,9 @@ class ReferenceN(Text, Acceptable):
         # need to compute deltas
         old_ids = await self.fetch(instance, set_storage=False)
         new_value = frozenset(value)
+        if new_value == frozenset(old_ids):
+            # nothing changed
+            return [], []
         # compute old value leaving out non-accessible items
         ref_items = await db.get_multi(old_ids)
         old_value = frozenset([i.id for i in ref_items])

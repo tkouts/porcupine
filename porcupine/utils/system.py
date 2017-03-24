@@ -72,6 +72,22 @@ def hash_series(*args, using='md5'):
     return md5_hash
 
 
+def resolve_set(raw_string):
+    # build set
+    uniques = {}
+    # print('raw value is', value)
+    for oid in raw_string.split(' '):
+        if oid:
+            if oid.startswith('-'):
+                key = oid[1:]
+                if key in uniques:
+                    del uniques[key]
+            else:
+                uniques[oid] = None
+    value = list(uniques.keys())
+    return value
+
+
 @context_cacheable(1000)
 async def get_item_state(item_id):
     return await db.connector.get_partial(
