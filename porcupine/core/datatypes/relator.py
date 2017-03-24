@@ -134,6 +134,7 @@ from porcupine.utils import system
 
 
 class RelatorItemReference(ItemReference):
+    # TODO: initialize properly
     descriptor = None
 
     async def item(self):
@@ -259,6 +260,14 @@ class RelatorItemCollection(ItemCollection):
         return [item for item in items
                 if self._descriptor.rel_attr in item.__schema__]
 
+    def add(self, item):
+        super().add(item)
+        self._descriptor.add_reference(self._instance, item)
+
+    def remove(self, item):
+        super().remove(item)
+        self._descriptor.remove_reference(self._instance, item)
+
 
 class RelatorN(ReferenceN):
     """
@@ -303,17 +312,22 @@ class RelatorN(ReferenceN):
         if not self.accepts_item(item):
             raise exceptions.ContainmentError(instance,
                                               self.name, item)
-        getattr(item, self.rel_attr).add(instance)
+        rel_attr = getattr(item, self.rel_attr)
+        if isinstance(rel_attr, RelatorItemCollection):
+            # call super add to avoid recursion
+            super(RelatorItemCollection, rel_attr).add(instance)
 
     def remove_reference(self, instance, item):
-        getattr(item, self.rel_attr).remove(instance)
+        rel_attr = getattr(item, self.rel_attr)
+        if isinstance(rel_attr, RelatorItemCollection):
+            # call super remove to avoid recursion
+            super(RelatorItemCollection, rel_attr).remove(instance)
 
     async def on_change(self, instance, value, old_value):
-        added, removed = await super().on_change(instance, value, old_value)
-        for item in added:
-            self.add_reference(instance, item)
-        for item in removed:
-            self.remove_reference(instance, item)
+        added, _ = await super().on_change(instance, value, old_value)
+        if instance.__is_new__:
+            for item in added:
+                self.add_reference(instance, item)
 
     def on_delete(self, instance, value, is_permanent):
         if not instance._is_deleted:

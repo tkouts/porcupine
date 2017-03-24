@@ -189,8 +189,6 @@ class ReferenceN(Text, Acceptable):
         removed = await db.get_multi(removed_ids)
         item_collection = getattr(instance, self.name)
         for item in added:
-            if not self.accepts_item(item):
-                raise ContainmentError(instance, self.name, item)
             item_collection.add(item)
         for item in removed:
             item_collection.remove(item)
