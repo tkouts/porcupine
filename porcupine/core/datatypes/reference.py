@@ -75,7 +75,7 @@ class Reference1(String, Acceptable):
         self.validate_value(value, instance)
         self.snapshot(instance, value.id)
         storage = getattr(instance, self.storage)
-        storage[self.name] = value.id
+        storage[self.storage_key] = value.id
 
     def clone(self, instance, memo):
         if '_id_map_' in memo:
@@ -143,7 +143,7 @@ class ReferenceN(Text, Acceptable):
             value = []
         if set_storage:
             storage = getattr(instance, self.storage)
-            storage[self.name] = value
+            storage[self.storage_key] = value
         return value
 
     def __get__(self, instance, owner):

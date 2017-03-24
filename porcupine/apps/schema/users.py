@@ -45,12 +45,14 @@ class Membership(Item):
     """
     member_of = RelatorN(
         accepts=('porcupine.apps.schema.groups.Group', ),
-        rel_attr='members')
+        rel_attr='members'
+    )
     policies = RelatorN(
         accepts=(
             # 'org.innoscript.desktop.schema.security.Policy',
         ),
-        rel_attr='granted_to')
+        rel_attr='granted_to'
+    )
 
     async def is_member_of(self, group):
         """

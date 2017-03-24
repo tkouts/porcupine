@@ -58,18 +58,6 @@ class Date(String):
     def __init__(self, default=None, **kwargs):
         super().__init__(default, **kwargs)
 
-    # def __get__(self, instance, owner):
-    #     if instance is None:
-    #         return self
-    #     value = super(Date, self).__get__(instance, owner)
-    #     if value is not None:
-    #         return date.Date(value)
-    #
-    # def __set__(self, instance, value):
-    #     if isinstance(value, date.Date):
-    #         value = value.value
-    #     super(Date, self).__set__(instance, value)
-
 
 class DateTime(Date):
     """Datetime data type"""

@@ -1,4 +1,4 @@
-from sanic.blueprints import Blueprint
+from sanic import Blueprint
 from porcupine import db, log
 from porcupine.config import settings
 from porcupine.utils import system

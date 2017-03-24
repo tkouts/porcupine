@@ -11,33 +11,6 @@ from .common import String
 from .datatype import DataType
 
 
-# from porcupine.utils import system
-
-
-# class BlobValue:
-#
-#     def __init__(self, descriptor, instance):
-#         self._descriptor = descriptor
-#         self._instance = instance
-#
-#     async def get(self):
-#         storage = getattr(self._instance, self._descriptor.storage)
-#         name = self._descriptor.name
-#         if name not in storage:
-#             value = await db.connector.get_external('{0}_{1}'.format(
-#                 self._instance.id, name))
-#             storage[name] = value
-#         return storage[name]
-#
-#     async def set(self, value):
-#         # should_snapshot = False
-#         name = self._descriptor.name
-#         if name not in self._instance.__snapshot__:
-#             # do not keep previous value, just trigger on_change
-#             self._instance.__snapshot__[name] = None
-#         DataType.__set__(self._descriptor, self._instance, value)
-
-
 class Blob(DataType):
     """
     Base class for binary large objects.
@@ -47,6 +20,8 @@ class Blob(DataType):
     storage = '__externals__'
 
     def __init__(self, default=None, **kwargs):
+        # do not allow store_as for external attributes
+        kwargs.pop('store_as', None)
         super().__init__(default, **kwargs)
 
     async def fetch(self, instance, set_storage=True):
@@ -61,9 +36,9 @@ class Blob(DataType):
         if instance is None:
             return self
         storage = getattr(instance, self.storage)
-        if self.name in storage:
+        if self.storage_key in storage:
             future = asyncio.Future()
-            future.set_result(storage[self.name])
+            future.set_result(storage[self.storage_key])
             return future
         return self.fetch(instance)
 
@@ -91,50 +66,8 @@ class Text(Blob):
     safe_type = str
 
 
-# class FileValue(ExternalAttributeValue):
-#
-#     @property
-#     def filename(self):
-#         return self._datum['filename']
-#
-#     @filename.setter
-#     def filename(self, filename):
-#         self._datum['filename'] = filename
-#
-#     def get_file(self):
-#         return io.StringIO(self.read())
-#
-#     def load_from_file(self, filename):
-#         """
-#         This method sets the value property of this data type instance
-#         to a stream read from a file that resides on the file system.
-#
-#         @param filename: A valid filename
-#         @type filename: str
-#
-#         @return: None
-#         """
-#         with open(filename, 'rb') as f:
-#             self.write(f.read())
-
-
 class File(Blob):
     """Data type to use for file objects"""
-
-    # def __get__(self, instance, owner):
-    #     if instance is None:
-    #         return self
-    #     name = self.name
-    #
-    #     value = None
-    #     if name not in instance.__storage__:
-    #         instance.__storage__[name] = {
-    #             'id': system.generate_oid(),
-    #             'size': len(self.default),
-    #             'filename': ''
-    #         }
-    #         value = self.default
-    #     return FileValue(self, instance.__storage__[name], value)
 
 
 class ExternalFileValue(str):

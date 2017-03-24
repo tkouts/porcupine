@@ -2,7 +2,7 @@ import datetime
 import asyncio
 
 from porcupine import context, exceptions, db
-from porcupine.datatypes import String, DateTime, Boolean, RelatorN
+from porcupine.datatypes import String, DateTime, Boolean, RelatorN, Integer
 from porcupine.core.datatypes.system import Acl
 from porcupine.core.context import system_override
 from porcupine.utils import permissions
@@ -33,15 +33,15 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     @type created: float
     """
     # system attributes
-    created = DateTime(readonly=True)
-    owner = String(required=True, readonly=True)
-    modified_by = String(required=True, readonly=True)
+    created = DateTime(readonly=True, store_as='cr')
+    owner = String(required=True, readonly=True, store_as='own')
+    modified_by = String(required=True, readonly=True, store_as='mdby')
     sys = Boolean(readonly=True, protected=True)
-    modified = DateTime(required=True, readonly=True)
-    deleted = Boolean(readonly=True, protected=True)
+    modified = DateTime(required=True, readonly=True, store_as='md')
+    deleted = Integer(readonly=True, protected=True, store_as='del')
 
     name = String(required=True)
-    description = String()
+    description = String(store_as='desc')
     acl = Acl(default=None)
 
     @property

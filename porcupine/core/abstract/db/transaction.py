@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from porcupine import exceptions
 from porcupine.config import settings
+from porcupine.utils import system
 
 
 class AbstractTransaction(object, metaclass=abc.ABCMeta):
@@ -72,7 +73,8 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
                 for item_id, snapshot in snapshots.items():
                     item = all_items[item_id]
                     for attr, old_value in snapshot.items():
-                        attr_def = item.__schema__[attr]
+                        attr_def = system.get_descriptor_by_storage_key(
+                            item.__class__, attr)
                         try:
                             on_change = attr_def.on_change(
                                 item,

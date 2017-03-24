@@ -95,24 +95,14 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         return repr(self.__storage__)
 
     def to_dict(self):
-        return {attr: value for attr, value in self.__storage__.items()
-                if attr in self.__schema__
-                and not self.__schema__[attr].protected}
+        schema_attrs = list(self.__schema__.values())
+        return {attr.name: attr.__get__(self, None)
+                for attr in schema_attrs
+                if not attr.protected
+                and attr.storage == '__storage__'}
 
     # json serializer
     toDict = to_dict
-
-    # @property
-    # def __snapshot__(self):
-    #     if self._snap is None:
-    #         self._snap = {}
-    #     return self._snap
-    #
-    # @property
-    # def __externals__(self):
-    #     if self._ext is None:
-    #         self._ext = {}
-    #     return self._ext
 
     @property
     def parent_id(self):

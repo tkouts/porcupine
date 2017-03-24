@@ -88,21 +88,34 @@ def resolve_set(raw_string):
     return value
 
 
+def get_descriptor_by_storage_key(cls, key):
+    if key in cls.__schema__:
+        return cls.__schema__[key]
+    return locate_descriptor_by_storage_key(cls, key)
+
+
+@functools.lru_cache()
+def locate_descriptor_by_storage_key(cls, key):
+    for desc in cls.__schema__.values():
+        if desc.storage_key == key:
+            return desc
+
+
 @context_cacheable(1000)
 async def get_item_state(item_id):
     return await db.connector.get_partial(
-        item_id, 'p_id', 'acl', 'deleted', 'sys',
+        item_id, 'p_id', 'acl', 'del', 'sys',
         snapshot=True)
 
 
 @context_cacheable(100)
 async def resolve_deleted(item_id):
     state = await get_item_state(item_id)
-    while not state['deleted'] and state['p_id'] is not None:
+    while not state['del'] and state['p_id'] is not None:
         if state['sys']:
             break
         state = await get_item_state(state['p_id'])
-    return state['deleted']
+    return state['del']
 
 
 @context_cacheable(100)
