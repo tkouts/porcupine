@@ -84,48 +84,46 @@ class Reference1(String, Acceptable):
 
 
 class ItemCollection:
-    def __init__(self, descriptor, instance):
-        self._descriptor = descriptor
-        self._instance = instance
+    __slots__ = ('_desc', '_inst')
 
-    @property
-    def key(self):
-        return '{0}_{1}'.format(self._instance.id, self._descriptor.name)
+    def __init__(self, descriptor, instance):
+        self._desc = descriptor
+        self._inst = instance
 
     async def get(self):
-        storage = getattr(self._instance, self._descriptor.storage)
-        name = self._descriptor.name
+        storage = getattr(self._inst, self._desc.storage)
+        name = self._desc.name
         if name not in storage:
-            await self._descriptor.fetch(self._instance)
+            await self._desc.fetch(self._inst)
         return tuple(storage[name])
 
     async def items(self):
         return await db.get_multi(await self.get())
 
     def add(self, item):
-        if not self._descriptor.accepts_item(item):
-            raise ContainmentError(self._instance,
-                                   self._descriptor.name,
-                                   item)
-        if self._instance.__is_new__:
-            storage = getattr(self._instance, self._descriptor.storage)
-            name = self._descriptor.name
+        if not self._desc.accepts_item(item):
+            raise ContainmentError(self._inst, self._desc.name, item)
+        if self._inst.__is_new__:
+            storage = getattr(self._inst, self._desc.storage)
+            name = self._desc.name
             if item.id not in storage[name]:
-                self._descriptor.snapshot(self._instance, None)
+                self._desc.snapshot(self._inst, None)
                 storage[name].append(item.id)
         else:
-            context.txn.append(self.key, ' {0}'.format(item.id))
+            context.txn.append(self._desc.key_for(self._inst),
+                               ' {0}'.format(item.id))
 
     def remove(self, item):
-        if self._instance.__is_new__:
-            storage = getattr(self._instance, self._descriptor.storage)
-            name = self._descriptor.name
+        if self._inst.__is_new__:
+            storage = getattr(self._inst, self._desc.storage)
+            name = self._desc.name
             if item.id in storage[name]:
                 # add snapshot to trigger on_change
-                self._descriptor.snapshot(self._instance, None)
+                self._desc.snapshot(self._inst, None)
                 storage[name].remove(item.id)
         else:
-            context.txn.append(self.key, ' -{0}'.format(item.id))
+            context.txn.append(self._desc.key_for(self._inst),
+                               ' -{0}'.format(item.id))
 
 
 class ReferenceN(Text, Acceptable):

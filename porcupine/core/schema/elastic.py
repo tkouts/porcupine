@@ -29,7 +29,7 @@ class ElasticMeta(type):
 
 
 class ElasticSlotsBase:
-    __slots__ = ('__storage__', '__externals__', '__snapshot__', '__is_new__')
+    __slots__ = ('__storage__', '_ext', '_snap', '__is_new__')
 
 
 class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
@@ -56,8 +56,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         if storage is None:
             storage = {}
         self.__storage__ = storage
-        self.__externals__ = {}
-        self.__snapshot__ = {}
+        self._ext = None
+        self._snap = None
         self.__is_new__ = False
 
         if 'id' not in storage:
@@ -76,8 +76,20 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             with system_override():
                 self.sig = self.__class__.__sig__
 
-    # def __hash__(self):
-    #     return hash(self.__storage__['id'])
+    @property
+    def __snapshot__(self):
+        if self._snap is None:
+            self._snap = {}
+        return self._snap
+
+    @property
+    def __externals__(self):
+        if self._ext is None:
+            self._ext = {}
+        return self._ext
+
+    def __reset__(self):
+        self._snap = {}
 
     def __repr__(self):
         return repr(self.__storage__)

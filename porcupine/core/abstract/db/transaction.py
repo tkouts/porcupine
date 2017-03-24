@@ -66,7 +66,7 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
                          if item.__snapshot__}
             # clear snapshots
             for item_id in snapshots:
-                all_items[item_id].__snapshot__ = {}
+                all_items[item_id].__reset__()
             # print(snapshots)
             if snapshots:
                 for item_id, snapshot in snapshots.items():

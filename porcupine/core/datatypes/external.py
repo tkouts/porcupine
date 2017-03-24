@@ -51,8 +51,7 @@ class Blob(DataType):
 
     async def fetch(self, instance, set_storage=True):
         name = self.name
-        value = await db.connector.get_external('{0}_{1}'.format(
-            instance.id, name))
+        value = await db.connector.get_external(self.key_for(instance))
         if set_storage:
             storage = getattr(instance, self.storage)
             storage[name] = value
@@ -68,6 +67,9 @@ class Blob(DataType):
             return future
         return self.fetch(instance)
 
+    def key_for(self, instance):
+        return '{0}_{1}'.format(instance.id, self.name)
+
     def snapshot(self, instance, value):
         if self.name not in instance.__snapshot__:
             instance.__snapshot__[self.name] = None
@@ -77,13 +79,11 @@ class Blob(DataType):
 
     def on_change(self, instance, value, old_value):
         if value is not None:
-            context.txn.put_external(
-                '{0}_{1}'.format(instance.id, self.name), value)
+            context.txn.put_external(self.key_for(instance), value)
 
     def on_delete(self, instance, value, is_permanent):
         if is_permanent:
-            context.txn.delete_external(
-                '{0}_{1}'.format(instance.id, self.name))
+            context.txn.delete_external(self.key_for(instance))
 
 
 class Text(Blob):

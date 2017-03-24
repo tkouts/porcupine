@@ -258,15 +258,15 @@ class RelatorItemCollection(ItemCollection):
     async def items(self):
         items = await super().items()
         return [item for item in items
-                if self._descriptor.rel_attr in item.__schema__]
+                if self._desc.rel_attr in item.__schema__]
 
     def add(self, item):
         super().add(item)
-        self._descriptor.add_reference(self._instance, item)
+        self._desc.add_reference(self._inst, item)
 
     def remove(self, item):
         super().remove(item)
-        self._descriptor.remove_reference(self._instance, item)
+        self._desc.remove_reference(self._inst, item)
 
 
 class RelatorN(ReferenceN):
