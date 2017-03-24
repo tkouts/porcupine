@@ -68,4 +68,3 @@ class App(Blueprint):
 
         for child_dict in children:
             await self.__process_item(child_dict, item)
-            # print(item, item.__snapshot__)
