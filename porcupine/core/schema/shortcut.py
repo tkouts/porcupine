@@ -1,3 +1,4 @@
+from porcupine import db, exceptions
 from porcupine.datatypes import Relator1
 from .item import Item
 
@@ -18,7 +19,7 @@ class Shortcut(Item):
     L{get_target} method.
     """
     target = Relator1(
-        relates_to=('porcupine.schema.Item', ),
+        accepts=(Item, ),
         rel_attr='shortcuts',
         required=True,
     )
@@ -32,63 +33,40 @@ class Shortcut(Item):
         @return: L{Shortcut}
         """
         if isinstance(target, str):
-            target = db._db.get_item(target)
+            target = db.connector.get(target)
         shortcut = Shortcut()
         shortcut.name = target.name
         shortcut.target = target.id
         return shortcut
 
-    # @db.requires_transactional_context
-    def append_to(self, parent):
-        if isinstance(parent, str):
-            parent = db._db.get_item(parent)
+    async def append_to(self, parent):
+        target = await self.get_target()
+        if not parent.__class__.children.accepts_item(target):
+            raise exceptions.ContainmentError(parent, 'children', target)
+        return await super().append_to(parent)
 
-        content_class = self.get_target_contentclass()
-        if content_class not in parent.containment:
-            raise exceptions.ContainmentError(
-                'The target container does not accept '
-                'objects of type\n"%s".' % content_class)
-        else:
-            return super(Shortcut, self).append_to(parent)
+    async def copy_to(self, target_container):
+        target = await self.get_target()
+        if not target_container.__class__.children.accepts_item(target):
+            raise exceptions.ContainmentError(target_container,
+                                              'children', target)
+        return super().copy_to(target_container)
 
-    # @db.requires_transactional_context
-    def copy_to(self, target):
-        if isinstance(target, str):
-            target = db._db.get_item(target)
+    async def move_to(self, target_container, inherit_roles=False):
+        target = await self.get_target()
+        if not target_container.__class__.children.accepts_item(target):
+            raise exceptions.ContainmentError(target_container,
+                                              'children', target)
+        return super().move_to(target_container, inherit_roles)
 
-        content_class = self.get_target_contentclass()
-        if content_class not in target.containment:
-            raise exceptions.ContainmentError(
-                'The target container does not accept '
-                'objects of type\n"%s".' % content_class)
-        else:
-            return super(Shortcut, self).copy_to(target)
+    async def update(self):
+        parent = await db.connector.get(self.p_id)
+        target = await self.get_target()
+        if not parent.__class__.children.accepts_item(target):
+            raise exceptions.ContainmentError(parent, 'children', target)
+        return await super().update()
 
-    # @db.requires_transactional_context
-    def move_to(self, target, inherit_roles=False):
-        if isinstance(target, str):
-            target = db._db.get_item(target)
-
-        content_class = self.get_target_contentclass()
-        if content_class not in target.containment:
-            raise exceptions.ContainmentError(
-                'The target container does not accept '
-                'objects of type\n"%s".' % content_class)
-        else:
-            return super(Shortcut, self).move_to(target, inherit_roles)
-
-    # @db.requires_transactional_context
-    def update(self):
-        parent = db._db.get_item(self._pid)
-        content_class = self.get_target_contentclass()
-        if content_class not in parent.containment:
-            raise exceptions.ContainmentError(
-                'The parent container does not accept '
-                'objects of type\n"%s".' % content_class)
-        else:
-            return super(Shortcut, self).update()
-
-    def get_target(self, get_lock=True):
+    async def get_target(self):
         """Returns the target item.
 
         @return: the target item or C{None} if the user
@@ -97,20 +75,7 @@ class Shortcut(Item):
         """
         target = None
         if self.target:
-            target = self.target.get_item(get_lock=get_lock)
+            target = await self.target.item()
             while target and isinstance(target, Shortcut):
-                target = target.target.get_item(get_lock=get_lock)
+                target = await target.target.item()
         return target
-
-    def get_target_contentclass(self):
-        """Returns the content class of the target item.
-
-        @return: the fully qualified name of the target's
-                 content class
-        @rtype: str
-        """
-        if self.target:
-            target = db._db.get_item(self.target, get_lock=False)
-            while isinstance(target, Shortcut):
-                target = db._db.get_item(target.target, get_lock=False)
-            return target.contentclass

@@ -1,5 +1,6 @@
 from porcupine import db, context
-from porcupine.exceptions import ContainmentError
+from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
+    InvalidUsage
 from porcupine.utils import system
 from .external import Text
 from .common import String
@@ -58,24 +59,24 @@ class Reference1(String, Acceptable):
         super().__init__(default, **kwargs)
         Acceptable.__init__(self, **kwargs)
 
-    def validate_value(self, value, instance):
-        if value is not None and not self.accepts_item(value):
-            raise ContainmentError(instance, self.name, value)
-        super().validate_value(value, instance)
-
     def __get__(self, instance, owner):
         if instance is None:
             return self
         value = super().__get__(instance, owner)
         if value:
-            value = ItemReference(value)
-        return value
+            return ItemReference(value)
 
-    def __set__(self, instance, value):
-        self.validate_value(value, instance)
-        self.snapshot(instance, value.id)
-        storage = getattr(instance, self.storage)
-        storage[self.storage_key] = value.id
+    async def on_change(self, instance, value, old_value):
+        super().on_change(instance, value, old_value)
+        if value:
+            try:
+                ref_item = await db.get_item(value, quiet=False)
+            except (NotFound, Forbidden):
+                # TODO: change wording
+                raise InvalidUsage('Invalid item {0}'.format(value))
+            if not self.accepts_item(ref_item):
+                raise ContainmentError(instance, self.name, ref_item)
+            return ref_item
 
     def clone(self, instance, memo):
         if '_id_map_' in memo:
@@ -107,7 +108,7 @@ class ItemCollection:
             storage = getattr(self._inst, self._desc.storage)
             name = self._desc.name
             if item.id not in storage[name]:
-                self._desc.snapshot(self._inst, None)
+                self._desc.snapshot(self._inst, True)
                 storage[name].append(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),
@@ -119,7 +120,7 @@ class ItemCollection:
             name = self._desc.name
             if item.id in storage[name]:
                 # add snapshot to trigger on_change
-                self._desc.snapshot(self._inst, None)
+                self._desc.snapshot(self._inst, True)
                 storage[name].remove(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),
@@ -154,16 +155,19 @@ class ReferenceN(Text, Acceptable):
     async def on_change(self, instance, value, old_value):
         # old_value is always None
         if instance.__is_new__:
-            ref_items = await db.get_multi(value)
-            # check containment
-            for item in ref_items:
-                if not self.accepts_item(item):
-                    raise ContainmentError(instance, self.name, item)
-            if ref_items:
-                # write external
-                super().on_change(instance,
-                                  ' '.join([i.id for i in ref_items]),
-                                  old_value)
+            if value:
+                ref_items = await db.get_multi(value)
+                # check containment
+                for item in ref_items:
+                    if not self.accepts_item(item):
+                        raise ContainmentError(instance, self.name, item)
+                if ref_items:
+                    # write external
+                    super().on_change(instance,
+                                      ' '.join([i.id for i in ref_items]),
+                                      old_value)
+            else:
+                ref_items = []
             return ref_items, []
         # need to compute deltas
         old_ids = await self.fetch(instance, set_storage=False)

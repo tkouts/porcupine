@@ -8,8 +8,8 @@ from porcupine.utils import system
 
 
 class AbstractTransaction(object, metaclass=abc.ABCMeta):
-    __slots__ = ('connector', 'options', '_inserted', '_externals',
-                 '_deleted', '_modified', '_sd', '_appends')
+    __slots__ = ('connector', 'options', '_upsertions', '_externals',
+                 '_deleted', '_sd', '_appends')
 
     txn_max_retries = settings['db'].get('txn_max_retries', 12)
     UPSERT_MUT = 0
@@ -18,42 +18,36 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
         self.connector = connector
         self.connector.active_txns += 1
         self.options = options
-        self._inserted = {}
+        self._upsertions = {}
         self._externals = {}
         self._deleted = {}
-        self._modified = {}
         # sub document mutations
         self._sd = defaultdict(dict)
         self._appends = defaultdict(str)
 
     def __contains__(self, key):
-        return key in self._inserted or key in self._modified \
-               or key in self._deleted or key in self._externals
+        return key in self._upsertions \
+               or key in self._deleted \
+               or key in self._externals
 
     def __getitem__(self, key):
         if key in self._deleted:
             return None
-        elif key in self._modified:
-            return self._modified[key]
-        elif key in self._inserted:
-            return self._inserted[key]
+        elif key in self._upsertions:
+            return self._upsertions[key]
         elif key in self._externals:
             return self._externals[key]
         raise KeyError
 
-    def insert(self, item):
-        if item.id in self._inserted:
-            raise exceptions.DBAlreadyExists
-        self._inserted[item.id] = item
-
-    def update(self, item):
-        self._modified[item.id] = item
+    def upsert(self, item):
+        self._upsertions[item.id] = item
 
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = (mutation_type, value)
 
     def append(self, key, value):
-        self._appends[key] += value
+        if value not in self._appends[key]:
+            self._appends[key] += value
 
     def put_external(self, key, value):
         self._externals[key] = value
@@ -61,17 +55,16 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
     async def prepare(self):
         # call changed attributes event handlers till snapshots are drained
         while True:
-            all_items = {**self._inserted, **self._modified}
             snapshots = {item.id: item.__snapshot__
-                         for item in all_items.values()
+                         for item in self._upsertions.values()
                          if item.__snapshot__}
             # clear snapshots
             for item_id in snapshots:
-                all_items[item_id].__reset__()
+                self._upsertions[item_id].__reset__()
             # print(snapshots)
             if snapshots:
                 for item_id, snapshot in snapshots.items():
-                    item = all_items[item_id]
+                    item = self._upsertions[item_id]
                     for attr, old_value in snapshot.items():
                         attr_def = system.get_descriptor_by_storage_key(
                             item.__class__, attr)
@@ -91,7 +84,9 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
         dumps = connector.persist.dumps
 
         # upsertions
-        upsertions = {k: dumps(i) for k, i in self._inserted.items()}
+        upsertions = {k: dumps(i)
+                      for k, i in self._upsertions.items()
+                      if i.__is_new__}
         # merge externals
         upsertions.update(self._externals)
 

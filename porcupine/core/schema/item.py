@@ -36,9 +36,9 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     created = DateTime(readonly=True, store_as='cr')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
-    sys = Boolean(readonly=True, protected=True)
+    sys = Boolean(readonly=True)
     modified = DateTime(required=True, readonly=True, store_as='md')
-    deleted = Integer(readonly=True, protected=True, store_as='del')
+    deleted = Integer(readonly=True, store_as='del')
 
     name = String(required=True)
     description = String(store_as='desc')
@@ -79,8 +79,8 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
                 'or "move_to" methods instead.')
 
         if parent is not None:
-            if isinstance(parent, str):
-                parent = await db.connector.get(parent)
+            # if isinstance(parent, str):
+            #     parent = await db.connector.get(parent)
             security = await parent.applied_acl
         else:
             # add as root
@@ -101,13 +101,13 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
             if parent is not None:
                 self.p_id = parent.id
 
-            context.txn.insert(self)
+            context.txn.upsert(self)
             if parent is not None:
                 parent.children.add(self)
                 if self.is_collection:
                     parent.containers.add(self)
                 parent.modified = self.modified
-                context.txn.update(parent)
+                context.txn.upsert(parent)
 
     def is_contained_in(self, item_id: str) -> bool:
         """
@@ -177,7 +177,7 @@ class Item(GenericItem):
     to create custom containers.
     """
     shortcuts = RelatorN(
-        relates_to=('porcupine.schema.Shortcut', ),
+        accepts=('porcupine.schema.Shortcut', ),
         rel_attr='target',
         cascade_delete=True,
     )
@@ -201,9 +201,9 @@ class Item(GenericItem):
                 with system_override():
                     self.modified_by = user.name
                     self.modified = datetime.datetime.utcnow().isoformat()
-                    context.txn.update(self)
+                    context.txn.upsert(self)
                     if parent is not None:
                         parent.modified = self.modified
-                        context.txn.update(parent)
+                        context.txn.upsert(parent)
             else:
                 raise exceptions.Forbidden('Forbidden')

@@ -98,7 +98,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         schema_attrs = list(self.__schema__.values())
         return {attr.name: attr.__get__(self, None)
                 for attr in schema_attrs
-                if not attr.protected
+                if attr.protected is False
                 and attr.storage == '__storage__'}
 
     # json serializer

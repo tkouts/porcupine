@@ -75,7 +75,7 @@ def hash_series(*args, using='md5'):
 def resolve_set(raw_string):
     # build set
     uniques = {}
-    # print('raw value is', value)
+    # print('raw value is', raw_string)
     for oid in raw_string.split(' '):
         if oid:
             if oid.startswith('-'):

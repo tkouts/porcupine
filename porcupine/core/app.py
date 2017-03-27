@@ -48,14 +48,18 @@ class App(Blueprint):
             await self.__process_item(item, None)
 
     async def __process_item(self, item_dict, parent):
-        item_id = item_dict.pop('id')
+        item_id = item_dict.pop('id', None)
         item_type = item_dict.pop('type')
         children = item_dict.pop('children', [])
-        item = await db.connector.get(item_id)
+        if item_id:
+            item = await db.connector.get(item_id)
+        else:
+            item = None
         if item is None:
             item = system.get_rto_by_name(item_type)()
-            # restore id in dict so it is set
-            item_dict['id'] = item_id
+            if item_id:
+                # restore id in dict so it is set
+                item_dict['id'] = item_id
 
         with system_override():
             for attr, value in item_dict.items():

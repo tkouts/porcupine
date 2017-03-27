@@ -47,7 +47,9 @@ class Blob(DataType):
 
     def snapshot(self, instance, value):
         if self.name not in instance.__snapshot__:
-            instance.__snapshot__[self.name] = None
+            # print(instance.__is_new__, value)
+            if not instance.__is_new__ or value:
+                instance.__snapshot__[self.name] = None
 
     def clone(self, instance, memo):
         pass

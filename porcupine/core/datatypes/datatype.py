@@ -74,7 +74,7 @@ class DataType:
             value = list(value)
         storage = getattr(instance, self.storage)
         if self.storage_key not in storage:
-            DataType.snapshot(self, instance, value)
+            self.snapshot(instance, value)
             storage[self.storage_key] = value
 
     def snapshot(self, instance, value):
