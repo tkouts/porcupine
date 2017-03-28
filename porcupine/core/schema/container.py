@@ -1,5 +1,4 @@
-from porcupine.datatypes import ReferenceN
-from porcupine.core.datatypes.system import Children
+from porcupine.core.datatypes.system import Items, Containers
 from porcupine.utils import permissions
 from .shortcut import Shortcut
 from .item import Item
@@ -19,11 +18,8 @@ class Container(Item):
     containment = (Shortcut, )
     is_collection = True
 
-    children = Children()
-    containers = ReferenceN(
-        accepts=('porcupine.core.schema.container.Container', ),
-        readonly=True
-    )
+    items = Items()
+    containers = Containers()
 
     def child_exists(self, name):
         """

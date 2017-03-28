@@ -27,15 +27,16 @@ class SchemaSignature(String):
 
 class Children(ReferenceN):
     readonly = True
+    name = None
 
     def __get__(self, instance, owner):
         if instance is None:
             if self.name not in owner.__dict__:
                 # create a separate instance per owner
                 # accepting the container's containment types
-                children = Children(default=self._default,
-                                    accepts=owner.containment)
-                setattr(owner, 'children', children)
+                children = self.__class__(default=self._default,
+                                          accepts=owner.containment)
+                setattr(owner, self.__class__.name, children)
                 return children
             return self
         return super().__get__(instance, owner)
@@ -45,6 +46,8 @@ class Children(ReferenceN):
             # allow for system
             return True
         return super().accepts_item(item)
+
+    # HTTP views
 
     async def get(self, request, instance, expand=True):
         return await super().get(request, instance, True)
@@ -56,9 +59,12 @@ class Children(ReferenceN):
         # TODO: handle invalid type exception
         item_type = system.get_rto_by_name(item_dict.pop('type'))
         new_item = item_type()
-        for attr, value in item_dict.items():
-            setattr(new_item, attr, value)
-        await new_item.append_to(instance)
+        try:
+            for attr, value in item_dict.items():
+                setattr(new_item, attr, value)
+            await new_item.append_to(instance)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
         location = server.url_for('resources.resource_handler',
                                   item_id=new_item.id)
         return json(
@@ -67,3 +73,31 @@ class Children(ReferenceN):
             headers={
                 'Location': location
             })
+
+
+class Items(Children):
+    name = 'items'
+
+    @property
+    def allowed_types(self):
+        if not self.accepts_resolved:
+            resolved = [
+                system.get_rto_by_name(x) if isinstance(x, str) else x
+                for x in self.accepts
+            ]
+            self.accepts = tuple([x for x in resolved if not x.is_collection])
+        return self.accepts
+
+
+class Containers(Children):
+    name = 'containers'
+
+    @property
+    def allowed_types(self):
+        if not self.accepts_resolved:
+            resolved = [
+                system.get_rto_by_name(x) if isinstance(x, str) else x
+                for x in self.accepts
+            ]
+            self.accepts = tuple([x for x in resolved if x.is_collection])
+        return self.accepts

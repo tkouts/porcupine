@@ -103,9 +103,10 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
 
             context.txn.upsert(self)
             if parent is not None:
-                parent.children.add(self)
                 if self.is_collection:
                     parent.containers.add(self)
+                else:
+                    parent.items.add(self)
                 parent.modified = self.modified
                 context.txn.upsert(parent)
 
