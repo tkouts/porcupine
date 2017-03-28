@@ -30,8 +30,8 @@ class RelatorBase(Acceptable):
             super(RelatorCollection, rel_attr_value).add(instance)
         elif isinstance(rel_attr_value, RelatorItem):
             setattr(item, self.rel_attr, instance.id)
-            if not item.__is_new__:
-                context.txn.upsert(item)
+            # if not item.__is_new__:
+            context.txn.upsert(item)
 
     def remove_reference(self, instance, item):
         rel_attr_value = getattr(item, self.rel_attr)
@@ -40,8 +40,8 @@ class RelatorBase(Acceptable):
             super(RelatorCollection, rel_attr_value).remove(instance)
         elif isinstance(rel_attr_value, RelatorItem):
             setattr(item, self.rel_attr, None)
-            if not item.__is_new__:
-                context.txn.upsert(item)
+            # if not item.__is_new__:
+            context.txn.upsert(item)
             # item.__storage__[self.rel_attr] = None
 
 
@@ -98,17 +98,6 @@ class Relator1(Reference1, RelatorBase):
             if old_ref_item:
                 self.remove_reference(instance, old_ref_item)
 
-    # def on_create(self, instance, value):
-    #     self.on_update(instance, value, None)
-    #
-    # def on_update(self, instance, value, old_value):
-    #     if value != old_value:
-    #         if old_value:
-    #             # remove old reference
-    #             self._remove_reference(old_value, instance.id)
-    #         if value:
-    #             self._add_reference(instance, value, instance.id)
-    #
     # def on_delete(self, instance, value, is_permanent):
     #     if not instance._is_deleted:
     #         if value and self.respects_references:
@@ -127,42 +116,6 @@ class Relator1(Reference1, RelatorBase):
     # def on_undelete(self, instance, value):
     #     if self.cascade_delete:
     #         db._db.get_item(value)._undelete()
-    #
-    # def _add_reference(self, instance, value, oid):
-    #     ref_item = db._db.get_item(value)
-    #     if ref_item is not None and isinstance(
-    #             ref_item,
-    #             tuple([system.get_rto_by_name(cc) for cc in self.relates_to])):
-    #         ref_attr = getattr(ref_item, self.rel_attr)
-    #         ref_attr_def = ref_item.__props__[self.rel_attr]
-    #         reference_added = False
-    #         if isinstance(ref_attr_def, RelatorN) and oid not in ref_attr:
-    #             ref_attr.append(oid)
-    #             reference_added = True
-    #         elif isinstance(ref_attr_def, Relator1) and oid != ref_attr:
-    #             setattr(ref_item, self.rel_attr, oid)
-    #             reference_added = True
-    #         if reference_added:
-    #             ref_attr_def.validate(ref_item)
-    #             db._db.put_item(ref_item)
-    #     else:
-    #         setattr(instance, self.name, None)
-    #
-    # def _remove_reference(self, value, oid):
-    #     ref_item = db._db.get_item(value)
-    #     if ref_item is not None:
-    #         ref_attr = getattr(ref_item, self.rel_attr)
-    #         ref_attr_def = ref_item.__props__[self.rel_attr]
-    #         reference_removed = False
-    #         if isinstance(ref_attr_def, RelatorN) and oid in ref_attr:
-    #             ref_attr.remove(oid)
-    #             reference_removed = True
-    #         elif isinstance(ref_attr_def, Relator1) and ref_attr is not None:
-    #             setattr(ref_item, self.rel_attr, None)
-    #             reference_removed = True
-    #         if reference_removed:
-    #             ref_attr_def.validate(ref_item)
-    #             db._db.put_item(ref_item)
 
 
 class RelatorCollection(ItemCollection):
@@ -234,45 +187,3 @@ class RelatorN(ReferenceN, RelatorBase):
     # def on_undelete(self, instance, value):
     #     if self.cascade_delete:
     #         [db._db.get_item(oid)._undelete() for oid in value]
-
-    # def _add_references(self, attr, ids, oid):
-    #     allowed_ref_types = tuple(
-    #         [misc.get_rto_by_name(cc) for cc in self.relates_to])
-    #     for id in ids:
-    #         ref_item = db._db.get_item(id)
-    #         if ref_item is not None \
-    #                 and isinstance(ref_item, allowed_ref_types):
-    #             ref_attr = getattr(ref_item, self.rel_attr)
-    #             ref_attr_def = ref_item.__props__[self.rel_attr]
-    #             reference_added = False
-    #             if isinstance(ref_attr_def, RelatorN) and oid not in ref_attr:
-    #                 ref_attr.append(oid)
-    #                 reference_added = True
-    #             elif isinstance(ref_attr_def, Relator1) and oid != ref_attr:
-    #                 setattr(ref_item, self.rel_attr, oid)
-    #                 reference_added = True
-    #             if reference_added:
-    #                 # ref_item._update_schema()
-    #                 ref_attr_def.validate(ref_item)
-    #                 db._db.put_item(ref_item)
-    #         else:
-    #             attr.remove(id)
-    #
-    # def _remove_references(self, ids, oid):
-    #     # remove references
-    #     for id in ids:
-    #         ref_item = db._db.get_item(id)
-    #         if ref_item is not None:
-    #             ref_attr = getattr(ref_item, self.rel_attr)
-    #             ref_attr_def = ref_item.__props__[self.rel_attr]
-    #             reference_removed = False
-    #             if isinstance(ref_attr_def, RelatorN) and oid in ref_attr:
-    #                 ref_attr.remove(oid)
-    #                 reference_removed = True
-    #             elif isinstance(ref_attr_def, Relator1) \
-    #                     and ref_attr is not None:
-    #                 setattr(ref_item, self.rel_attr, None)
-    #                 reference_removed = True
-    #             if reference_removed:
-    #                 ref_attr_def.validate(ref_item)
-    #                 db._db.put_item(ref_item)
