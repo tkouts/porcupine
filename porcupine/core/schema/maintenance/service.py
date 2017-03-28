@@ -9,7 +9,7 @@ class SchemaMaintenance:
     queue = None
 
     @classmethod
-    async def start(cls):
+    def start(cls):
         log.info('Starting schema maintenance service')
         cls.queue = asyncio.Queue()
         asyncio.ensure_future(cls.worker())

@@ -23,7 +23,7 @@ async def close_db():
 @services.listener('before_server_start')
 async def init_services(server, loop):
     await open_db()
-    await SchemaMaintenance.start()
+    SchemaMaintenance.start()
 
 
 @services.listener('after_server_stop')
