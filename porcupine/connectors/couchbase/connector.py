@@ -3,7 +3,7 @@ import ujson
 import couchbase.experimental
 import random
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
-    SubdocPathNotFoundError
+    SubdocPathNotFoundError, KeyExistsError
 
 from porcupine import exceptions
 from porcupine.core.abstract.db.connector import AbstractConnector
@@ -70,6 +70,19 @@ class Couchbase(AbstractConnector):
     async def get_partial_raw(self, key, *paths):
         values = await self.bucket.retrieve_in(key, *paths)
         return dict(zip(paths, values))
+
+    async def replace_atomically(self, key, xform_func):
+        try:
+            result = await self.bucket.get(key)
+            self.bucket.replace(key,
+                                xform_func(result.value),
+                                cas=result.cas,
+                                format=couchbase.FMT_AUTO)
+        except KeyExistsError:
+            return False
+        except NotFoundError:
+            pass
+        return True
 
     async def close(self):
         pass

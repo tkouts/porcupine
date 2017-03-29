@@ -114,6 +114,9 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get_multi_raw(self, keys):
         raise NotImplementedError
 
+    async def replace_atomically(self, key, xform_func):
+        raise NotImplementedError
+
     # @abc.abstractmethod
     # async def insert_raw(self, key, value):
     #     raise NotImplementedError

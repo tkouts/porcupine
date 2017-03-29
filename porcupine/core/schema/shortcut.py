@@ -41,20 +41,32 @@ class Shortcut(Item):
 
     async def append_to(self, parent):
         target = await self.get_target()
-        if not parent.__class__.children.accepts_item(target):
+        if target.is_collection:
+            containment_dt = parent.__class__.containers
+        else:
+            containment_dt = parent.__class__.items
+        if not containment_dt.accepts_item(target):
             raise exceptions.ContainmentError(parent, 'children', target)
         return await super().append_to(parent)
 
     async def copy_to(self, target_container):
         target = await self.get_target()
-        if not target_container.__class__.children.accepts_item(target):
+        if target.is_collection:
+            containment_dt = target_container.__class__.containers
+        else:
+            containment_dt = target_container.__class__.items
+        if not containment_dt.accepts_item(target):
             raise exceptions.ContainmentError(target_container,
                                               'children', target)
         return super().copy_to(target_container)
 
     async def move_to(self, target_container, inherit_roles=False):
         target = await self.get_target()
-        if not target_container.__class__.children.accepts_item(target):
+        if target.is_collection:
+            containment_dt = target_container.__class__.containers
+        else:
+            containment_dt = target_container.__class__.items
+        if not containment_dt.accepts_item(target):
             raise exceptions.ContainmentError(target_container,
                                               'children', target)
         return super().move_to(target_container, inherit_roles)
@@ -62,7 +74,11 @@ class Shortcut(Item):
     async def update(self):
         parent = await db.connector.get(self.p_id)
         target = await self.get_target()
-        if not parent.__class__.children.accepts_item(target):
+        if target.is_collection:
+            containment_dt = parent.__class__.containers
+        else:
+            containment_dt = parent.__class__.items
+        if not containment_dt.accepts_item(target):
             raise exceptions.ContainmentError(parent, 'children', target)
         return await super().update()
 

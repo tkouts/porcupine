@@ -75,17 +75,27 @@ def hash_series(*args, using='md5'):
 def resolve_set(raw_string):
     # build set
     uniques = {}
+    dirty_count = 0
+    total_count = 0
     # print('raw value is', raw_string)
     for oid in raw_string.split(' '):
         if oid:
+            total_count += 1
             if oid.startswith('-'):
                 key = oid[1:]
                 if key in uniques:
+                    dirty_count += 2
                     del uniques[key]
             else:
+                if oid in uniques:
+                    dirty_count += 1
                 uniques[oid] = None
     value = list(uniques.keys())
-    return value
+    if total_count:
+        dirtiness = dirty_count / total_count
+    else:
+        dirtiness = 0.0
+    return value, dirtiness
 
 
 def get_descriptor_by_storage_key(cls, key):

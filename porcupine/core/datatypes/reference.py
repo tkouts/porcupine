@@ -1,6 +1,7 @@
 from porcupine import db, context
 from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
     InvalidUsage
+from porcupine.core.schema.maintenance.service import SchemaMaintenance
 from porcupine.utils import system
 from .external import Text
 from .common import String
@@ -130,6 +131,7 @@ class ItemCollection:
 class ReferenceN(Text, Acceptable):
     safe_type = (list, tuple)
     allow_none = False
+    compact_threshold = 0.3
 
     def __init__(self, default=(), **kwargs):
         super().__init__(default, **kwargs)
@@ -139,7 +141,11 @@ class ReferenceN(Text, Acceptable):
         # build set
         value = await super().fetch(instance, set_storage=False)
         if value:
-            value = system.resolve_set(value)
+            value, dirtiness = system.resolve_set(value)
+            # print(dirtiness)
+            if dirtiness > self.compact_threshold:
+                await SchemaMaintenance.compact_collection(
+                    self.key_for(instance))
         else:
             value = []
         if set_storage:
