@@ -154,6 +154,8 @@ class RelatorN(ReferenceN, RelatorBase):
                          will be deleted upon the object's deletion.
     @type cascade_delete: bool
     """
+    storage_info = '_relN_'
+
     def __init__(self, default=(), **kwargs):
         super().__init__(default, **kwargs)
         RelatorBase.__init__(self, **kwargs)

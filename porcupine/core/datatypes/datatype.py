@@ -1,5 +1,3 @@
-import copy
-import collections
 from porcupine import context, db, exceptions
 
 
@@ -65,13 +63,9 @@ class DataType:
         if self.storage_key in instance.__storage__:
             del instance.__storage__[self.storage_key]
 
-    def set_default(self, instance):
-        value = self._default
-        if isinstance(value, (collections.MutableMapping,
-                              collections.MutableSequence)):
-            value = copy.deepcopy(value)
-        elif isinstance(value, tuple):
-            value = list(value)
+    def set_default(self, instance, value=None):
+        if value is None:
+            value = self._default
         storage = getattr(instance, self.storage)
         if self.storage_key not in storage:
             self.snapshot(instance, value)

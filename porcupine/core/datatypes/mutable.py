@@ -1,4 +1,6 @@
+import copy
 from functools import wraps
+from collections import MutableSequence, MutableMapping
 from .datatype import DataType
 
 
@@ -15,12 +17,14 @@ class MutableWatcher(type):
     def snapshot(method):
         @wraps(method)
         def mutation_watcher(self, *args, **kwargs):
-            print('method call', *args)
+            # TODO: snapshot
+            # print('method call', *args)
             return method(self, *args, **kwargs)
         return mutation_watcher
 
 
 class GuardedList(list, metaclass=MutableWatcher):
+    # TODO: add mutating members
     watch_list = ['__setitem__']
 
     def __init__(self, descriptor, instance, seq=()):
@@ -48,8 +52,16 @@ class List(DataType):
         if value is not None:
             return GuardedList(self, instance, value)
 
+    def set_default(self, instance, value=None):
+        if value is None:
+            value = self._default
+        if isinstance(value, MutableSequence):
+            value = copy.deepcopy(value)
+        super().set_default(instance, value)
+
 
 class GuardedDict(dict, metaclass=MutableWatcher):
+    # TODO: add mutating members
     watch_list = ['__setitem__']
 
     def __init__(self, descriptor, instance, seq=None, **kwargs):
@@ -74,3 +86,10 @@ class Dictionary(DataType):
         value = super().__get__(instance, owner)
         if value is not None:
             return GuardedDict(self, instance, value)
+
+    def set_default(self, instance, value=None):
+        if value is None:
+            value = self._default
+        if isinstance(value, MutableMapping):
+            value = copy.deepcopy(value)
+        super().set_default(instance, value)

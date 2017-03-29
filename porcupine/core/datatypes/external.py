@@ -17,6 +17,7 @@ class Blob(DataType):
     """
     safe_type = bytes
     allow_none = True
+    storage_info = '_blob_'
     storage = '__externals__'
 
     def __init__(self, default=None, **kwargs):
@@ -41,6 +42,14 @@ class Blob(DataType):
             future.set_result(storage[self.storage_key])
             return future
         return self.fetch(instance)
+
+    def set_default(self, instance, value=None):
+        if value is None:
+            value = self._default
+        super().set_default(instance, value)
+        # add external info
+        if self.name not in instance.__storage__:
+            instance.__storage__[self.name] = self.storage_info
 
     def key_for(self, instance):
         return '{0}_{1}'.format(instance.id, self.name)

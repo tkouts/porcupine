@@ -129,6 +129,7 @@ class ItemCollection:
 
 
 class ReferenceN(Text, Acceptable):
+    storage_info = '_refN_'
     safe_type = (list, tuple)
     allow_none = False
     compact_threshold = 0.3
@@ -157,6 +158,22 @@ class ReferenceN(Text, Acceptable):
         if instance is None:
             return self
         return ItemCollection(self, instance)
+
+    def set_default(self, instance, value=None):
+        if value is None:
+            value = self._default
+        if isinstance(value, tuple):
+            value = list(value)
+        super().set_default(instance, value)
+        # add active key index
+        active_key_index = '{0}/ind'.format(self.name)
+        if active_key_index not in instance.__storage__:
+            instance.__storage__[active_key_index] = 0
+
+    def key_for(self, instance):
+        active_key_index = '{0}/ind'.format(self.name)
+        return '{0}_{1}/{2}'.format(instance.id, self.name,
+                                    instance.__storage__[active_key_index])
 
     async def on_change(self, instance, value, old_value):
         # old_value is always None
