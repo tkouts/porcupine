@@ -93,14 +93,14 @@ class CollectionSplitter(SchemaMaintenanceTask):
 
     async def execute(self):
         # print('splitting collection', self.key)
-        from porcupine.datatypes import ReferenceN
         item_id, collection_name, chunk_no = self.key.split('/')
         chunk_no = int(chunk_no)
         # compute number of parts
         raw_collection, cas = await db.connector.get_for_update(self.key)
         size = len(raw_collection)
-        if size > ReferenceN.split_threshold:
-            parts = math.ceil(size / ReferenceN.split_threshold)
+        split_threshold = db.connector.coll_split_threshold
+        if size > split_threshold:
+            parts = math.ceil(size / split_threshold)
             # bump up active chunk number
             # so that new collection appends are done in a new doc
             await db.connector.bump_up_chunk_number(item_id, collection_name,

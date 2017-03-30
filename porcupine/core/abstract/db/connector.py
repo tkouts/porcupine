@@ -9,7 +9,9 @@ from .join import Join
 
 class AbstractConnector(metaclass=abc.ABCMeta):
     settings = settings['db']
-    multi_fetch_chunk_size = 800
+    multi_fetch_chunk_size = settings['multi_fetch_chunk_size']
+    coll_compact_threshold = settings['collection_compact_threshold']
+    coll_split_threshold = settings['collection_split_threshold']
     indexes = {}
     active_txns = 0
     root_id = ''

@@ -1,5 +1,3 @@
-import math
-
 from porcupine import db, context
 from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
     InvalidUsage
@@ -134,9 +132,6 @@ class ReferenceN(Text, Acceptable):
     storage_info = '_refN_'
     safe_type = (list, tuple)
     allow_none = False
-    compact_threshold = 0.3
-    # split threshold set to 64K
-    split_threshold = 65535
 
     def __init__(self, default=(), **kwargs):
         super().__init__(default, **kwargs)
@@ -168,16 +163,17 @@ class ReferenceN(Text, Acceptable):
 
         value, dirtiness = system.resolve_set(' '.join(chunks))
         # print(dirtiness)
-        if current_size > self.split_threshold \
-                or dirtiness > self.compact_threshold:
+        split_threshold = db.connector.coll_split_threshold
+        compact_threshold = db.connector.coll_compact_threshold
+        if current_size > split_threshold or dirtiness > compact_threshold:
             # we need to maintain the collection
             key = self.key_for(instance)
-            if current_size > self.split_threshold:
-                if not is_split and (current_size * (1 - dirtiness)) < self.split_threshold:
+            if current_size > split_threshold:
+                if not is_split and (current_size * (1 - dirtiness)) < split_threshold:
                     await SchemaMaintenance.compact_collection(key)
                 else:
                     await SchemaMaintenance.split_collection(key)
-            elif dirtiness > self.compact_threshold:
+            elif dirtiness > compact_threshold:
                 if is_split:
                     # full rebuild
                     pass

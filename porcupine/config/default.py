@@ -13,6 +13,11 @@ default_settings = {
         # 'protocol': 'couchbase',
         'bucket': 'porcupine',
         'password': '',
+
+        'multi_fetch_chunk_size': 800,
+        'collection_compact_threshold': 0.3,
+        # split threshold set to 64K
+        'collection_split_threshold': 65535,
         # optional for running unit tests suite
         # 'tests_bucket': 'porcupine_tests'
     },
