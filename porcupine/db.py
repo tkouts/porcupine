@@ -29,7 +29,7 @@ async def get_item(item_id, quiet=True):
     """
     item = await connector.get(item_id, quiet=quiet)
     if item is not None:
-        is_deleted = await item.is_deleted
+        is_deleted = await item.is_deleted()
         if not is_deleted:
             access_level = await permissions.resolve(item, context.user)
             if access_level != permissions.NO_ACCESS:
@@ -45,7 +45,7 @@ async def get_multi(ids):
     items = []
     if ids:
         async for item in connector.get_multi(ids):
-            is_deleted = await item.is_deleted
+            is_deleted = await item.is_deleted()
             if not is_deleted:
                 access_level = await permissions.resolve(item, context.user)
                 if access_level != permissions.NO_ACCESS:

@@ -17,7 +17,7 @@ COORDINATOR = 8
 
 
 async def resolve(item, user):
-    return await resolve_acl(await item.applied_acl, user)
+    return await resolve_acl(await item.applied_acl(), user)
 
 
 async def resolve_acl(acl, user_or_group):

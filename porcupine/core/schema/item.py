@@ -1,5 +1,4 @@
 import datetime
-import asyncio
 
 from porcupine import context, exceptions, db
 from porcupine.datatypes import String, DateTime, Boolean, RelatorN, Integer
@@ -44,21 +43,15 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     description = String(store_as='desc')
     acl = Acl(default=None)
 
-    @property
-    def is_deleted(self):
+    async def is_deleted(self):
         if self.deleted or self.p_id is None:
-            future = asyncio.Future()
-            future.set_result(self.deleted)
-            return future
-        return resolve_deleted(self.p_id)
+            return self.deleted
+        return await resolve_deleted(self.p_id)
 
-    @property
-    def applied_acl(self):
+    async def applied_acl(self):
         if self.acl is not None or self.p_id is None:
-            future = asyncio.Future()
-            future.set_result(self.acl)
-            return future
-        return resolve_acl(self.p_id)
+            return self.acl
+        return await resolve_acl(self.p_id)
 
     @property
     def is_system(self):
@@ -81,7 +74,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         if parent is not None:
             # if isinstance(parent, str):
             #     parent = await db.connector.get(parent)
-            security = await parent.applied_acl
+            security = await parent.applied_acl()
         else:
             # add as root
             security = {}
