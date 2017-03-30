@@ -1,4 +1,4 @@
-from porcupine.core.abstract.db.index import AbstractIndex
+from porcupine.core.abstract.connector.index import AbstractIndex
 from porcupine.utils import system
 
 

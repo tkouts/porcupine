@@ -7,7 +7,7 @@ from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
     SubdocPathNotFoundError, KeyExistsError
 
 from porcupine import exceptions
-from porcupine.core.abstract.db.connector import AbstractConnector
+from porcupine.core.abstract.connector import AbstractConnector
 from .cursor import Cursor
 from .transaction import Transaction
 

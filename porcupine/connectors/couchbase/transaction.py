@@ -3,7 +3,7 @@ import asyncio
 import couchbase
 import couchbase.subdocument as sub_doc
 
-from porcupine.core.abstract.db.transaction import AbstractTransaction
+from porcupine.core.abstract.connector.transaction import AbstractTransaction
 
 
 class Transaction(AbstractTransaction):
@@ -27,7 +27,7 @@ class Transaction(AbstractTransaction):
             # insertions
             if insertions:
                 tasks.append(bucket.insert_multi(insertions,
-                                                 format=couchbase.FMT_UTF8))
+                                                 format=couchbase.FMT_AUTO))
             # upsertions
             if upsertions:
                 tasks.append(bucket.upsert_multi(upsertions,

@@ -1,7 +1,7 @@
 from couchbase.exceptions import NotFoundError
 from couchbase.views.params import *
 
-from porcupine.core.abstract.db.cursor import AbstractCursor
+from porcupine.core.abstract.connector.cursor import AbstractCursor
 
 
 class Cursor(AbstractCursor):
@@ -32,7 +32,7 @@ class Cursor(AbstractCursor):
         stale = context.data.get('stale', False)
         if not self._scope.startswith('.'):
             # it is not a deep query
-            # retrieve stale value from db
+            # retrieve stale value from connector
             try:
                 self.connector.bucket.delete('%s_stale' % self._scope)
             except NotFoundError:
