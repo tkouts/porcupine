@@ -154,7 +154,6 @@ class RelatorN(ReferenceN, RelatorBase):
                          will be deleted upon the object's deletion.
     @type cascade_delete: bool
     """
-    storage_info = '_relN_'
 
     def __init__(self, default=(), **kwargs):
         super().__init__(default, **kwargs)
@@ -170,6 +169,10 @@ class RelatorN(ReferenceN, RelatorBase):
         if instance.__is_new__:
             for item in added:
                 self.add_reference(instance, item)
+
+    @property
+    def storage_info(self):
+        return '_relN_:{0}'.format(self.rel_attr)
 
     # def on_delete(self, instance, value, is_permanent):
     #     if not instance._is_deleted:

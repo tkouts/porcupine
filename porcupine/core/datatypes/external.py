@@ -52,7 +52,7 @@ class Blob(DataType):
             instance.__storage__[self.name] = self.storage_info
 
     def key_for(self, instance):
-        return '{0}_{1}'.format(instance.id, self.name)
+        return '{0}/{1}'.format(instance.id, self.name)
 
     def snapshot(self, instance, value):
         if self.name not in instance.__snapshot__:

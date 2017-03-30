@@ -9,7 +9,7 @@ from .join import Join
 
 class AbstractConnector(metaclass=abc.ABCMeta):
     settings = settings['db']
-    multi_fetch_chunk_size = 600
+    multi_fetch_chunk_size = 800
     indexes = {}
     active_txns = 0
     root_id = ''
@@ -114,7 +114,17 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get_multi_raw(self, keys):
         raise NotImplementedError
 
-    async def replace_atomically(self, key, xform_func):
+    # schema maintenance functions
+    async def get_for_update(self, key):
+        raise NotImplementedError
+
+    async def check_and_set(self, key, value, cas):
+        raise NotImplementedError
+
+    async def bump_up_chunk_number(self, key, collection_name, amount):
+        raise NotImplementedError
+
+    async def write_chunks(self, chunks: dict):
         raise NotImplementedError
 
     # @abc.abstractmethod

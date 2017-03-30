@@ -1,5 +1,6 @@
 import ujson
 
+import couchbase.subdocument as SD
 import couchbase.experimental
 import random
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
@@ -71,18 +72,27 @@ class Couchbase(AbstractConnector):
         values = await self.bucket.retrieve_in(key, *paths)
         return dict(zip(paths, values))
 
-    async def replace_atomically(self, key, xform_func):
+    # schema maintenance functions
+    async def get_for_update(self, key):
+        result = await self.bucket.get(key)
+        return result.value, result.cas
+
+    async def check_and_set(self, key, value, cas):
         try:
-            result = await self.bucket.get(key)
-            self.bucket.replace(key,
-                                xform_func(result.value),
-                                cas=result.cas,
-                                format=couchbase.FMT_AUTO)
+            await self.bucket.replace(key, value, cas=cas,
+                                      format=couchbase.FMT_AUTO)
         except KeyExistsError:
             return False
         except NotFoundError:
             pass
         return True
+
+    async def bump_up_chunk_number(self, key, collection_name, amount):
+        path = '{0}/ind'.format(collection_name)
+        await self.bucket.mutate_in(key, SD.counter(path, amount))
+
+    async def write_chunks(self, chunks: dict):
+        return self.bucket.upsert_multi(chunks, format=couchbase.FMT_AUTO)
 
     async def close(self):
         pass

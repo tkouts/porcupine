@@ -28,5 +28,5 @@ async def init_services(server, loop):
 
 @services.listener('after_server_stop')
 async def shutdown_services(server, loop):
-    await close_db()
     await SchemaMaintenance.stop()
+    await close_db()
