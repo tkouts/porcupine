@@ -106,6 +106,12 @@ class CollectionSplitter(SchemaMaintenanceTask):
         counter_path = '{0}/ind'.format(collection_name)
         connector = db.connector
 
+        # bump up active chunk number
+        await connector.mutate_in(item_id, {
+            counter_path: (connector.SUB_DOC_UPSERT_MUT,
+                           chunk_no + int(self.parts))
+        })
+
         # replace active chunk
         while True:
             success, chunks = await connector.swap_if_not_modified(
@@ -119,10 +125,6 @@ class CollectionSplitter(SchemaMaintenanceTask):
                 print('failed to split')
                 await asyncio.sleep(0.1)
         if chunks is not None:
-            # bump up active chunk number
-            await connector.mutate_in(item_id, {
-                counter_path: (connector.SUB_DOC_COUNTER, int(self.parts))
-            })
             # add other chunks
             chunks = {
                 '{0}/{1}/{2}'.format(item_id, collection_name,
