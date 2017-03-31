@@ -8,49 +8,31 @@ from porcupine.utils import system
 
 
 class AbstractConnector(metaclass=abc.ABCMeta):
+    # configuration
     settings = settings['db']
     multi_fetch_chunk_size = settings['multi_fetch_chunk_size']
     coll_compact_threshold = settings['collection_compact_threshold']
     coll_split_threshold = settings['collection_split_threshold']
+    txn_max_retries = settings.get('txn_max_retries', 12)
+
     indexes = {}
     active_txns = 0
-    root_id = ''
     TransactionType = None
     CursorType = None
     persist = DefaultPersistence
+
+    # Sub Document Mutation Codes
+    SUB_DOC_UPSERT_MUT = 0
+    SUB_DOC_COUNTER = 1
 
     @abc.abstractmethod
     def connect(self):
         raise NotImplementedError
 
-    # async def _get_item_by_path(self, path_tokens):
-    #     child_id = ''
-    #     child = None
-    #     for name in path_tokens[1:]:
-    #         if name:
-    #             child = await self.get_child_by_name(child_id, name)
-    #             if child is None:
-    #                 return None
-    #             else:
-    #                 child_id = child.id
-    #     return child
-
     async def get(self, object_id, quiet=True):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
-        # if object_id.startswith('/'):
-        #     item = None
-        #     path_tokens = object_id.split('/')
-        #     path_depth = len(path_tokens)
-        #     # /[itemID]?
-        #     if path_depth == 2:
-        #         item = await self.get_raw(path_tokens[1])
-        #     # /folder1/folder2/item
-        #     if item is None:
-        #         return await self._get_item_by_path(path_tokens)
-        # else:
         item = await self.get_raw(object_id, quiet=quiet)
-
         if item is not None:
             item = self.persist.loads(item)
             return item
@@ -116,22 +98,20 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get_multi_raw(self, keys):
         raise NotImplementedError
 
-    # schema maintenance functions
-    async def get_for_update(self, key):
+    def insert_multi(self, insertions):
         raise NotImplementedError
 
-    async def check_and_set(self, key, value, cas):
+    def upsert_multi(self, upsertions):
         raise NotImplementedError
 
-    async def bump_up_chunk_number(self, key, collection_name, amount):
+    def mutate_in(self, item_id, mutations_dict: dict):
         raise NotImplementedError
 
-    async def write_chunks(self, chunks: dict):
+    def append_multi(self, appends):
         raise NotImplementedError
 
-    # @abc.abstractmethod
-    # async def insert_raw(self, key, value):
-    #     raise NotImplementedError
+    async def swap_if_not_modified(self, key, xform):
+        raise NotImplementedError
 
     # @abc.abstractmethod
     # async def delete_raw(self, key, value):

@@ -1,3 +1,5 @@
+import math
+
 from porcupine import db, context
 from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
     InvalidUsage
@@ -172,7 +174,8 @@ class ReferenceN(Text, Acceptable):
                 if not is_split and (current_size * (1 - dirtiness)) < split_threshold:
                     await SchemaMaintenance.compact_collection(key)
                 else:
-                    await SchemaMaintenance.split_collection(key)
+                    parts = math.ceil(current_size / split_threshold)
+                    await SchemaMaintenance.split_collection(key, parts)
             elif dirtiness > compact_threshold:
                 if is_split:
                     # full rebuild

@@ -2,9 +2,7 @@
 Schema maintenance service
 """
 import asyncio
-import math
-
-from porcupine import log, db
+from porcupine import log, db, exceptions
 
 
 class SchemaMaintenance:
@@ -40,8 +38,8 @@ class SchemaMaintenance:
         await cls.queue.put(task)
 
     @classmethod
-    async def split_collection(cls, key):
-        task = CollectionSplitter(key)
+    async def split_collection(cls, key, parts):
+        task = CollectionSplitter(key, parts)
         await cls.queue.put(task)
 
 
@@ -67,65 +65,69 @@ class CollectionCompacter(SchemaMaintenanceTask):
                     if removal_key in uniques:
                         del uniques[removal_key]
                     uniques[oid] = None
-        return ' '.join(uniques.keys())
+        return ' '.join(uniques.keys()), True
 
     async def execute(self):
-        raw_collection, cas = await db.connector.get_for_update(self.key)
-        success = await db.connector.check_and_set(
-            self.key,
-            self.compact_set(raw_collection),
-            cas=cas)
-        if not success:
-            log.info('Failed to compact {0}'.format(self.key))
+        try:
+            success, _ = await db.connector.swap_if_not_modified(
+                self.key,
+                xform=self.compact_set
+            )
+            if not success:
+                log.info('Failed to compact {0}'.format(self.key))
+        except exceptions.NotFound:
+            # the key is removed
+            pass
 
 
 class CollectionSplitter(SchemaMaintenanceTask):
-    @staticmethod
-    def split_set(raw_string, parts):
+    def __init__(self, key, parts):
+        super().__init__(key)
+        self.parts = parts
+
+    def split_set(self, raw_string):
+        if len(raw_string) < db.connector.coll_split_threshold:
+            # no op, already split
+            return None, None
         chunks = []
         collection = [op for op in raw_string.split(' ') if op]
-        avg = len(collection) / parts
+        avg = len(collection) / self.parts
         last = 0.0
         while last < len(collection):
             chunks.append(collection[int(last):int(last + avg)])
             last += avg
-        return [' '.join(chunk) for chunk in chunks]
+        raw_chunks = [' '.join(chunk) for chunk in chunks]
+        return raw_chunks[0], raw_chunks[1:]
 
     async def execute(self):
         # print('splitting collection', self.key)
         item_id, collection_name, chunk_no = self.key.split('/')
         chunk_no = int(chunk_no)
-        # compute number of parts
-        raw_collection, cas = await db.connector.get_for_update(self.key)
-        size = len(raw_collection)
-        split_threshold = db.connector.coll_split_threshold
-        if size > split_threshold:
-            parts = math.ceil(size / split_threshold)
+        counter_path = '{0}/ind'.format(collection_name)
+        connector = db.connector
+
+        # replace active chunk
+        while True:
+            success, chunks = await connector.swap_if_not_modified(
+                self.key,
+                xform=self.split_set
+            )
+            if success:
+                break
+            else:
+                # wait for pending to complete and try again
+                print('failed to split')
+                await asyncio.sleep(0.1)
+        if chunks is not None:
             # bump up active chunk number
-            # so that new collection appends are done in a new doc
-            await db.connector.bump_up_chunk_number(item_id, collection_name,
-                                                    int(parts))
-            while True:
-                chunks = self.split_set(raw_collection, parts)
-                # print('got {} chunks'.format(len(chunks)))
-                first = chunks.pop(0)
-                success = await db.connector.check_and_set(
-                    self.key,
-                    first,
-                    cas=cas
-                )
-                if success:
-                    break
-                else:
-                    # pending transactions have modified the collection
-                    # wait for pending to complete and try again
-                    await asyncio.sleep(0.1)
-                    raw_collection, cas = await db.connector.get_for_update(
-                        self.key)
+            await connector.mutate_in(item_id, {
+                counter_path: (connector.SUB_DOC_COUNTER, int(self.parts))
+            })
             # add other chunks
             chunks = {
                 '{0}/{1}/{2}'.format(item_id, collection_name,
                                      chunk_no + i + 1): chunk
                 for (i, chunk) in enumerate(chunks)
             }
-            await db.connector.write_chunks(chunks)
+            await connector.upsert_multi(chunks)
+            # TODO handle exceptions

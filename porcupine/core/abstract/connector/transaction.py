@@ -11,9 +11,6 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
     __slots__ = ('connector', 'options', '_upsertions', '_externals',
                  '_deleted', '_sd', '_appends')
 
-    txn_max_retries = settings['db'].get('txn_max_retries', 12)
-    UPSERT_MUT = 0
-
     def __init__(self, connector, **options):
         self.connector = connector
         self.connector.active_txns += 1

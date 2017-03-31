@@ -72,27 +72,41 @@ class Couchbase(AbstractConnector):
         values = await self.bucket.retrieve_in(key, *paths)
         return dict(zip(paths, values))
 
-    # schema maintenance functions
-    async def get_for_update(self, key):
-        result = await self.bucket.get(key)
-        return result.value, result.cas
+    def insert_multi(self, insertions):
+        return self.bucket.insert_multi(insertions, format=couchbase.FMT_AUTO)
 
-    async def check_and_set(self, key, value, cas):
+    def upsert_multi(self, upsertions):
+        return self.bucket.upsert_multi(upsertions, format=couchbase.FMT_AUTO)
+
+    def mutate_in(self, item_id: str, mutations_dict: dict):
+        mutations = []
+        for path, mutation in mutations_dict.items():
+            mutation_type, value = mutation
+            if mutation_type == self.SUB_DOC_UPSERT_MUT:
+                mutations.append(SD.upsert(path, value))
+            elif mutation_type == self.SUB_DOC_COUNTER:
+                mutations.append(SD.counter(path, value))
+        return self.bucket.mutate_in(item_id, *mutations)
+
+    def append_multi(self, appends):
+        return self.bucket.append_multi(appends)
+
+    async def swap_if_not_modified(self, key, xform):
         try:
-            await self.bucket.replace(key, value, cas=cas,
-                                      format=couchbase.FMT_AUTO)
-        except KeyExistsError:
-            return False
+            result = await self.bucket.get(key)
         except NotFoundError:
-            pass
-        return True
-
-    async def bump_up_chunk_number(self, key, collection_name, amount):
-        path = '{0}/ind'.format(collection_name)
-        await self.bucket.mutate_in(key, SD.counter(path, amount))
-
-    async def write_chunks(self, chunks: dict):
-        return self.bucket.upsert_multi(chunks, format=couchbase.FMT_AUTO)
+            raise exceptions.NotFound
+        new_value, return_value = xform(result.value)
+        if new_value is not None:
+            try:
+                await self.bucket.replace(key, new_value,
+                                          cas=result.cas,
+                                          format=couchbase.FMT_AUTO)
+            except KeyExistsError:
+                return False, None
+            except NotFoundError:
+                raise exceptions.NotFound
+        return True, return_value
 
     async def close(self):
         pass

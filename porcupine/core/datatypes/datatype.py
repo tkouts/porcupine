@@ -103,8 +103,8 @@ class DataType:
     def on_change(self, instance, value, old_value):
         self.validate(value)
         if not instance.__is_new__:
-            txn = context.txn
-            txn.mutate(instance, self.storage_key, txn.UPSERT_MUT, value)
+            context.txn.mutate(instance, self.storage_key,
+                               db.connector.SUB_DOC_UPSERT_MUT, value)
 
     def on_delete(self, instance, value, is_permanent):
         pass

@@ -1,7 +1,6 @@
 # import logging
 import asyncio
-import couchbase
-import couchbase.subdocument as sub_doc
+from inspect import isawaitable
 
 from porcupine.core.abstract.connector.transaction import AbstractTransaction
 
@@ -20,29 +19,33 @@ class Transaction(AbstractTransaction):
         @return: None
         """
         insertions, upsertions = await self.prepare()
-        bucket = self.connector.bucket
+        connector = self.connector
 
         if not self.done:
             tasks = []
             # insertions
             if insertions:
-                tasks.append(bucket.insert_multi(insertions,
-                                                 format=couchbase.FMT_AUTO))
+                task = connector.insert_multi(insertions)
+                if isawaitable(task):
+                    tasks.append(task)
+
             # upsertions
             if upsertions:
-                tasks.append(bucket.upsert_multi(upsertions,
-                                                 format=couchbase.FMT_AUTO))
+                task = connector.upsert_multi(upsertions)
+                if isawaitable(task):
+                    tasks.append(task)
+
             # sub document mutations
-            for item_id, paths in self._sd.items():
-                mutations = []
-                for path, mutation in paths.items():
-                    mutation_type, value = mutation
-                    if mutation_type == self.UPSERT_MUT:
-                        mutations.append(sub_doc.upsert(path, value))
-                tasks.append(bucket.mutate_in(item_id, *mutations))
+            for item_id, mutations in self._sd.items():
+                task = connector.mutate_in(item_id, mutations)
+                if isawaitable(task):
+                    tasks.append(task)
+
             # appends
             if self._appends:
-                tasks.append(bucket.append_multi(self._appends))
+                task = connector.append_multi(self._appends)
+                if isawaitable(task):
+                    tasks.append(task)
 
             if tasks:
                 completed, _ = await asyncio.wait(tasks)
