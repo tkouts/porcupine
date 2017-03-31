@@ -58,18 +58,18 @@ def transactional(auto_commit=True):
     max_sleep_time = 0.288
     do_not_copy_types = (Request, Blueprint)
 
-    def transactional_decorator(function):
+    def transactional_decorator(func):
         """
         This is the descriptor for making a function transactional.
         """
-        @wraps(function)
+        @wraps(func)
         async def transactional_wrapper(*args, **kwargs):
             if context.txn is None:
                 # top level function
                 retries = 0
                 sleep_time = min_sleep_time
-                context.txn = connector.get_transaction()
-                max_retries = context.txn.txn_max_retries
+                context.txn = txn = connector.get_transaction()
+                max_retries = connector.txn_max_retries
                 try:
                     while retries < max_retries:
                         # print('trying.... %d' % retries)
@@ -91,19 +91,19 @@ def transactional(auto_commit=True):
                                 if sleep_time > max_sleep_time:
                                     sleep_time = max_sleep_time + \
                                                  (retries * min_sleep_time)
-                            val = await function(*args_copy,
-                                                 **keyword_args_copy)
+                            val = await func(*args_copy,
+                                             **keyword_args_copy)
                             if auto_commit:
-                                await context.txn.commit()
+                                await txn.commit()
                             else:
                                 # abort if not committed
-                                await context.txn.abort()
+                                await txn.abort()
                             return val
                         except exceptions.DBDeadlockError:
-                            await context.txn.abort()
+                            await txn.abort()
                             retries += 1
                         except:
-                            await context.txn.abort()
+                            await txn.abort()
                             raise
                     # maximum retries exceeded
                     raise exceptions.DBDeadlockError
@@ -111,7 +111,7 @@ def transactional(auto_commit=True):
                     context.txn = None
             else:
                 # pass through
-                return await function(*args, **kwargs)
+                return await func(*args, **kwargs)
 
         return transactional_wrapper
 
