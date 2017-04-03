@@ -80,23 +80,26 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
         connector = self.connector
         dumps = connector.persist.dumps
 
-        # upsertions
-        upsertions = {k: dumps(i)
+        # insertions
+        insertions = {k: dumps(i)
                       for k, i in self._upsertions.items()
                       if i.__is_new__}
-        # merge externals
-        upsertions.update(self._externals)
 
-        # insertions
-        insertions = {}
+        # upsertions
+        upsertions = self._externals
+        # upsertions.update(self._externals)
+
+        # insertions = {}
         if self._appends:
             # make sure externals with appends are initialized
             append_keys = list(self._appends.keys())
             tasks = [connector.exists(key) for key in append_keys]
             completed, _ = await asyncio.wait(tasks)
             keys_exist = [c.result() for c in completed]
-            insertions = {key: '' for key, exists in keys_exist
-                          if not exists}
+            # insertions = {...}
+            insertions.update({key: '' for key, exists in keys_exist
+                               if not exists})
+
         return insertions, upsertions
 
     @abc.abstractmethod
