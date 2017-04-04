@@ -21,7 +21,8 @@ def run_server(debug=False, loop=None):
                port=settings['port'],
                workers=settings['workers'],
                loop=loop,
-               debug=debug)
+               debug=debug,
+               backlog=150)
 
 
 class PorcupineDaemon(Daemon):
