@@ -40,10 +40,10 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get_partial(self, object_id, *paths, snapshot=False):
 
         def snapshot_getter(i, p):
-            return i.__snapshot__.get(p, i.__storage__[p])
+            return i.__snapshot__.get(p, getattr(i.__storage__, p))
 
         def normal_getter(i, p):
-            return i.__storage__[p]
+            return getattr(i.__storage__, p)
 
         if context.txn is not None and object_id in context.txn:
             item = context.txn[object_id]

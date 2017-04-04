@@ -21,6 +21,7 @@ class Acl(Dictionary):
 
 
 class SchemaSignature(String):
+    required = True
     readonly = True
     protected = True
 

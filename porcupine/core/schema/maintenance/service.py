@@ -103,7 +103,7 @@ class CollectionSplitter(SchemaMaintenanceTask):
         # print('splitting collection', self.key)
         item_id, collection_name, chunk_no = self.key.split('/')
         chunk_no = int(chunk_no)
-        counter_path = '{0}/ind'.format(collection_name)
+        counter_path = '{0}_'.format(collection_name)
         connector = db.connector
 
         # bump up active chunk number

@@ -114,18 +114,18 @@ def locate_descriptor_by_storage_key(cls, key):
 @context_cacheable(1000)
 async def get_item_state(item_id):
     return await db.connector.get_partial(
-        item_id, 'p_id', 'acl', 'del', 'sys',
+        item_id, 'p_id', 'acl', 'dl', 'sys',
         snapshot=True)
 
 
 @context_cacheable(100)
 async def resolve_deleted(item_id):
     state = await get_item_state(item_id)
-    while not state['del'] and state['p_id'] is not None:
+    while not state['dl'] and state['p_id'] is not None:
         if state['sys']:
             break
         state = await get_item_state(state['p_id'])
-    return state['del']
+    return state['dl']
 
 
 @context_cacheable(100)

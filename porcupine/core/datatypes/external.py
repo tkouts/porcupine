@@ -48,15 +48,13 @@ class Blob(DataType):
             value = self._default
         super().set_default(instance, value)
         # add external info
-        if self.name not in instance.__storage__:
-            instance.__storage__[self.name] = self.storage_info
+        setattr(instance.__storage__, self.name, self.storage_info)
 
     def key_for(self, instance):
         return '{0}/{1}'.format(instance.id, self.name)
 
     def snapshot(self, instance, value):
         if self.name not in instance.__snapshot__:
-            # print(instance.__is_new__, value)
             if not instance.__is_new__ or value:
                 instance.__snapshot__[self.name] = None
 

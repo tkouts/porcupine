@@ -51,13 +51,13 @@ class DataType:
         if instance is None:
             return self
         storage = getattr(instance, self.storage)
-        return storage[self.storage_key]
+        return getattr(storage, self.storage_key)
 
     def __set__(self, instance, value):
         self.validate_value(value, instance)
         self.snapshot(instance, value)
         storage = getattr(instance, self.storage)
-        storage[self.storage_key] = value
+        setattr(storage, self.storage_key, value)
 
     def __delete__(self, instance):
         if self.storage_key in instance.__storage__:
@@ -67,14 +67,14 @@ class DataType:
         if value is None:
             value = self._default
         storage = getattr(instance, self.storage)
-        if self.storage_key not in storage:
-            self.snapshot(instance, value)
-            storage[self.storage_key] = value
+        self.snapshot(instance, value)
+        setattr(storage, self.storage_key, value)
 
     def snapshot(self, instance, value):
         storage_key = self.storage_key
         if storage_key not in instance.__snapshot__:
-            previous_value = getattr(instance, self.storage).get(storage_key)
+            storage = getattr(instance, self.storage)
+            previous_value = getattr(storage, storage_key)
             if previous_value != value:
                 instance.__snapshot__[storage_key] = previous_value
         elif instance.__snapshot__[storage_key] == value:

@@ -1,9 +1,10 @@
 from porcupine import db, exceptions
 from porcupine.contract import contract
-from porcupine.datatypes import DataType, Composition, String
+from porcupine.datatypes import DataType, Composition, String, ReferenceN
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.utils import system
 from porcupine.core.context import system_override
+from .storage import storage
 
 
 class ElasticMeta(type):
@@ -15,15 +16,23 @@ class ElasticMeta(type):
 
     def __init__(cls, name, bases, dct):
         schema = {}
+        field_spec = []
+        ext_spec = []
         for attr_name in dir(cls):
             try:
                 attr = getattr(cls, attr_name)
                 if isinstance(attr, DataType):
                     schema[attr_name] = attr
                     attr.name = attr_name
+                    field_spec.append(attr.storage_key)
+                    if isinstance(attr, ReferenceN):
+                        field_spec.append('{0}_'.format(attr.storage_key))
+                        ext_spec.append(attr.storage_key)
             except AttributeError:
                 continue
         cls.__schema__ = schema
+        cls.__record__ = storage(cls.__name__, field_spec)
+        cls.__ext_record__ = storage(cls.__name__, ext_spec)
         cls.__sig__ = system.hash_series(*schema.keys()).hexdigest()
         super().__init__(name, bases, dct)
 
@@ -44,6 +53,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     """
     __schema__ = {}
     __sig__ = ''
+    __record__ = None
+    __ext_record__ = None
 
     event_handlers = []
     is_collection = False
@@ -52,26 +63,29 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     p_id = String(readonly=True, allow_none=True, default=None)
     sig = SchemaSignature()
 
-    def __init__(self, storage=None):
-        if storage is None:
-            storage = {}
-        self.__storage__ = storage
+    def __init__(self, dict_storage=None):
+        if dict_storage is None:
+            dict_storage = {}
         self._ext = None
         self._snap = None
-        self.__is_new__ = False
+        self.__is_new__ = 'id' not in dict_storage
 
-        if 'id' not in storage:
+        if self.__is_new__:
             # new item
-            self.__is_new__ = True
-            storage['id'] = system.generate_oid()
-            storage['sig'] = self.__class__.__sig__
+            dict_storage['id'] = system.generate_oid()
+            dict_storage['sig'] = self.__class__.__sig__
+            self.__storage__ = self.__record__(**dict_storage)
             # initialize storage with default values
-            for attr_def in self.__schema__.values():
-                attr_def.set_default(self)
-        elif self.sig != self.__class__.__sig__:
+            self.__add_defaults()
+            # for attr_def in self.__schema__.values():
+            #     attr_def.set_default(self)
+        elif dict_storage['sig'] == self.__class__.__sig__:
+            self.__storage__ = self.__record__(**dict_storage)
+        else:
             # update storage with default values of added attributes
-            for attr_def in self.__schema__.values():
-                attr_def.set_default(self)
+            self.__add_defaults()
+            # for attr_def in self.__schema__.values():
+            #     attr_def.set_default(self)
             # update sig to latest schema
             with system_override():
                 self.sig = self.__class__.__sig__
@@ -85,7 +99,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @property
     def __externals__(self):
         if self._ext is None:
-            self._ext = {}
+            self._ext = self.__ext_record__()
         return self._ext
 
     def __reset__(self):
@@ -93,6 +107,12 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     def __repr__(self):
         return repr(self.__storage__)
+
+    def __add_defaults(self):
+        to_add = [dt for dt in list(self.__schema__.values())
+                  if getattr(getattr(self, dt.storage), dt.storage_key) is None]
+        for dt in to_add:
+            dt.set_default(self)
 
     def to_dict(self):
         schema_attrs = list(self.__schema__.values())

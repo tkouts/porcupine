@@ -32,6 +32,7 @@ setup(
         'couchbase>=2.2.2',
         'PyYAML>=3.12',
         'lru-dict>=1.1.6',
+        'namedlist>=1.7',
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

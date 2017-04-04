@@ -97,9 +97,9 @@ class ItemCollection:
     async def get(self):
         storage = getattr(self._inst, self._desc.storage)
         name = self._desc.name
-        if name not in storage:
+        if getattr(storage, name) is None:
             await self._desc.fetch(self._inst)
-        return tuple(storage[name])
+        return tuple(getattr(storage, name))
 
     async def items(self):
         return await db.get_multi(await self.get())
@@ -109,10 +109,10 @@ class ItemCollection:
             raise ContainmentError(self._inst, self._desc.name, item)
         if self._inst.__is_new__:
             storage = getattr(self._inst, self._desc.storage)
-            name = self._desc.name
-            if item.id not in storage[name]:
+            collection = getattr(storage, self._desc.name)
+            if item.id not in collection:
                 self._desc.snapshot(self._inst, True)
-                storage[name].append(item.id)
+                collection.append(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),
                                ' {0}'.format(item.id))
@@ -120,11 +120,11 @@ class ItemCollection:
     def remove(self, item):
         if self._inst.__is_new__:
             storage = getattr(self._inst, self._desc.storage)
-            name = self._desc.name
-            if item.id in storage[name]:
+            collection = getattr(storage, self._desc.name)
+            if item.id in collection:
                 # add snapshot to trigger on_change
                 self._desc.snapshot(self._inst, True)
-                storage[name].remove(item.id)
+                collection.remove(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),
                                ' -{0}'.format(item.id))
@@ -148,7 +148,7 @@ class ReferenceN(Text, Acceptable):
             current_size = len(value)
             chunks.append(value)
 
-        active_index = instance.__storage__['{0}/ind'.format(self.name)]
+        active_index = getattr(instance.__storage__, '{0}_'.format(self.name))
         if active_index > 0:
             # collection is split
             is_split = True
@@ -184,7 +184,7 @@ class ReferenceN(Text, Acceptable):
                     await SchemaMaintenance.compact_collection(key)
         if set_storage:
             storage = getattr(instance, self.storage)
-            storage[self.storage_key] = value
+            setattr(storage, self.storage_key, value)
         return value
 
     def __get__(self, instance, owner):
@@ -199,15 +199,14 @@ class ReferenceN(Text, Acceptable):
             value = list(value)
         super().set_default(instance, value)
         # add active key index
-        active_key_index = '{0}/ind'.format(self.name)
-        if active_key_index not in instance.__storage__:
-            instance.__storage__[active_key_index] = 0
+        active_key_index = '{0}_'.format(self.name)
+        setattr(instance.__storage__, active_key_index, 0)
 
     def key_for(self, instance, chunk=None):
         if chunk is None:
             # return active chunk
-            active_key_index = '{0}/ind'.format(self.name)
-            chunk = instance.__storage__[active_key_index]
+            active_key_index = '{0}_'.format(self.name)
+            chunk = getattr(instance.__storage__, active_key_index)
         return '{0}/{1}/{2}'.format(instance.id, self.name, chunk)
 
     async def on_change(self, instance, value, old_value):

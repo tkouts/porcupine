@@ -37,7 +37,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     modified_by = String(required=True, readonly=True, store_as='mdby')
     sys = Boolean(readonly=True)
     modified = DateTime(required=True, readonly=True, store_as='md')
-    deleted = Integer(readonly=True, store_as='del')
+    deleted = Integer(readonly=True, store_as='dl')
 
     name = String(required=True)
     description = String(store_as='desc')

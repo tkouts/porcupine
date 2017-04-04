@@ -42,7 +42,6 @@ class RelatorBase(Acceptable):
             setattr(item, self.rel_attr, None)
             # if not item.__is_new__:
             context.txn.upsert(item)
-            # item.__storage__[self.rel_attr] = None
 
 
 class RelatorItem(ItemReference):

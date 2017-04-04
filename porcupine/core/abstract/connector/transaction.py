@@ -66,9 +66,10 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
                         attr_def = system.get_descriptor_by_storage_key(
                             item.__class__, attr)
                         try:
+                            storage = getattr(item, attr_def.storage)
                             on_change = attr_def.on_change(
                                 item,
-                                getattr(item, attr_def.storage)[attr],
+                                getattr(storage, attr),
                                 old_value)
                             if asyncio.iscoroutine(on_change):
                                 await on_change
