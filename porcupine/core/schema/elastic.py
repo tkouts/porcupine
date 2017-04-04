@@ -111,9 +111,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             dt.set_default(self)
 
     def to_dict(self):
-        schema_attrs = list(self.__schema__.values())
+        schema = list(self.__schema__.values())
         return {attr.name: attr.__get__(self, None)
-                for attr in schema_attrs
+                for attr in schema
                 if attr.protected is False
                 and attr.storage == '__storage__'}
 
@@ -155,7 +155,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     @contract(accepts=dict)
     @db.transactional()
-    async def post(self, request):
+    async def patch(self, request):
         for attr, value in request.json.items():
             try:
                 setattr(self, attr, value)

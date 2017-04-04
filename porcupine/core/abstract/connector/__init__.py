@@ -14,7 +14,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     multi_fetch_chunk_size = settings['multi_fetch_chunk_size']
     coll_compact_threshold = settings['collection_compact_threshold']
     coll_split_threshold = settings['collection_split_threshold']
-    txn_max_retries = settings.get('txn_max_retries', 12)
+    txn_max_retries = settings['txn_max_retries']
 
     indexes = {}
     active_txns = 0

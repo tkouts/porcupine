@@ -7,14 +7,14 @@ default_settings = {
     'db': {
         # how many times a transaction is retried
         # before an error is raised
-        # 'txn_max_retries': 16,
         'type': 'porcupine.connectors.Couchbase',
         'hosts': ['localhost'],
         # 'protocol': 'couchbase',
         'bucket': 'porcupine',
         'password': '',
 
-        'multi_fetch_chunk_size': 800,
+        'txn_max_retries': 16,
+        'multi_fetch_chunk_size': 500,
         'collection_compact_threshold': 0.3,
         # split threshold set to 64K
         'collection_split_threshold': 65535,
