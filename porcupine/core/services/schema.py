@@ -28,6 +28,12 @@ class SchemaMaintenance(AbstractService):
                 cls.queue.task_done()
 
     @classmethod
+    def status(cls):
+        return {
+            'queue_size': cls.queue.qsize()
+        }
+
+    @classmethod
     async def stop(cls):
         log.info('Stopping schema maintenance service')
         await cls.queue.put(None)

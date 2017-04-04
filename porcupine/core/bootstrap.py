@@ -5,6 +5,7 @@ import asyncio
 
 from porcupine import __version__
 from porcupine.apps.resources import resources
+from porcupine.apps.status import status
 from porcupine.config import settings
 from . import log
 from .server import server
@@ -48,7 +49,7 @@ def start(args):
     server.blueprint(services_blueprint)
 
     # locate apps
-    apps = [resources]
+    apps = [resources, status]
     # register apps
     for app in apps:
         server.blueprint(app, url_prefix=app.name)

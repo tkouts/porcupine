@@ -11,3 +11,7 @@ class AbstractService:
     @classmethod
     def stop(cls):
         raise NotImplementedError
+
+    @classmethod
+    def status(cls):
+        return {}

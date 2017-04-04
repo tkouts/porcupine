@@ -19,3 +19,9 @@ class Db(AbstractService):
     async def stop(cls):
         log.info('Closing database')
         await db.connector.close()
+
+    @classmethod
+    def status(cls):
+        return {
+            'active_txns': db.connector.active_txns
+        }
