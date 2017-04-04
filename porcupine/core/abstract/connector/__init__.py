@@ -5,6 +5,7 @@ from porcupine.config import settings
 from porcupine.core.abstract.connector.join import Join
 from porcupine.core.abstract.connector.persist import DefaultPersistence
 from porcupine.utils import system
+from .transaction import Transaction
 
 
 class AbstractConnector(metaclass=abc.ABCMeta):
@@ -17,7 +18,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     indexes = {}
     active_txns = 0
-    TransactionType = None
+    TransactionType = Transaction
     CursorType = None
     persist = DefaultPersistence
 

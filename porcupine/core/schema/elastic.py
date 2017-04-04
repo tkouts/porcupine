@@ -77,15 +77,11 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             self.__storage__ = self.__record__(**dict_storage)
             # initialize storage with default values
             self.__add_defaults()
-            # for attr_def in self.__schema__.values():
-            #     attr_def.set_default(self)
         elif dict_storage['sig'] == self.__class__.__sig__:
             self.__storage__ = self.__record__(**dict_storage)
         else:
             # update storage with default values of added attributes
             self.__add_defaults()
-            # for attr_def in self.__schema__.values():
-            #     attr_def.set_default(self)
             # update sig to latest schema
             with system_override():
                 self.sig = self.__class__.__sig__

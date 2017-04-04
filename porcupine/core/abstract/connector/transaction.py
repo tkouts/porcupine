@@ -1,13 +1,12 @@
-import abc
 import asyncio
+from inspect import isawaitable
 from collections import defaultdict
 
 from porcupine import exceptions
-from porcupine.config import settings
 from porcupine.utils import system
 
 
-class AbstractTransaction(object, metaclass=abc.ABCMeta):
+class Transaction:
     __slots__ = ('connector', 'options', '_upsertions', '_externals',
                  '_deleted', '_sd', '_appends')
 
@@ -103,17 +102,50 @@ class AbstractTransaction(object, metaclass=abc.ABCMeta):
 
         return insertions, upsertions
 
-    @abc.abstractmethod
-    def commit(self):
+    async def commit(self):
         """
         Commits the transaction.
 
         @return: None
         """
+        insertions, upsertions = await self.prepare()
+        connector = self.connector
+
+        tasks = []
+        # insertions
+        if insertions:
+            task = connector.insert_multi(insertions)
+            if isawaitable(task):
+                tasks.append(task)
+
+        # upsertions
+        if upsertions:
+            task = connector.upsert_multi(upsertions)
+            if isawaitable(task):
+                tasks.append(task)
+
+        # sub document mutations
+        for item_id, mutations in self._sd.items():
+            task = connector.mutate_in(item_id, mutations)
+            if isawaitable(task):
+                tasks.append(task)
+
+        # appends
+        if self._appends:
+            task = connector.append_multi(self._appends)
+            if isawaitable(task):
+                tasks.append(task)
+
+        if tasks:
+            completed, _ = await asyncio.wait(tasks)
+            errors = [task.exception() for task in tasks]
+            if any(errors):
+                # TODO: log errors
+                pass
+
         self.connector.active_txns -= 1
 
-    @abc.abstractmethod
-    def abort(self):
+    async def abort(self):
         """
         Aborts the transaction.
 

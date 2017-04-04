@@ -9,7 +9,6 @@ from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
 from porcupine import exceptions
 from porcupine.core.abstract.connector import AbstractConnector
 from .cursor import Cursor
-from .transaction import Transaction
 
 couchbase.experimental.enable()
 from acouchbase.bucket import Bucket
@@ -19,7 +18,6 @@ couchbase.set_json_converters(ujson.dumps, ujson.loads)
 
 
 class Couchbase(AbstractConnector):
-    TransactionType = Transaction
     CursorType = Cursor
 
     def __init__(self):

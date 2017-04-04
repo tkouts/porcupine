@@ -1,4 +1,5 @@
 import abc
+from porcupine import context
 from porcupine.utils import permissions
 from porcupine.schema import Shortcut
 
@@ -10,7 +11,6 @@ class Range(object):
     value while the second is a boolean indicating if the value is
     inclusive.
     """
-
     def __init__(self, lower_bound=None, upper_bound=None):
         # self.use_packed = use_packed
         self._lower_value = None
@@ -85,24 +85,27 @@ class AbstractCursor(object, metaclass=abc.ABCMeta):
         self._reversed = False
         self._scope = None
 
-    def resolve(self, v):
+    async def resolve(self, v):
         item = self.connector.persist.loads(v)
         if not self.enforce_permissions:
             if self.resolve_shortcuts:
                 while item is not None and isinstance(item, Shortcut):
-                    item = self.connector.get(item.target)
+                    item = await self.connector.get(item.target)
         else:
             # check read permissions
-            access = permissions.resolve(item, context.user)
-            if item._is_deleted or access == permissions.NO_ACCESS:
-                item = None
+            is_deleted = await item.is_deleted()
+            if is_deleted:
+                return None
+            access = await permissions.resolve(item, context.user)
+            if access == permissions.NO_ACCESS:
+                return None
             elif self.resolve_shortcuts and isinstance(item, Shortcut):
-                item = item.get_target()
+                item = await item.get_target()
         return item
 
     def eval(self, item):
-        if hasattr(item, self.name):
-            attr = getattr(item, self.name)
+        if hasattr(item, self.index.name):
+            attr = getattr(item, self.index.name)
             # if self.use_packed:
             #     attr = pack_value(attr)
             if self._value is not None:
@@ -130,7 +133,8 @@ class AbstractCursor(object, metaclass=abc.ABCMeta):
     def reverse(self):
         self._reversed = not self._reversed
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def size(self):
         raise NotImplementedError
 
