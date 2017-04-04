@@ -3,7 +3,7 @@ import math
 from porcupine import db, context
 from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
     InvalidUsage
-from porcupine.core.schema.maintenance.service import SchemaMaintenance
+from porcupine.core.services.schema import SchemaMaintenance
 from porcupine.utils import system
 from .external import Text
 from .common import String

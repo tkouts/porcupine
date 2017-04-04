@@ -8,7 +8,7 @@ from porcupine.apps.resources import resources
 from porcupine.config import settings
 from . import log
 from .server import server
-from .services import services
+from .services.blueprint import services_blueprint
 from .daemon import Daemon
 
 PID_FILE = '/tmp/porcupine.pid'
@@ -45,7 +45,7 @@ def start(args):
         before_start.append(log.setup_mp)
 
     # register services blueprint
-    server.blueprint(services)
+    server.blueprint(services_blueprint)
 
     # locate apps
     apps = [resources]

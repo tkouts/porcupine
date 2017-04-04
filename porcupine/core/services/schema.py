@@ -3,9 +3,10 @@ Schema maintenance service
 """
 import asyncio
 from porcupine import log, db, exceptions
+from .service import AbstractService
 
 
-class SchemaMaintenance:
+class SchemaMaintenance(AbstractService):
     queue = None
 
     @classmethod
