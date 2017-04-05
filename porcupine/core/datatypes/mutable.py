@@ -1,36 +1,21 @@
 import copy
-from functools import wraps
 from collections import MutableSequence, MutableMapping
+from porcupine.utils.observables import ObservableList, ObservableDict
 from .datatype import DataType
 
 
-class MutableWatcher(type):
-    watch_list = []
-
-    def __init__(cls, name, bases, dct):
-        for member_name in cls.watch_list:
-            member = getattr(cls, member_name)
-            setattr(cls, member_name, MutableWatcher.snapshot(member))
-        super().__init__(name, bases, dct)
-
-    @staticmethod
-    def snapshot(method):
-        @wraps(method)
-        def mutation_watcher(self, *args, **kwargs):
-            # TODO: snapshot
-            # print('method call', *args)
-            return method(self, *args, **kwargs)
-        return mutation_watcher
-
-
-class GuardedList(list, metaclass=MutableWatcher):
-    # TODO: add mutating members
-    watch_list = ['__setitem__']
-
+class OList(ObservableList):
     def __init__(self, descriptor, instance, seq=()):
         self._descriptor = descriptor
         self._instance = instance
+        self._prev = None
         super().__init__(seq)
+
+    def on_before_mutate(self):
+        self._prev = copy.deepcopy(self[:])
+
+    def on_after_mutate(self):
+        self._descriptor.snapshot(self._instance, self, self._prev)
 
 
 class List(DataType):
@@ -50,7 +35,7 @@ class List(DataType):
         if self.readonly:
             return tuple(value)
         if value is not None:
-            return GuardedList(self, instance, value)
+            return OList(self, instance, value)
 
     def set_default(self, instance, value=None):
         if value is None:
@@ -60,14 +45,18 @@ class List(DataType):
         super().set_default(instance, value)
 
 
-class GuardedDict(dict, metaclass=MutableWatcher):
-    # TODO: add mutating members
-    watch_list = ['__setitem__']
-
-    def __init__(self, descriptor, instance, seq=None, **kwargs):
+class ODict(ObservableDict):
+    def __init__(self, descriptor, instance, seq=(), **kwargs):
         self._descriptor = descriptor
         self._instance = instance
+        self._prev = None
         super().__init__(seq, **kwargs)
+
+    def on_before_mutate(self):
+        self._prev = copy.deepcopy(dict(self.items()))
+
+    def on_after_mutate(self):
+        self._descriptor.snapshot(self._instance, self, self._prev)
 
 
 class Dictionary(DataType):
@@ -85,7 +74,7 @@ class Dictionary(DataType):
             return self
         value = super().__get__(instance, owner)
         if value is not None:
-            return GuardedDict(self, instance, value)
+            return ODict(self, instance, value)
 
     def set_default(self, instance, value=None):
         if value is None:

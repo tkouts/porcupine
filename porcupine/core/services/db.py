@@ -9,14 +9,14 @@ from .service import AbstractService
 
 class Db(AbstractService):
     @classmethod
-    async def start(cls):
+    async def start(cls, server):
         log.info('Opening database')
         connector_type = system.get_rto_by_name(settings['db']['type'])
         db.connector = connector_type()
         await db.connector.connect()
 
     @classmethod
-    async def stop(cls):
+    async def stop(cls, server):
         log.info('Closing database')
         await db.connector.close()
 

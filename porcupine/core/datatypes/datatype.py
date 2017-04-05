@@ -55,8 +55,8 @@ class DataType:
 
     def __set__(self, instance, value):
         self.validate_value(value, instance)
-        self.snapshot(instance, value)
         storage = getattr(instance, self.storage)
+        self.snapshot(instance, value, getattr(storage, self.storage_key))
         setattr(storage, self.storage_key, value)
 
     def __delete__(self, instance):
@@ -67,17 +67,15 @@ class DataType:
         if value is None:
             value = self._default
         storage = getattr(instance, self.storage)
-        self.snapshot(instance, value)
+        self.snapshot(instance, value, getattr(storage, self.storage_key))
         setattr(storage, self.storage_key, value)
 
-    def snapshot(self, instance, value):
+    def snapshot(self, instance, new_value, previous_value):
         storage_key = self.storage_key
         if storage_key not in instance.__snapshot__:
-            storage = getattr(instance, self.storage)
-            previous_value = getattr(storage, storage_key)
-            if previous_value != value:
+            if previous_value != new_value:
                 instance.__snapshot__[storage_key] = previous_value
-        elif instance.__snapshot__[storage_key] == value:
+        elif instance.__snapshot__[storage_key] == new_value:
             del instance.__snapshot__[storage_key]
 
     def validate(self, value):

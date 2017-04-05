@@ -39,15 +39,15 @@ def get_rto_by_name(name):
     """
     modules = name.split('.')
     if len(modules) == 1:
-        module = modules[0]
+        module_name = modules[0]
         attribute = None
     else:
-        module = '.'.join(modules[:-1])
+        module_name = '.'.join(modules[:-1])
         attribute = modules[-1]
     is_second_level = False
 
     try:
-        mod = __import__(module, globals(), locals(),
+        mod = __import__(module_name, globals(), locals(),
                          [attribute] if attribute else [])
     except ImportError:
         is_second_level = True

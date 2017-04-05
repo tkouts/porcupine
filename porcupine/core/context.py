@@ -30,8 +30,6 @@ class PContext(Local):
 
     def reset(self):
         # clear caches
-        # for cache in self.caches.values():
-        #     cache.clear()
         setattr(self, '__caches__', {})
         setattr(self, 'user', None)
         setattr(self, 'txn', None)

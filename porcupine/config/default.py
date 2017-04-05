@@ -22,7 +22,7 @@ default_settings = {
         # 'tests_bucket': 'porcupine_tests'
     },
     'session_manager': {
-        'interface': 'porcupine.core.session.incookie.SessionManager',
+        'type': 'porcupine.session.cookie.SessionManager',
         'timeout': 1200,
         'guest_user_id': 'guest',
         'params': {'secret': 'SECRET'}

@@ -111,7 +111,7 @@ class ItemCollection:
             storage = getattr(self._inst, self._desc.storage)
             collection = getattr(storage, self._desc.name)
             if item.id not in collection:
-                self._desc.snapshot(self._inst, True)
+                self._desc.snapshot(self._inst, True, None)
                 collection.append(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),
@@ -123,7 +123,7 @@ class ItemCollection:
             collection = getattr(storage, self._desc.name)
             if item.id in collection:
                 # add snapshot to trigger on_change
-                self._desc.snapshot(self._inst, True)
+                self._desc.snapshot(self._inst, True, None)
                 collection.remove(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),

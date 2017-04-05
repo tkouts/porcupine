@@ -53,9 +53,9 @@ class Blob(DataType):
     def key_for(self, instance):
         return '{0}/{1}'.format(instance.id, self.name)
 
-    def snapshot(self, instance, value):
+    def snapshot(self, instance, new_value, old_value):
         if self.name not in instance.__snapshot__:
-            if not instance.__is_new__ or value:
+            if not instance.__is_new__ or new_value:
                 instance.__snapshot__[self.name] = None
 
     def clone(self, instance, memo):

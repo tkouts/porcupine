@@ -10,7 +10,7 @@ class SchemaMaintenance(AbstractService):
     queue = None
 
     @classmethod
-    def start(cls):
+    def start(cls, server):
         log.info('Starting schema maintenance service')
         cls.queue = asyncio.Queue()
         asyncio.ensure_future(cls.worker())
@@ -34,7 +34,7 @@ class SchemaMaintenance(AbstractService):
         }
 
     @classmethod
-    async def stop(cls):
+    async def stop(cls, server):
         log.info('Stopping schema maintenance service')
         await cls.queue.put(None)
         await cls.queue.join()
