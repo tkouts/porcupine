@@ -1,17 +1,19 @@
+import random
 import ujson
 
 import couchbase.subdocument as SD
-import couchbase.experimental
-import random
+from couchbase.bucket import Bucket
+from couchbase.n1ql import N1QLQuery
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
-    SubdocPathNotFoundError, KeyExistsError
+    SubdocPathNotFoundError, KeyExistsError, HTTPError
 
-from porcupine import exceptions
+from porcupine import exceptions, log
 from porcupine.core.abstract.connector import AbstractConnector
 from .cursor import Cursor
-
+from .index import Index
+import couchbase.experimental
 couchbase.experimental.enable()
-from acouchbase.bucket import Bucket
+from acouchbase.bucket import Bucket as aBucket
 
 
 couchbase.set_json_converters(ujson.dumps, ujson.loads)
@@ -19,8 +21,10 @@ couchbase.set_json_converters(ujson.dumps, ujson.loads)
 
 class Couchbase(AbstractConnector):
     CursorType = Cursor
+    IndexType = Index
 
     def __init__(self):
+        super().__init__()
         self.bucket = None
 
     @property
@@ -35,15 +39,24 @@ class Couchbase(AbstractConnector):
     def password(self):
         return self.settings['password']
 
-    async def connect(self):
+    def connect(self, async=True):
         hosts = self.settings['hosts'][:]
         random.shuffle(hosts)
-        connection_string = '{}://{}/{}'.format(self.protocol,
-                                                ','.join(hosts),
-                                                self.bucket_name)
-        self.bucket = Bucket(connection_string,
+        connection_string = '{0}://{1}/{2}'.format(self.protocol,
+                                                   ','.join(hosts),
+                                                   self.bucket_name)
+        if async:
+            bucket = aBucket
+        else:
+            bucket = Bucket
+        self.bucket = bucket(connection_string,
                              password=self.password)
-        await self.bucket.connect()
+        if async:
+            return self.bucket.connect()
+
+    def get_query(self, query, **kwargs):
+        n1query = N1QLQuery(query, **kwargs)
+        return self.bucket.n1ql_query(n1query)
 
     async def exists(self, key):
         try:
@@ -105,6 +118,36 @@ class Couchbase(AbstractConnector):
             except NotFoundError:
                 raise exceptions.NotFound
         return True, return_value
+
+    # indexes
+    def prepare_indexes(self):
+        log.info('Preparing indexes')
+        self.connect(async=False)
+        # get existing indexes
+        existing = []
+        query = 'SELECT name FROM system:indexes WHERE keyspace_id=$bucket'
+        for result in self.get_query(query, bucket=self.bucket_name):
+            existing.append(result['name'])
+        new_indexes = [ind for name, ind in self.indexes.items()
+                       if name not in existing]
+        # create secondary indexes
+        for index in new_indexes:
+            index.create()
+        if new_indexes:
+            self.build_indexes(*new_indexes)
+
+    def build_indexes(self, *indexes):
+        new_indexes_names = ','.join(
+            [ind.data_type.name for ind in indexes])
+        log.info('Building indexes [{0}]'.format(new_indexes_names))
+        build_query = 'BUILD INDEX ON `{0}`({1});'.format(
+            self.bucket_name, new_indexes_names)
+        try:
+            self.get_query(build_query).execute()
+        except HTTPError as e:
+            message = e.objextra.value['errors'][0]['msg'].lower()
+            if 'already' not in message:
+                raise
 
     async def close(self):
         pass

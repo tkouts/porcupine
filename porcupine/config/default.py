@@ -20,6 +20,7 @@ default_settings = {
         'collection_split_threshold': 65535,
         # optional for running unit tests suite
         # 'tests_bucket': 'porcupine_tests'
+        '__indices__': {},
     },
     'session_manager': {
         'type': 'porcupine.session.cookie.SessionManager',

@@ -1,4 +1,5 @@
 from porcupine import db, exceptions
+from porcupine import config
 from porcupine.contract import contract
 from porcupine.datatypes import DataType, Composition, String, ReferenceN
 from porcupine.core.datatypes.system import SchemaSignature
@@ -28,6 +29,8 @@ class ElasticMeta(type):
                     if isinstance(attr, ReferenceN):
                         field_spec.append('{0}_'.format(attr.storage_key))
                         ext_spec.append(attr.storage_key)
+                    if attr.indexed:
+                        config.add_index(attr)
             except AttributeError:
                 continue
         cls.__schema__ = schema
@@ -60,7 +63,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     id = String(readonly=True)
     parent_id = String(readonly=True, allow_none=True,
-                       default=None, store_as='p_id')
+                       default=None, store_as='pid',
+                       indexed=True)
     sig = SchemaSignature()
 
     def __init__(self, dict_storage=None):
@@ -105,8 +109,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         return repr(self.__storage__)
 
     def __add_defaults(self):
-        to_add = [dt for dt in list(self.__schema__.values())
-                  if getattr(getattr(self, dt.storage), dt.storage_key) is None]
+        to_add = [
+            dt for dt in list(self.__schema__.values())
+            if getattr(getattr(self, dt.storage), dt.storage_key) is None
+        ]
         for dt in to_add:
             dt.set_default(self)
 
@@ -119,15 +125,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     # json serializer
     toDict = to_dict
-
-    # @property
-    # def parent_id(self):
-    #     """
-    #     The ID of the parent container
-    #
-    #     @rtype: str
-    #     """
-    #     return self.p_id
 
     @property
     def content_class(self) -> str:

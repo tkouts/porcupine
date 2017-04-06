@@ -12,6 +12,7 @@ class DataType:
     readonly = False
     protected = False
     store_as = None
+    indexed = False
     safe_type = object
     storage = '__storage__'
 
@@ -19,7 +20,7 @@ class DataType:
         self._default = default
         self.name = None
         for arg in ('required', 'allow_none', 'readonly',
-                    'protected', 'store_as'):
+                    'protected', 'store_as', 'indexed'):
             if arg in kwargs:
                 setattr(self, arg, kwargs[arg])
         self.validate_value(default, None)

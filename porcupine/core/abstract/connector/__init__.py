@@ -20,11 +20,20 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     active_txns = 0
     TransactionType = Transaction
     CursorType = None
+    IndexType = None
     persist = DefaultPersistence
 
     # Sub Document Mutation Codes
     SUB_DOC_UPSERT_MUT = 0
     SUB_DOC_COUNTER = 1
+
+    def __init__(self):
+        # create index map
+        indexed_data_types = self.settings['__indices__']
+        self.indexes = {
+            k: self.get_index(v)
+            for k, v in indexed_data_types.items()
+        }
 
     @abc.abstractmethod
     def connect(self):
@@ -161,7 +170,14 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     def get_transaction(self, **options):
         return self.TransactionType(self, **options)
 
-    # indices
+    # indexes
+    @abc.abstractmethod
+    def prepare_indexes(self):
+        raise NotImplementedError
+
+    def get_index(self, data_type):
+        return self.IndexType(self, data_type)
+
     def get_cursor_list(self, conditions):
         cur_list = []
         for index, value in conditions:

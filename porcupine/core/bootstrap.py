@@ -9,14 +9,13 @@ from porcupine.apps.status import status
 from porcupine.config import settings
 from . import log
 from .server import server
-from .services.blueprint import services_blueprint
+from .services.blueprint import services_blueprint, services
 from .daemon import Daemon
 
 PID_FILE = '/tmp/porcupine.pid'
 
 
 def run_server(debug=False, loop=None):
-    log.porcupine_log.info('Starting Porcupine %s', __version__)
     server.run(host=settings['host'],
                port=settings['port'],
                workers=settings['workers'],
@@ -48,14 +47,20 @@ def start(args):
 
     # register services blueprint
     server.blueprint(services_blueprint)
-
-    # locate apps
-    apps = [resources, status]
-    # register apps
-    for app in apps:
-        server.blueprint(app, url_prefix=app.name)
+    log.porcupine_log.info('Starting Porcupine %s', __version__)
 
     try:
+        # prepare services
+        log.porcupine_log.info('Preparing services')
+        for service in services:
+            service.prepare()
+
+        # locate apps
+        apps = [resources, status]
+        # register apps
+        for app in apps:
+            server.blueprint(app, url_prefix=app.name)
+
         if args.daemon or args.stop or args.graceful:
             # daemon commands
             daemon = PorcupineDaemon(debug=args.debug)

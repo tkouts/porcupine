@@ -8,11 +8,20 @@ from .service import AbstractService
 
 
 class Db(AbstractService):
+    @staticmethod
+    def get_connector():
+        connector_type = system.get_rto_by_name(settings['db']['type'])
+        return connector_type()
+
+    @classmethod
+    def prepare(cls):
+        connector = cls.get_connector()
+        connector.prepare_indexes()
+
     @classmethod
     async def start(cls, server):
         log.info('Opening database')
-        connector_type = system.get_rto_by_name(settings['db']['type'])
-        db.connector = connector_type()
+        db.connector = cls.get_connector()
         await db.connector.connect()
 
     @classmethod

@@ -29,7 +29,7 @@ setup(
     platforms='any',
     install_requires=[
         'sanic>=0.4.1',
-        'couchbase>=2.2.2',
+        'couchbase>=2.2.3',
         'PyYAML>=3.12',
         'lru-dict>=1.1.6',
         'namedlist>=1.7',

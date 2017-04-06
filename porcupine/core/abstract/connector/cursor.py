@@ -4,7 +4,7 @@ from porcupine.utils import permissions
 from porcupine.schema import Shortcut
 
 
-class Range(object):
+class Range:
     """
     Range objects are used for setting cursor boundaries.
     The bounds are tuples of two elements. The first element contains the
@@ -66,7 +66,7 @@ class Range(object):
         return True
 
 
-class AbstractCursor(object, metaclass=abc.ABCMeta):
+class AbstractCursor(metaclass=abc.ABCMeta):
     def __init__(self,
                  connector,
                  index,
