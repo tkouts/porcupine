@@ -3,3 +3,4 @@ couchbase>=2.2.2
 PyYAML>=3.12
 lru-dict>=1.1.6
 namedlist>=1.7
+cbor>=1.0.0
