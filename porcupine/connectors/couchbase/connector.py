@@ -135,6 +135,10 @@ class Couchbase(AbstractConnector):
             index.create()
         if new_indexes:
             self.build_indexes(*new_indexes)
+        old_indexes = [ind_name for ind_name in existing
+                       if ind_name not in self.indexes]
+        for index in old_indexes:
+            self.drop_index(index)
 
     def build_indexes(self, *indexes):
         new_indexes_names = ','.join(
@@ -148,6 +152,14 @@ class Couchbase(AbstractConnector):
             message = e.objextra.value['errors'][0]['msg'].lower()
             if 'already' not in message:
                 raise
+
+    def drop_index(self, name):
+        log.info('Dropping index {0}'.format(name))
+        build_query = 'DROP INDEX `{0}`.{1};'.format(self.bucket_name, name)
+        try:
+            self.get_query(build_query).execute()
+        except HTTPError:
+            pass
 
     async def close(self):
         pass
