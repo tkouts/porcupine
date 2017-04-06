@@ -25,11 +25,11 @@ class Composite(Elastic):
 
     @property
     def applied_acl(self):
-        return system.resolve_acl(self.p_id[1:])
+        return system.resolve_acl(self.parent_id[1:])
 
     @property
     def is_deleted(self):
-        return system.resolve_deleted(self.p_id[1:])
+        return system.resolve_deleted(self.parent_id[1:])
 
     def clone(self, memo=None):
         """

@@ -59,7 +59,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     event_handlers = []
 
     id = String(readonly=True)
-    p_id = String(readonly=True, allow_none=True, default=None)
+    parent_id = String(readonly=True, allow_none=True,
+                       default=None, store_as='p_id')
     sig = SchemaSignature()
 
     def __init__(self, dict_storage=None):
@@ -119,14 +120,14 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     # json serializer
     toDict = to_dict
 
-    @property
-    def parent_id(self):
-        """
-        The ID of the parent container
-
-        @rtype: str
-        """
-        return self.p_id
+    # @property
+    # def parent_id(self):
+    #     """
+    #     The ID of the parent container
+    #
+    #     @rtype: str
+    #     """
+    #     return self.p_id
 
     @property
     def content_class(self) -> str:

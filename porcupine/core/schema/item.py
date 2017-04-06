@@ -36,7 +36,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     created = DateTime(readonly=True, store_as='cr')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
-    sys = Boolean(readonly=True)
+    is_system = Boolean(readonly=True, store_as='sys')
     modified = DateTime(required=True, readonly=True, store_as='md')
     deleted = Integer(readonly=True, store_as='dl')
 
@@ -45,18 +45,14 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     acl = Acl(default=None)
 
     async def is_deleted(self):
-        if self.deleted or self.p_id is None:
+        if self.deleted or self.parent_id is None:
             return self.deleted
-        return await resolve_deleted(self.p_id)
+        return await resolve_deleted(self.parent_id)
 
     async def applied_acl(self):
-        if self.acl is not None or self.p_id is None:
+        if self.acl is not None or self.parent_id is None:
             return self.acl
-        return await resolve_acl(self.p_id)
-
-    @property
-    def is_system(self):
-        return self.sys
+        return await resolve_acl(self.parent_id)
 
     async def append_to(self, parent):
         """
@@ -93,7 +89,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
                 datetime.datetime.utcnow().isoformat()
             self.modified_by = user.name
             if parent is not None:
-                self.p_id = parent.id
+                self.parent_id = parent.id
 
             context.txn.upsert(self)
             if parent is not None:
@@ -121,8 +117,8 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         @return: the parent container object
         @rtype: type
         """
-        if self.p_id is not None:
-            return await db.get_item(self.p_id)
+        if self.parent_id is not None:
+            return await db.get_item(self.parent_id)
 
     def get_ancestor(self, n_levels=1):
         """
@@ -145,7 +141,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         """
         parents = []
         parent = self
-        while parent.p_id is not None:
+        while parent.parent_id is not None:
             parent = await parent.get_parent()
             if parent is not None:
                 parents.append(parent)
@@ -184,8 +180,8 @@ class Item(GenericItem):
         @return: None
         """
         if self.__snapshot__:
-            if self.p_id is not None:
-                parent = await db.connector.get(self.p_id)
+            if self.parent_id is not None:
+                parent = await db.connector.get(self.parent_id)
             else:
                 parent = None
 

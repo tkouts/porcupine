@@ -72,7 +72,7 @@ class Shortcut(Item):
         return super().move_to(target_container, inherit_roles)
 
     async def update(self):
-        parent = await db.connector.get(self.p_id)
+        parent = await db.connector.get(self.parent_id)
         target = await self.get_target()
         if target.is_collection:
             containment_dt = parent.__class__.containers
