@@ -62,14 +62,19 @@ def get_rto_by_name(name):
         return mod
 
 
-def hash_series(*args, using='md5'):
+def hash_series(*args, using='md5', salt=b''):
     with io.BytesIO() as bt:
         for arg in args:
-            if isinstance(arg, str):
-                arg = arg.encode('utf-8')
-            bt.write(arg)
-        md5_hash = getattr(hashlib, using)(bt.getvalue())
-    return md5_hash
+            if arg is not None:
+                if isinstance(arg, str):
+                    arg = arg.encode('utf-8')
+                bt.write(arg)
+        hash_provider = getattr(hashlib, using)
+        if salt:
+            h = hash_provider(bt.getvalue(), salt=salt)
+        else:
+            h = hash_provider(bt.getvalue())
+    return h
 
 
 def resolve_set(raw_string):

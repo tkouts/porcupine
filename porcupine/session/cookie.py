@@ -7,14 +7,14 @@ from porcupine.core.abstract.session import AbstractSessionManager
 class SessionManager(AbstractSessionManager):
     def __init__(self, **params):
         super().__init__(**params)
-        self.secret = self.params['secret']
+        self.secret = self.params['secret'].encode('utf-8')
 
     def generate_sig(self, session):
         return system.hash_series(
             session.id,
             session.user_id,
             self.secret,
-            using='sha3_224').hexdigest()
+            using='sha3_256').hexdigest()
 
     def new_session(self):
         session = super().new_session()

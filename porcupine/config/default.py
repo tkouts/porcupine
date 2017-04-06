@@ -24,7 +24,7 @@ default_settings = {
     'session_manager': {
         'type': 'porcupine.session.cookie.SessionManager',
         'timeout': 1200,
-        'guest_user_id': 'guest',
+        'guest_user_id': None,
         'params': {'secret': 'SECRET'}
     },
     'template_languages': {

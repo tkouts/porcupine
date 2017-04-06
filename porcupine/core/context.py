@@ -61,14 +61,7 @@ def with_context(identity=None):
             with Context():
                 user = identity
                 if user is None:
-                    # locate request
-                    try:
-                        request = [arg for arg in args
-                                   if isinstance(arg, Request)][0]
-                    except IndexError:
-                        raise ServerError(
-                            'Missing request argument from context handler')
-                    session = request['session']
+                    session = args[0].session
                     if session is not None and session['uid'] is not None:
                         # print('user is', session['uid'])
                         user = await db.connector.get(session['uid'])
