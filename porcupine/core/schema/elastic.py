@@ -57,7 +57,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     __ext_record__ = None
 
     event_handlers = []
-    is_collection = False
 
     id = String(readonly=True)
     p_id = String(readonly=True, allow_none=True, default=None)
@@ -136,8 +135,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
         @rtype: str
         """
-        return '{}.{}'.format(self.__class__.__module__,
-                              self.__class__.__name__)
+        return '{0}.{1}'.format(self.__class__.__module__,
+                                self.__class__.__name__)
 
     def custom_view(self, *args, **kwargs):
         if not args and not kwargs:

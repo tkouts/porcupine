@@ -32,6 +32,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     @type created: float
     """
     # system attributes
+    is_collection = Boolean(readonly=True, store_as='col')
     created = DateTime(readonly=True, store_as='cr')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')

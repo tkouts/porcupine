@@ -16,10 +16,12 @@ class Container(Item):
     @type is_collection: bool
     """
     containment = (Shortcut, )
-    is_collection = True
-
     items = Items()
     containers = Containers()
+
+    def __init__(self, dict_storage=None):
+        super().__init__(dict_storage)
+        self.__storage__.col = True
 
     def child_exists(self, name):
         """
