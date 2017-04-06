@@ -1,6 +1,8 @@
 import asyncio
-from lru import LRU
 from functools import wraps
+from sanic.request import Request
+from lru import LRU
+from porcupine.exceptions import ServerError
 from .aiolocals.local import Local, Context
 
 
@@ -58,8 +60,20 @@ def with_context(identity=None):
         async def context_wrapper(*args, **kwargs):
             with Context():
                 user = identity
-                if identity is not None and isinstance(identity, str):
-                    user = await db.connector.get(identity)
+                if user is None:
+                    # locate request
+                    try:
+                        request = [arg for arg in args
+                                   if isinstance(arg, Request)][0]
+                    except IndexError:
+                        raise ServerError(
+                            'Missing request argument from context handler')
+                    session = request['session']
+                    if session is not None and session['uid'] is not None:
+                        # print('user is', session['uid'])
+                        user = await db.connector.get(session['uid'])
+                elif isinstance(user, str):
+                    user = await db.connector.get(user)
                 context.user = user
                 try:
                     result = func(*args, **kwargs)
