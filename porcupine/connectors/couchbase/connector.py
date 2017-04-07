@@ -1,11 +1,11 @@
 import random
 import ujson
 
-import couchbase.subdocument as SD
+import couchbase.subdocument as sub_doc
 from couchbase.bucket import Bucket
 from couchbase.n1ql import N1QLQuery
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
-    SubdocPathNotFoundError, KeyExistsError, HTTPError
+    SubdocPathNotFoundError, KeyExistsError
 
 from porcupine import exceptions, log
 from porcupine.core.abstract.connector import AbstractConnector
@@ -54,8 +54,9 @@ class Couchbase(AbstractConnector):
         if async:
             return self.bucket.connect()
 
-    def get_query(self, query, **kwargs):
+    def get_query(self, query, ad_hoc=True, **kwargs):
         n1query = N1QLQuery(query, **kwargs)
+        n1query.adhoc = ad_hoc
         return self.bucket.n1ql_query(n1query)
 
     async def exists(self, key):
@@ -94,9 +95,9 @@ class Couchbase(AbstractConnector):
         for path, mutation in mutations_dict.items():
             mutation_type, value = mutation
             if mutation_type == self.SUB_DOC_UPSERT_MUT:
-                mutations.append(SD.upsert(path, value))
+                mutations.append(sub_doc.upsert(path, value))
             elif mutation_type == self.SUB_DOC_COUNTER:
-                mutations.append(SD.counter(path, value))
+                mutations.append(sub_doc.counter(path, value))
         return self.bucket.mutate_in(item_id, *mutations)
 
     def append_multi(self, appends):
@@ -124,42 +125,30 @@ class Couchbase(AbstractConnector):
         log.info('Preparing indexes')
         self.connect(async=False)
         # get existing indexes
-        existing = []
-        query = 'SELECT name FROM system:indexes WHERE keyspace_id=$bucket'
-        for result in self.get_query(query, bucket=self.bucket_name):
-            existing.append(result['name'])
+        mgr = self.bucket.bucket_manager()
+        existing = [index.name for index in mgr.list_n1ql_indexes()]
         new_indexes = [ind for name, ind in self.indexes.items()
                        if name not in existing]
-        # create secondary indexes
+        # create new indexes
         for index in new_indexes:
             index.create()
         if new_indexes:
-            self.build_indexes(*new_indexes)
+            self.build_indexes(*[index.name for index in new_indexes])
         old_indexes = [ind_name for ind_name in existing
                        if ind_name not in self.indexes]
         for index in old_indexes:
             self.drop_index(index)
 
     def build_indexes(self, *indexes):
-        new_indexes_names = ','.join(
-            [ind.data_type.name for ind in indexes])
-        log.info('Building indexes [{0}]'.format(new_indexes_names))
-        build_query = 'BUILD INDEX ON `{0}`({1});'.format(
-            self.bucket_name, new_indexes_names)
-        try:
-            self.get_query(build_query).execute()
-        except HTTPError as e:
-            message = e.objextra.value['errors'][0]['msg'].lower()
-            if 'already' not in message:
-                raise
+        log.info('Building indexes {0}'.format(indexes))
+        mgr = self.bucket.bucket_manager()
+        mgr.build_n1ql_deferred_indexes()
+        mgr.watch_n1ql_indexes(indexes, timeout=120)
 
     def drop_index(self, name):
         log.info('Dropping index {0}'.format(name))
-        build_query = 'DROP INDEX `{0}`.{1};'.format(self.bucket_name, name)
-        try:
-            self.get_query(build_query).execute()
-        except HTTPError:
-            pass
+        mgr = self.bucket.bucket_manager()
+        mgr.drop_n1ql_index(name, ignore_missing=True)
 
     async def close(self):
         pass

@@ -1,4 +1,3 @@
-from couchbase.exceptions import HTTPError
 from porcupine.core.abstract.connector.index import AbstractIndex
 
 
@@ -7,18 +6,10 @@ class Index(AbstractIndex):
     Couchbase index
     """
     def create(self):
-        try:
-            query = 'CREATE INDEX {0} ON `{1}`({2}) ' \
-                    'WITH {{"defer_build": true}};'.format(
-                        self.name,
-                        self.connector.bucket_name,
-                        self.key
-                    )
-            self.connector.get_query(query).execute()
-        except HTTPError as e:
-            message = e.objextra.value['errors'][0]['msg'].lower()
-            if 'already' not in message:
-                raise
+        mgr = self.connector.bucket.bucket_manager()
+        mgr.create_n1ql_index(self.name, fields=[self.key],
+                              defer=True,
+                              ignore_exists=True)
 
     def exists(self, container_id, value):
         pass
