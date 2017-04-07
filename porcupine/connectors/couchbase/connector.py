@@ -131,7 +131,10 @@ class Couchbase(AbstractConnector):
                        if name not in existing]
         # create new indexes
         for index in new_indexes:
-            index.create()
+            mgr.create_n1ql_index(index.name,
+                                  fields=[index.key],
+                                  defer=True,
+                                  ignore_exists=True)
         if new_indexes:
             self.build_indexes(*[index.name for index in new_indexes])
         old_indexes = [ind_name for ind_name in existing
