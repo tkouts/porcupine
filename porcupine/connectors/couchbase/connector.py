@@ -131,27 +131,23 @@ class Couchbase(AbstractConnector):
                        if name not in existing]
         # create new indexes
         for index in new_indexes:
+            log.info('Creating index {0}'.format(index.name))
             mgr.create_n1ql_index(index.name,
                                   fields=[index.key],
                                   defer=True,
                                   ignore_exists=True)
+        # build new indexes
         if new_indexes:
-            self.build_indexes(*[index.name for index in new_indexes])
+            new_indexes_names = [index.name for index in new_indexes]
+            log.info('Building indexes {0}'.format(new_indexes_names))
+            mgr.build_n1ql_deferred_indexes()
+            mgr.watch_n1ql_indexes(new_indexes_names, timeout=120)
+        # drop old indexes
         old_indexes = [ind_name for ind_name in existing
                        if ind_name not in self.indexes]
         for index in old_indexes:
-            self.drop_index(index)
-
-    def build_indexes(self, *indexes):
-        log.info('Building indexes {0}'.format(indexes))
-        mgr = self.bucket.bucket_manager()
-        mgr.build_n1ql_deferred_indexes()
-        mgr.watch_n1ql_indexes(indexes, timeout=120)
-
-    def drop_index(self, name):
-        log.info('Dropping index {0}'.format(name))
-        mgr = self.bucket.bucket_manager()
-        mgr.drop_n1ql_index(name, ignore_missing=True)
+            log.info('Dropping index {0}'.format(index))
+            mgr.drop_n1ql_index(index, ignore_missing=True)
 
     async def close(self):
         pass
