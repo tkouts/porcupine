@@ -1,7 +1,7 @@
-import io
 import random
 import hashlib
 import functools
+import cbor
 
 from porcupine import db
 from porcupine.core.context import context_cacheable
@@ -62,18 +62,10 @@ def get_rto_by_name(name):
         return mod
 
 
-def hash_series(*args, using='md5', salt=b''):
-    with io.BytesIO() as bt:
-        for arg in args:
-            if arg is not None:
-                if isinstance(arg, str):
-                    arg = arg.encode('utf-8')
-                bt.write(arg)
-        hash_provider = getattr(hashlib, using)
-        if salt:
-            h = hash_provider(bt.getvalue(), salt=salt)
-        else:
-            h = hash_provider(bt.getvalue())
+def hash_series(*args, using='md5'):
+    b = cbor.dumps(args)
+    hash_provider = getattr(hashlib, using)
+    h = hash_provider(b)
     return h
 
 
