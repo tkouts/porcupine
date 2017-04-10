@@ -24,6 +24,7 @@ class Acceptable:
                 system.get_rto_by_name(x) if isinstance(x, str) else x
                 for x in self.accepts
             ])
+            self.accepts_resolved = True
         return self.accepts
 
     def accepts_item(self, item):
@@ -246,7 +247,7 @@ class ReferenceN(Text, Acceptable):
             item_collection.remove(item)
         return added, removed
 
-    async def get(self, request, instance, expand=False):
+    async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
         if expand:
             return await getattr(instance, self.name).items()

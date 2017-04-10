@@ -1,5 +1,8 @@
+import itertools
+from sanic.response import json
+from porcupine import db, view, gather, contract, exceptions, server
 from porcupine.core.datatypes.system import Items, Containers
-from porcupine.utils import permissions
+from porcupine.utils import permissions, system
 from .shortcut import Shortcut
 from .item import Item
 
@@ -65,45 +68,30 @@ class Container(Item):
                 return None
         return item
 
-    def get_children(self, resolve_shortcuts=False):
+    async def get_children(self, resolve_shortcuts=False):
         """
         This method returns all the children of the container.
 
         @rtype: L{ObjectSet<porcupine.core.objectset.ObjectSet>}
         """
-        cursor = db._db.get_children(self._id)
-        cursor.resolve_shortcuts = resolve_shortcuts
-        children = ObjectSet([c for c in cursor])
-        cursor.close()
-        return children
+        return itertools.chain(*await gather(self.get_containers(),
+                                             self.get_items()))
 
-    def get_items(self, resolve_shortcuts=False):
+    async def get_items(self, resolve_shortcuts=False):
         """
         This method returns the children that are not containers.
 
         @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
         """
-        conditions = (('is_collection', False), )
-        cursor = db._db.query(conditions)
-        cursor.set_scope(self._id)
-        cursor.resolve_shortcuts = resolve_shortcuts
-        items = ObjectSet([i for i in cursor])
-        cursor.close()
-        return items
+        return await self.items.items()
 
-    def get_subfolders(self, resolve_shortcuts=False):
+    async def get_containers(self, resolve_shortcuts=False):
         """
         This method returns the children that are containers.
 
         @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
         """
-        conditions = (('is_collection', True), )
-        cursor = db._db.query(conditions)
-        cursor.set_scope(self._id)
-        cursor.resolve_shortcuts = resolve_shortcuts
-        subfolders = ObjectSet([f for f in cursor])
-        cursor.close()
-        return subfolders
+        return await self.containers.items()
 
     def has_items(self):
         """
@@ -135,3 +123,31 @@ class Container(Item):
     def containers_count(self):
         """The number of containers contained"""
         return self._nc
+
+    @view
+    async def children(self, request):
+        return await self.get_children()
+
+    @children.http_post
+    @contract.is_new_item()
+    @db.transactional()
+    async def children(self, request):
+        item_dict = request.json
+        # TODO: handle invalid type exception
+        item_type = system.get_rto_by_name(item_dict.pop('type'))
+        new_item = item_type()
+        try:
+            for attr, value in item_dict.items():
+                setattr(new_item, attr, value)
+            await new_item.append_to(self)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+        location = server.url_for('resources.resource_handler',
+                                  item_id=new_item.id)
+        return json(
+            new_item.id,
+            status=201,
+            headers={
+                'Location': location
+            })
+

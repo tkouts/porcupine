@@ -121,11 +121,11 @@ class DataType:
         pass
 
     # HTTP views
-    def get(self, request, instance):
+    def get(self, instance, request):
         return getattr(instance, self.name)
 
     @db.transactional()
-    async def put(self, request, instance):
+    async def put(self, instance, request):
         try:
             setattr(instance, self.name, request.json)
         except exceptions.AttributeSetError as e:

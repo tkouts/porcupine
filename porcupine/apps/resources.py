@@ -37,7 +37,7 @@ async def member_handler(request, item_id, member):
                           None)
         if handler is None:
             raise exceptions.MethodNotAllowed('Method not allowed')
-        result = handler(request, item)
+        result = handler(item, request)
         if asyncio.iscoroutine(result):
             result = await result
         return result if isinstance(result, HTTPResponse) else json(result)
