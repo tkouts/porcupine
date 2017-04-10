@@ -63,8 +63,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     id = String(readonly=True)
     parent_id = String(readonly=True, allow_none=True,
-                       default=None, store_as='pid',
-                       indexed=True)
+                       default=None, store_as='pid')
     sig = SchemaSignature()
 
     def __init__(self, dict_storage=None):

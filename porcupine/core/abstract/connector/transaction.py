@@ -7,36 +7,50 @@ from porcupine.utils import system
 
 
 class Transaction:
-    __slots__ = ('connector', 'options', '_upsertions', '_externals',
-                 '_deleted', '_sd', '_appends')
+    __slots__ = ('connector', 'options', '_items',
+                 '_insertions', '_upsertions',
+                 '_deletions', '_sd', '_appends')
 
     def __init__(self, connector, **options):
         self.connector = connector
         self.connector.active_txns += 1
         self.options = options
+        self._items = {}
+        self._insertions = {}
         self._upsertions = {}
-        self._externals = {}
-        self._deleted = {}
+        self._deletions = {}
+
         # sub document mutations
         self._sd = defaultdict(dict)
         self._appends = defaultdict(str)
 
     def __contains__(self, key):
-        return key in self._upsertions \
-               or key in self._deleted \
-               or key in self._externals
+        return key in self._items \
+               or key in self._insertions \
+               or key in self._deletions \
+               or key in self._upsertions
 
     def __getitem__(self, key):
-        if key in self._deleted:
+        if key in self._deletions:
             return None
+        elif key in self._items:
+            return self._items[key]
+        elif key in self._insertions:
+            return self._insertions[key]
         elif key in self._upsertions:
             return self._upsertions[key]
-        elif key in self._externals:
-            return self._externals[key]
         raise KeyError
 
+    def insert(self, item):
+        if item.id in self._items:
+            self.raise_exists(item.id)
+        self.upsert(item)
+
     def upsert(self, item):
-        self._upsertions[item.id] = item
+        self._items[item.id] = item
+
+    def delete(self, item):
+        self._deletions[item.id] = True
 
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = (mutation_type, value)
@@ -45,22 +59,43 @@ class Transaction:
         if value not in self._appends[key]:
             self._appends[key] += value
 
+    def insert_external(self, key, value):
+        if key in self._insertions:
+            self.raise_exists(key)
+        self._insertions[key] = value
+
     def put_external(self, key, value):
-        self._externals[key] = value
+        self._upsertions[key] = value
+
+    def delete_external(self, key):
+        self._deletions[key] = True
+
+    @staticmethod
+    def raise_exists(key):
+        if '/' in key:
+            # unique constraint
+            _, attr_name, _ = key.split('/')
+            raise exceptions.DBAlreadyExists(
+                'A resource having the same {0} already exists'
+                .format(attr_name))
+        else:
+            # item
+            raise exceptions.DBAlreadyExists(
+                'A resource having an id of {0} already exists'.format(key))
 
     async def prepare(self):
         # call changed attributes event handlers till snapshots are drained
         while True:
             snapshots = {item.id: item.__snapshot__
-                         for item in self._upsertions.values()
+                         for item in self._items.values()
                          if item.__snapshot__}
             # clear snapshots
             for item_id in snapshots:
-                self._upsertions[item_id].__reset__()
+                self._items[item_id].__reset__()
             # print(snapshots)
             if snapshots:
                 for item_id, snapshot in snapshots.items():
-                    item = self._upsertions[item_id]
+                    item = self._items[item_id]
                     for attr, old_value in snapshot.items():
                         attr_def = system.get_descriptor_by_storage_key(
                             item.__class__, attr)
@@ -81,22 +116,20 @@ class Transaction:
         dumps = connector.persist.dumps
 
         # insertions
-        insertions = {k: dumps(i)
-                      for k, i in self._upsertions.items()
-                      if i.__is_new__}
+        insertions = self._insertions
+        insertions.update({k: dumps(i)
+                           for k, i in self._items.items()
+                           if i.__is_new__})
 
         # upsertions
-        upsertions = self._externals
-        # upsertions.update(self._externals)
+        upsertions = self._upsertions
 
-        # insertions = {}
         if self._appends:
             # make sure externals with appends are initialized
             append_keys = list(self._appends.keys())
             tasks = [connector.exists(key) for key in append_keys]
             completed, _ = await asyncio.wait(tasks)
             keys_exist = [c.result() for c in completed]
-            # insertions = {...}
             insertions.update({key: '' for key, exists in keys_exist
                                if not exists})
 
@@ -114,9 +147,14 @@ class Transaction:
         tasks = []
         # insertions
         if insertions:
-            task = connector.insert_multi(insertions)
-            if isawaitable(task):
-                tasks.append(task)
+            # first transaction phase - make sure all keys are non-existing
+            # otherwise rollback successful insertions and raise
+            success, existing_key, inserted = await connector.insert_multi(insertions)
+            if not success:
+                # rollback
+                if inserted:
+                    await connector.delete_multi(inserted)
+                self.raise_exists(existing_key)
 
         # upsertions
         if upsertions:

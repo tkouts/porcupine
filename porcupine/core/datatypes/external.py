@@ -6,7 +6,7 @@ import os.path
 import shutil
 import asyncio
 
-from porcupine import db, context
+from porcupine import db, context, exceptions
 from .common import String
 from .datatype import DataType
 
@@ -21,8 +21,11 @@ class Blob(DataType):
     storage = '__externals__'
 
     def __init__(self, default=None, **kwargs):
-        # do not allow store_as for external attributes
-        kwargs.pop('store_as', None)
+        type_error_message = "{0}() got an unexpected keyword argument '{1}'"
+        for kwarg in ('store_as', 'unique', 'indexed'):
+            if kwarg in kwargs:
+                raise TypeError(
+                    type_error_message.format(self.__class__.__name__, kwarg))
         super().__init__(default, **kwargs)
 
     async def fetch(self, instance, set_storage=True):

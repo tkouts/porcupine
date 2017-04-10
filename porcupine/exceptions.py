@@ -1,4 +1,13 @@
-from sanic.exceptions import SanicException, InvalidUsage, NotFound, ServerError
+from sanic.exceptions import SanicException, InvalidUsage, \
+    NotFound, ServerError
+
+
+InvalidUsage = InvalidUsage
+NotFound = NotFound
+
+
+class SchemaError(Exception):
+    pass
 
 
 class Conflict(SanicException):

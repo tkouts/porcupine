@@ -114,6 +114,9 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     def upsert_multi(self, upsertions):
         raise NotImplementedError
 
+    def delete_multi(self, deletions):
+        raise NotImplementedError
+
     def mutate_in(self, item_id, mutations_dict: dict):
         raise NotImplementedError
 
@@ -177,6 +180,14 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     def get_index(self, data_type):
         return self.IndexType(self, data_type)
+
+    def get_cursor(self, index_name, value=None, c_range=None):
+        cursor = self.CursorType(self, self.indexes[index_name])
+        if c_range is None:
+            cursor.set(value)
+        else:
+            cursor.set_range(c_range)
+        return cursor
 
     def get_cursor_list(self, conditions):
         cur_list = []

@@ -61,7 +61,7 @@ class Couchbase(AbstractConnector):
 
     async def exists(self, key):
         try:
-            await self.bucket.retrieve_in(key, '/')
+            await self.bucket.retrieve_in(key, 'dl')
         except NotFoundError:
             return key, False
         except (DocumentNotJsonError, SubdocPathNotFoundError):
@@ -84,11 +84,23 @@ class Couchbase(AbstractConnector):
         values = await self.bucket.retrieve_in(key, *paths)
         return dict(zip(paths, values))
 
-    def insert_multi(self, insertions):
-        return self.bucket.insert_multi(insertions, format=couchbase.FMT_AUTO)
+    async def insert_multi(self, insertions):
+        try:
+            await self.bucket.insert_multi(insertions,
+                                           format=couchbase.FMT_AUTO)
+            return True, None, None
+        except KeyExistsError as e:
+            existing_key = e.key
+            inserted = [key
+                        for key, result in e.all_results.items()
+                        if result.rc == 0]
+            return False, existing_key, inserted
 
     def upsert_multi(self, upsertions):
         return self.bucket.upsert_multi(upsertions, format=couchbase.FMT_AUTO)
+
+    def delete_multi(self, deletions):
+        return self.bucket.remove_multi(deletions, quiet=True)
 
     def mutate_in(self, item_id: str, mutations_dict: dict):
         mutations = []

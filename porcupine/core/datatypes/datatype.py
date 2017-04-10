@@ -1,4 +1,5 @@
 from porcupine import context, db, exceptions
+from porcupine.utils.system import hash_series
 
 
 class DataType:
@@ -13,6 +14,7 @@ class DataType:
     protected = False
     store_as = None
     indexed = False
+    unique = False
     safe_type = object
     storage = '__storage__'
 
@@ -20,7 +22,8 @@ class DataType:
         self._default = default
         self.name = None
         for arg in ('required', 'allow_none', 'readonly',
-                    'protected', 'store_as', 'indexed'):
+                    'protected', 'store_as', 'indexed',
+                    'unique'):
             if arg in kwargs:
                 setattr(self, arg, kwargs[arg])
         self.validate_value(default, None)
@@ -101,6 +104,12 @@ class DataType:
 
     def on_change(self, instance, value, old_value):
         self.validate(value)
+        if self.unique and instance.__storage__.pid is not None:
+            unique_key = '{0}/{1}/{2}'.format(
+                instance.__storage__.pid,
+                self.name,
+                hash_series(value).hexdigest())
+            context.txn.insert_external(unique_key, instance.__storage__.id)
         if not instance.__is_new__:
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)

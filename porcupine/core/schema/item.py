@@ -40,7 +40,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     modified = DateTime(required=True, readonly=True, store_as='md')
     deleted = Integer(readonly=True, store_as='dl')
 
-    name = String(required=True, indexed=True)
+    name = String(required=True, unique=True)
     description = String(store_as='desc')
     acl = Acl(default=None)
 
@@ -91,7 +91,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
             if parent is not None:
                 self.parent_id = parent.id
 
-            context.txn.upsert(self)
+            context.txn.insert(self)
             if parent is not None:
                 if self.is_collection:
                     parent.containers.add(self)
