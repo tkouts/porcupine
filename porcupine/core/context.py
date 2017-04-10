@@ -1,8 +1,6 @@
 import asyncio
 from functools import wraps
-from sanic.request import Request
 from lru import LRU
-from porcupine.exceptions import ServerError
 from .aiolocals.local import Local, Context
 
 
@@ -58,7 +56,7 @@ def with_context(identity=None):
         """
         @wraps(func)
         async def context_wrapper(*args, **kwargs):
-            with Context():
+            with Context(locals=(context,)):
                 user = identity
                 if user is None:
                     session = args[0].session
