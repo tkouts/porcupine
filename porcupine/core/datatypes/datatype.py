@@ -104,7 +104,7 @@ class DataType:
 
     def on_change(self, instance, value, old_value):
         self.validate(value)
-        if self.unique and instance.__storage__.pid is not None:
+        if self.unique:
             unique_key = '{0}/{1}/{2}'.format(
                 instance.__storage__.pid,
                 self.name,

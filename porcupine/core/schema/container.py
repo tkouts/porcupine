@@ -26,7 +26,7 @@ class Container(Item):
         super().__init__(dict_storage)
         self.__storage__.col = True
 
-    def child_exists(self, name):
+    async def child_exists(self, name):
         """
         Checks if a child with the specified name is contained
         in the container.
@@ -36,13 +36,16 @@ class Container(Item):
 
         @rtype: bool
         """
-        item_id = db._db.get_child_id_by_name(self._id, name)
-        if item_id is None:
+        child_id = await db.connector.get_raw('{0}/{1}/{2}'.format(
+                self.id,
+                'name',
+                system.hash_series(name).hexdigest()))
+        if child_id is None:
             return False
         else:
             return True
 
-    def get_child_by_name(self, name, get_lock=True, resolve_shortcuts=False):
+    async def get_child_by_name(self, name, resolve_shortcuts=False):
         """
         This method returns the child with the specified name.
 
@@ -52,14 +55,15 @@ class Container(Item):
                  else None.
         @rtype: L{GenericItem}
         """
-        item = db._db.get_child_by_name(self._id, name, get_lock)
-        if item is not None:
-            user_role = permissions.resolve(item, context.user)
-            if user_role < permissions.READER:
-                return None
-        if resolve_shortcuts and isinstance(item, Shortcut):
-            item = item.get_target(get_lock=get_lock)
-        return item
+        child_id = await db.connector.get_raw('{0}/{1}/{2}'.format(
+                self.id,
+                'name',
+                system.hash_series(name).hexdigest()))
+        if child_id:
+            item = await db.get_item(child_id)
+            if resolve_shortcuts and isinstance(item, Shortcut):
+                item = item.get_target()
+            return item
 
     def get_child_by_id(self, oid, get_lock=True):
         item = db.get_item(oid, get_lock)

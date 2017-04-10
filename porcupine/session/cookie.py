@@ -16,11 +16,6 @@ class SessionManager(AbstractSessionManager):
             self.secret,
             using='sha3_256').hexdigest()
 
-    def new_session(self):
-        session = super().new_session()
-        session['sig'] = self.generate_sig(session)
-        return session
-
     async def load(self, request):
         session = None
         i = 0
@@ -42,9 +37,12 @@ class SessionManager(AbstractSessionManager):
         return session
 
     async def save(self, request, response):
+        session = request['session']
+        # update signature
+        session['sig'] = self.generate_sig(session)
         # chunk = msgpack.dumps(request['session'],
         #                       use_bin_type=True).decode('latin-1')
-        chunk = cbor.dumps(request['session']).decode('latin-1')
+        chunk = cbor.dumps(session).decode('latin-1')
         chunks = [chunk[i:i + 4000]
                   for i in range(0, len(chunk), 4000)]
         for i in range(len(chunks)):
