@@ -1,5 +1,4 @@
 import hashlib
-
 from porcupine.schema import Container
 from porcupine.schema import Item
 from porcupine.datatypes import String, RelatorN, Password, Reference1, \
@@ -104,10 +103,8 @@ class User(Membership):
 
         @rtype: bool
         """
-        if type(password) == str:
-            password = password.encode('utf-8')
-        md = hashlib.md5(password)
-        hex_digest = md.hexdigest()
+        hex_digest = hashlib.sha3_256(
+            password.encode('utf-8')).hexdigest()
         return hex_digest == self.password
 
 

@@ -1,6 +1,5 @@
-# import msgpack
+import hashlib
 import cbor
-from porcupine.utils import system
 from porcupine.core.abstract.session import AbstractSessionManager
 
 
@@ -10,11 +9,12 @@ class SessionManager(AbstractSessionManager):
         self.secret = self.params['secret'].encode('utf-8')
 
     def generate_sig(self, session):
-        return system.hash_series(
-            session.id,
-            session.user_id,
-            self.secret,
-            using='sha3_256')
+        h = hashlib.blake2b(
+            '{0}{1}'.format(session['id'], session['uid']).encode(),
+            key=self.secret,
+            digest_size=32
+        )
+        return h.hexdigest()
 
     async def load(self, request):
         session = None
@@ -28,7 +28,6 @@ class SessionManager(AbstractSessionManager):
         if chunks:
             session_bytes = ''.join(chunks).encode('latin-1')
             session = self.SessionType(
-                # msgpack.loads(session_bytes, encoding='utf-8')
                 cbor.loads(session_bytes)
             )
             sig = self.generate_sig(session)
@@ -40,8 +39,6 @@ class SessionManager(AbstractSessionManager):
         session = request['session']
         # update signature
         session['sig'] = self.generate_sig(session)
-        # chunk = msgpack.dumps(request['session'],
-        #                       use_bin_type=True).decode('latin-1')
         chunk = cbor.dumps(session).decode('latin-1')
         chunks = [chunk[i:i + 4000]
                   for i in range(0, len(chunk), 4000)]
@@ -50,9 +47,9 @@ class SessionManager(AbstractSessionManager):
             response.cookies[cookie_name] = chunks[i]
             response.cookies[cookie_name]['httponly'] = True
         # remove extra cookies
-        await self.remove(request, response, len(chunks))
+        self.remove(request, response, len(chunks))
 
-    async def remove(self, request, response, start=0):
+    def remove(self, request, response, start=0):
         j = 0
         next_cookie = request.cookies.get('_s{0}'.format(j))
         while next_cookie is not None:

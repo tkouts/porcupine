@@ -3,7 +3,6 @@ Porcupine data types
 ====================
 """
 import hashlib
-
 from .datatype import DataType
 
 
@@ -70,14 +69,13 @@ class Password(String):
     This data type is actually storing MD5 hex digests
     of the assigned string value.
     """
-    empty = hashlib.md5(''.encode()).hexdigest()
+    digest_size = 32
+    empty = hashlib.sha3_256(b'').hexdigest()
     protected = True
 
     def __set__(self, instance, value):
-        super().__set__(instance,
-                        hashlib.md5(value.encode('utf-8')).hexdigest())
-        # self.validate_value(value)
-        # instance.__storage__[self.name] = hashlib.md5(value).hexdigest()
+        digest = hashlib.sha3_256(value.encode('utf-8')).hexdigest()
+        super().__set__(instance, digest)
 
     def validate(self, value):
         if self.required and value == self.empty:
