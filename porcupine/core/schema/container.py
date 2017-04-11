@@ -36,10 +36,8 @@ class Container(Item):
 
         @rtype: bool
         """
-        child_id = await db.connector.get_raw('{0}/{1}/{2}'.format(
-                self.id,
-                'name',
-                system.hash_series(name)))
+        child_id = await db.connector.get_raw(
+                system.get_key_of_unique(self.id, 'name', name))
         if child_id is None:
             return False
         else:
@@ -55,10 +53,8 @@ class Container(Item):
                  else None.
         @rtype: L{GenericItem}
         """
-        child_id = await db.connector.get_raw('{0}/{1}/{2}'.format(
-                self.id,
-                'name',
-                system.hash_series(name)))
+        child_id = await db.connector.get_raw(
+                system.get_key_of_unique(self.id, 'name', name))
         if child_id:
             item = await db.get_item(child_id)
             if resolve_shortcuts and isinstance(item, Shortcut):

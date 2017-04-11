@@ -69,6 +69,12 @@ def hash_series(*args, using='md5'):
     return h.hexdigest()
 
 
+def get_key_of_unique(parent_id, attr_name, attr_value):
+    return '{0}/{1}/{2}'.format(parent_id,
+                                attr_name,
+                                hash_series(attr_value))
+
+
 def resolve_set(raw_string):
     # build set
     uniques = {}
