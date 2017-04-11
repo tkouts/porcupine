@@ -44,7 +44,7 @@ class App(Blueprint):
     @with_context(SystemUser())
     @transactional()
     async def __initialize_db(self, blueprint):
-        for item in blueprint.get('items', []):
+        for item in blueprint:
             await self.__process_item(item, None)
 
     async def __process_item(self, item_dict, parent):

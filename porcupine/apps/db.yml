@@ -1,55 +1,50 @@
-indices:
-  name: Yes
-  is_collection: No
+- id: ROOT
+  type: porcupine.apps.schema.root.Root
+  name: Root Container
+  description: The mother of all
+  is_system: Yes
+  acl:
+    everyone: 1
+  children:
+    - id: admintools
+      type: porcupine.apps.schema.admintools.AdminTools
+      name: Administrative Tools
+      is_system: Yes
+      acl: {}
+      children:
+        - id: users
+          type: porcupine.apps.schema.users.UsersContainer
+          name: Users & Groups
+          is_system: Yes
+          children:
+            - id: guest
+              name: Guest
+              description: Guest User
+              type: porcupine.apps.schema.users.Membership
+              is_system: Yes
+            - id: system
+              name: SYSTEM
+              description: System User
+              type: porcupine.apps.schema.users.SystemUser
+              is_system: Yes
+            - id: admin
+              name: admin
+              password: admin
+              type: porcupine.apps.schema.users.User
+            - id: everyone
+              name: Everyone Group
+              type: porcupine.apps.schema.groups.EveryoneGroup
+            - id: authusers
+              name: Authenticated Users
+              type: porcupine.apps.schema.groups.AuthUsersGroup
+            - id: administrators
+              name: Administrators
+              type: porcupine.apps.schema.groups.Group
+              members:
+                - admin
 
-items:
-  - id: ROOT
-    type: porcupine.apps.schema.root.Root
-    name: Root Container
-    description: The mother of all
-    is_system: Yes
-    acl:
-      everyone: 1
-    children:
-      - id: admintools
-        type: porcupine.apps.schema.admintools.AdminTools
-        name: Administrative Tools
-        is_system: Yes
-        acl: {}
-        children:
-          - id: users
-            type: porcupine.apps.schema.users.UsersContainer
-            name: Users & Groups
-            is_system: Yes
-            children:
-              - id: guest
-                name: Guest
-                description: Guest User
-                type: porcupine.apps.schema.users.Membership
-                is_system: Yes
-              - id: system
-                name: SYSTEM
-                description: System User
-                type: porcupine.apps.schema.users.SystemUser
-                is_system: Yes
-              - id: admin
-                name: admin
-                password: admin
-                type: porcupine.apps.schema.users.User
-              - id: everyone
-                name: Everyone Group
-                type: porcupine.apps.schema.groups.EveryoneGroup
-              - id: authusers
-                name: Authenticated Users
-                type: porcupine.apps.schema.groups.AuthUsersGroup
-              - id: administrators
-                name: Administrators
-                type: porcupine.apps.schema.groups.Group
-                members:
-                  - admin
-
-  - id: RB
-    type: porcupine.apps.schema.root.RecycleBin
-    name: Recycle Bin
-    is_system: Yes
-    acl: {}
+- id: RB
+  type: porcupine.apps.schema.root.RecycleBin
+  name: Recycle Bin
+  is_system: Yes
+  acl: {}
