@@ -16,7 +16,6 @@ class Container(Item):
     @cvar containment: a tuple of strings with all the content types of
                        Porcupine objects that this class instance can accept.
     @type containment: tuple
-    @type is_collection: bool
     """
     containment = (Shortcut, )
     items = Items()
@@ -61,10 +60,10 @@ class Container(Item):
                 item = item.get_target()
             return item
 
-    def get_child_by_id(self, oid, get_lock=True):
-        item = db.get_item(oid, get_lock)
+    async def get_child_by_id(self, oid):
+        item = await db.get_item(oid)
         if item is not None:
-            if item.parentid != self.id:
+            if item.parent_id != self.id:
                 return None
         return item
 

@@ -1,5 +1,6 @@
 from porcupine import context, exceptions
 from porcupine.utils import permissions
+from porcupine.core.services.schema import SchemaMaintenance
 from .mutable import Dictionary
 from .common import String
 from .reference import ReferenceN
@@ -21,6 +22,9 @@ class SchemaSignature(String):
     required = True
     readonly = True
     protected = True
+
+    async def on_change(self, instance, value, old_value):
+        await SchemaMaintenance.clean_schema(instance.id)
 
 
 class Children(ReferenceN):

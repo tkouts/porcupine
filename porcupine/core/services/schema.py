@@ -49,6 +49,11 @@ class SchemaMaintenance(AbstractService):
         task = CollectionSplitter(key, parts)
         await cls.queue.put(task)
 
+    @classmethod
+    async def clean_schema(cls, key):
+        task = SchemaCleaner(key)
+        await cls.queue.put(task)
+
 
 class SchemaMaintenanceTask:
     def __init__(self, key):
@@ -129,7 +134,7 @@ class CollectionSplitter(SchemaMaintenanceTask):
                 break
             else:
                 # wait for pending to complete and try again
-                print('failed to split')
+                # print('failed to split')
                 await asyncio.sleep(0.1)
         if chunks is not None:
             # add other chunks
@@ -140,3 +145,53 @@ class CollectionSplitter(SchemaMaintenanceTask):
             }
             await connector.upsert_multi(chunks)
             # TODO handle exceptions
+
+
+class SchemaCleaner(SchemaMaintenanceTask):
+    @staticmethod
+    def schema_updater(item_dict):
+        item = db.connector.persist.loads(item_dict)
+        item_schema = frozenset([key for key in item_dict.keys()
+                                 if not key.startswith('_')
+                                 and not key.endswith('_')])
+        current_schema = frozenset([dt.storage_key
+                                    for dt in item.__schema__.values()])
+        # remove old attributes
+        for_removal = item_schema.difference(current_schema)
+        # composite_pid = ':{}'.format(self.id)
+        for attr_name in for_removal:
+            # detect if it is composite attribute
+            attr_value = item_dict.pop(attr_name)
+            # if attr_value:
+            #     if isinstance(attr_value, str):
+            #         # is it an embedded data type?
+            #         item = db._db.get_item(attr_value)
+            #         if item is not None and item.parent_id == composite_pid:
+            #             Composition._remove_composite(item, True)
+            #     elif isinstance(attr_value, list):
+            #         # is it a composition data type?
+            #         item = db._db.get_item(attr_value[0])
+            #         if item is not None and item.parent_id == composite_pid:
+            #             items = db._db.get_multi(attr_value)
+            #             if all([item.parent_id == composite_pid
+            #                     for item in items]):
+            #                 for item in items:
+            #                     Composition._remove_composite(item, True)
+        # update sig
+        item_dict['sig'] = type(item).__sig__
+        # add cc back
+        item_dict['_cc'] = item.content_class
+        return item_dict, {}
+
+    async def execute(self):
+        # log.info('Cleaning schema of {0}'.format(self.key))
+        try:
+            success, _ = await db.connector.swap_if_not_modified(
+                self.key,
+                xform=self.schema_updater
+            )
+            if not success:
+                log.info('Failed to update schema of {0}'.format(self.key))
+        except exceptions.NotFound:
+            # the key is removed
+            pass

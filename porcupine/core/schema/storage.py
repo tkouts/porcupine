@@ -4,9 +4,9 @@ from namedlist import namedlist
 class Storage(namedlist('Storage', '')):
     __slots__ = ()
 
-    @property
-    def fields(self):
-        return self._fields
+    @classmethod
+    def fields(cls):
+        return getattr(cls, '_fields')
 
     def as_dict(self):
         return self._asdict()

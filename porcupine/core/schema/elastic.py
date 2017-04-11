@@ -83,11 +83,21 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         elif dict_storage['sig'] == self.__class__.__sig__:
             self.__storage__ = self.__record__(**dict_storage)
         else:
+            # construct new record that fits the new schema and the old one
+            field_spec = frozenset(self.__record__.fields() +
+                                   tuple(dict_storage.keys()))
+            record = storage(type(self).__name__, field_spec)
+            self.__storage__ = record(**dict_storage)
             # update storage with default values of added attributes
             self.__add_defaults()
-            # update sig to latest schema
-            with system_override():
-                self.sig = self.__class__.__sig__
+            # change sig to trigger schema update
+            try:
+                with system_override():
+                    self.sig = str(id(self))
+            except ValueError:
+                # running outside context
+                # possibly instantiated from schema maintenance service
+                pass
 
     @property
     def __snapshot__(self):
@@ -158,41 +168,3 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
         await self.update()
-
-    def update_schema(self):
-        schema = self.__schema__
-        new_sig = hash(tuple(schema.keys()))
-        if 'sig' not in self.__storage__ or self.__storage__['sig'] != new_sig:
-            item_schema = set(self.__storage__.keys())
-            current_schema = set(schema.keys())
-
-            for_addition = current_schema - item_schema
-            for attr_name in for_addition:
-                # add new attributes
-                value = getattr(self, attr_name)
-                # call event handlers
-                getattr(self.__class__, attr_name).on_create(self, value)
-
-            # remove old attributes
-            for_removal = item_schema - current_schema
-            composite_pid = ':{}'.format(self.id)
-            for attr_name in for_removal:
-                # detect if it is composite attribute
-                attr_value = self.__storage__.pop(attr_name)
-                if attr_value:
-                    if isinstance(attr_value, str):
-                        # is it an embedded data type?
-                        item = db._db.get_item(attr_value)
-                        if item is not None and item.parent_id == composite_pid:
-                            Composition._remove_composite(item, True)
-                    elif isinstance(attr_value, list):
-                        # is it a composition data type?
-                        item = db._db.get_item(attr_value[0])
-                        if item is not None and item.parent_id == composite_pid:
-                            items = db._db.get_multi(attr_value)
-                            if all([item.parent_id == composite_pid
-                                    for item in items]):
-                                for item in items:
-                                    Composition._remove_composite(item, True)
-            # [self._dict['bag'].pop(x) for x in for_removal]
-            self.__storage__['sig'] = new_sig
