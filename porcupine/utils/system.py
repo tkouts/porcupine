@@ -66,7 +66,7 @@ def hash_series(*args, using='md5'):
     b = cbor.dumps(args)
     hash_provider = getattr(hashlib, using)
     h = hash_provider(b)
-    return h
+    return h.hexdigest()
 
 
 def resolve_set(raw_string):

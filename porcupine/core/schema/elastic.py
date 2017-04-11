@@ -36,7 +36,7 @@ class ElasticMeta(type):
         cls.__schema__ = schema
         cls.__record__ = storage(cls.__name__, field_spec)
         cls.__ext_record__ = storage(cls.__name__, ext_spec)
-        cls.__sig__ = system.hash_series(*schema.keys()).hexdigest()
+        cls.__sig__ = system.hash_series(*schema.keys())
         super().__init__(name, bases, dct)
 
 

@@ -14,7 +14,7 @@ class SessionManager(AbstractSessionManager):
             session.id,
             session.user_id,
             self.secret,
-            using='sha3_256').hexdigest()
+            using='sha3_256')
 
     async def load(self, request):
         session = None

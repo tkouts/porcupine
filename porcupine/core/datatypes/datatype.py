@@ -108,7 +108,7 @@ class DataType:
             unique_key = '{0}/{1}/{2}'.format(
                 instance.__storage__.pid,
                 self.name,
-                hash_series(value).hexdigest())
+                hash_series(value))
             context.txn.insert_external(unique_key, instance.__storage__.id)
         if not instance.__is_new__:
             context.txn.mutate(instance, self.storage_key,
