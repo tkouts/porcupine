@@ -133,7 +133,10 @@ class Transaction:
             insertions.update({key: '' for key, exists in keys_exist
                                if not exists})
 
-        return insertions, upsertions
+        # deletions
+        deletions = self._deletions.keys()
+
+        return insertions, upsertions, deletions
 
     async def commit(self):
         """
@@ -141,7 +144,7 @@ class Transaction:
 
         @return: None
         """
-        insertions, upsertions = await self.prepare()
+        insertions, upsertions, deletions = await self.prepare()
         connector = self.connector
 
         tasks = []
@@ -171,6 +174,13 @@ class Transaction:
         # appends
         if self._appends:
             task = connector.append_multi(self._appends)
+            if isawaitable(task):
+                tasks.append(task)
+
+        # deletions
+        print(deletions)
+        if deletions:
+            task = connector.delete_multi(deletions)
             if isawaitable(task):
                 tasks.append(task)
 

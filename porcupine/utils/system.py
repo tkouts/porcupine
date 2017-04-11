@@ -15,7 +15,7 @@ VALID_ID_CHARS = [
 ]
 
 
-def generate_oid(length=8):
+def generate_oid(length: int=8) -> str:
     """
     Generates a random Object ID string.
 
@@ -25,7 +25,7 @@ def generate_oid(length=8):
 
 
 @functools.lru_cache()
-def get_rto_by_name(name):
+def get_rto_by_name(name: str):
     """
     This function returns a runtime object by name.
 
@@ -62,20 +62,20 @@ def get_rto_by_name(name):
         return mod
 
 
-def hash_series(*args, using='md5'):
+def hash_series(*args, using='md5') -> str:
     b = cbor.dumps(args)
     hash_provider = getattr(hashlib, using)
     h = hash_provider(b)
     return h.hexdigest()
 
 
-def get_key_of_unique(parent_id, attr_name, attr_value):
+def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
     return '{0}/{1}/{2}'.format(parent_id,
                                 attr_name,
                                 hash_series(attr_value))
 
 
-def resolve_set(raw_string):
+def resolve_set(raw_string: str) -> (list, float):
     # build set
     uniques = {}
     dirty_count = 0

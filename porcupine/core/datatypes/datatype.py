@@ -109,6 +109,12 @@ class DataType:
                                            self.name,
                                            value)
             context.txn.insert_external(unique_key, instance.__storage__.id)
+            if not instance.__is_new__:
+                # TODO: what if item is moved?
+                old_unique_key = get_key_of_unique(instance.__storage__.pid,
+                                                   self.name,
+                                                   old_value)
+                context.txn.delete_external(old_unique_key)
         if not instance.__is_new__:
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
