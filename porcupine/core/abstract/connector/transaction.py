@@ -152,7 +152,8 @@ class Transaction:
         if insertions:
             # first transaction phase - make sure all keys are non-existing
             # otherwise rollback successful insertions and raise
-            success, existing_key, inserted = await connector.insert_multi(insertions)
+            success, existing_key, inserted = \
+                await connector.insert_multi(insertions)
             if not success:
                 # rollback
                 if inserted:
@@ -178,7 +179,6 @@ class Transaction:
                 tasks.append(task)
 
         # deletions
-        print(deletions)
         if deletions:
             task = connector.delete_multi(deletions)
             if isawaitable(task):

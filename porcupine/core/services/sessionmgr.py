@@ -1,6 +1,7 @@
 """
 Session Manager Service
 """
+import asyncio
 from sanic import Blueprint
 from porcupine import log
 from porcupine.utils import system
@@ -24,7 +25,9 @@ async def add_session_to_request(request):
 async def save_session(request, response):
     session = request['session']
     if session.is_terminated:
-        await session_manager.remove(request, response)
+        _ = session_manager.remove(request, response)
+        if asyncio.iscoroutine(_):
+            await _
     elif session.is_dirty:
         # print('saving session')
         await session_manager.save(request, response)

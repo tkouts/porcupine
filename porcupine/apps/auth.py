@@ -1,4 +1,4 @@
-from sanic.response import json
+from sanic.response import json, redirect
 
 from porcupine import App
 from porcupine import db, context_user
@@ -23,3 +23,11 @@ async def auth_handler(request):
                 request.session['uid'] = user.id
                 return json(True)
         return json(False)
+
+
+@auth.route('/logout')
+async def logout(request):
+    request.session.terminate()
+    if 'redirect' in request.args:
+        return redirect(request.args['redirect'][0])
+    return json(True)
