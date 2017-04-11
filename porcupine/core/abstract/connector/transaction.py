@@ -50,6 +50,8 @@ class Transaction:
         self._items[item.id] = item
 
     def delete(self, item):
+        if item.id in self._items:
+            del self._items[item.id]
         self._deletions[item.id] = True
 
     def mutate(self, item, path, mutation_type, value):
