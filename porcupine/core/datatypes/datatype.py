@@ -5,8 +5,6 @@ from porcupine.utils.system import get_key_of_unique
 class DataType:
     """
     Base data type class.
-
-    Use this as a base class if you want to create your own custom data type.
     """
     required = False
     allow_none = False
@@ -35,11 +33,11 @@ class DataType:
     def validate_value(self, value, instance):
         if instance is not None:
             try:
-                is_system_update = context.is_system_update
+                system_override = context.system_override
             except ValueError:
                 # running outside the event loop, assume yes
-                is_system_update = True
-            if self.readonly and not is_system_update:
+                system_override = True
+            if self.readonly and not system_override:
                 raise AttributeError(
                     'Attribute {0} of {1} is readonly'.format(
                         self.name, instance.__class__.__name__))
@@ -96,8 +94,7 @@ class DataType:
         @return: None
         """
         if self.required and not value:
-            raise ValueError(
-                'Attribute {0} is mandatory.'.format(self.name))
+            raise ValueError('Attribute {0} is mandatory.'.format(self.name))
 
     def clone(self, instance, memo):
         pass
@@ -110,17 +107,19 @@ class DataType:
                                            value)
             context.txn.insert_external(unique_key, instance.__storage__.id)
             if not instance.__is_new__:
-                # TODO: what if item is moved?
-                old_unique_key = get_key_of_unique(instance.__storage__.pid,
-                                                   self.name,
-                                                   old_value)
+                old_unique_key = get_key_of_unique(
+                    instance.get_snapshot_of('pid'), self.name, old_value)
                 context.txn.delete_external(old_unique_key)
         if not instance.__is_new__:
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 
     def on_delete(self, instance, value, is_permanent):
-        pass
+        if self.unique:
+            unique_key = get_key_of_unique(instance.__storage__.pid,
+                                           self.name,
+                                           value)
+            context.txn.delete_external(unique_key)
 
     def on_undelete(self, instance, value):
         pass

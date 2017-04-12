@@ -1,9 +1,10 @@
-import time
+import datetime
 import copy
 
-from porcupine import exceptions
+from porcupine import db, context, exceptions, gather
+from porcupine.core.context import system_override
 from porcupine.datatypes import Embedded, Composition
-from porcupine.utils import system
+from porcupine.utils import system, permissions
 from .elastic import Elastic
 
 
@@ -315,53 +316,38 @@ class Removable(object):
     """
     __slots__ = ()
 
-    def _delete(self, _update_parent=True):
-        """
-        Deletes the item physically.
-
-        @return: None
-        """
-        db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-        if self.is_collection and self.children_count and \
-                (_update_parent or not db_supports_deep_indexing):
-            cursor = db._db.get_children(self._id, deep=db_supports_deep_indexing)
-            cursor.enforce_permissions = False
-            [child._delete(False) for child in cursor]
-            cursor.close()
-
-        db._db.handle_delete(self, True)
-        db._db.delete_item(self)
-
-        if _update_parent and not self._is_deleted:
-            # update container modification timestamp
-            parent = db._db.get_item(self._pid, get_lock=False)
-            if parent is not None:
-                # update parent
-                if self.is_collection:
-                    parent._nc.decr(1)
-                else:
-                    parent._ni.decr(1)
-                parent.modified = time.time()
-
-        db._db.handle_post_delete(self, True)
-
-    # @db.requires_transactional_context
-    def delete(self):
+    async def remove(self) -> None:
         """
         Deletes the item permanently.
 
         @return: None
         """
+        async def _delete(item):
+            if item.is_collection:
+                children = await item.get_children()
+                await gather(*[_delete(child) for child in children])
+            context.txn.delete(item)
+
         user = context.user
-        self_ = db._db.get_item(self.id)
+        user_role = await permissions.resolve(self, user)
+        can_delete = (
+            (user_role > permissions.AUTHOR) or
+            (user_role == permissions.AUTHOR and self.owner == user.id)
+        )
 
-        user_role = permsresolver.get_access(self_, user)
-        can_delete = (user_role > permsresolver.AUTHOR) or \
-                     (user_role == permsresolver.AUTHOR and self_._owner == user._id)
-
-        if not self_._is_system and can_delete:
-            # delete item physically
-            self_._delete()
+        if not self.is_system and can_delete:
+            # update container modification timestamp
+            with system_override():
+                parent = await db.connector.get(self.parent_id)
+                if parent is not None:
+                    # update parent
+                    if self.is_collection:
+                        parent.containers.remove(self)
+                    else:
+                        parent.items.remove(self)
+                    parent.modified = datetime.datetime.utcnow().isoformat()
+                    context.txn.upsert(parent)
+                await _delete(self)
         else:
             raise exceptions.Forbidden(
                 'The object was not deleted.\n'

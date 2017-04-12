@@ -209,7 +209,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
                     or ext_type.startswith(RelatorN.storage_info_prefix):
                 external_key = system.get_collection_key(self.key, ext_name,
                                                          active_chunk)
-                while db.connector.exists(external_key):
+                while (await db.connector.exists(external_key))[1]:
                     external_keys.append(external_key)
                     active_chunk -= 1
                     external_key = system.get_collection_key(

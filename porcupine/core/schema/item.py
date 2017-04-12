@@ -51,8 +51,9 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         return await resolve_deleted(self.parent_id)
 
     async def applied_acl(self):
-        if self.acl is not None or self.parent_id is None:
-            return self.acl
+        acl = self.get_snapshot_of('acl')
+        if acl is not None or self.parent_id is None:
+            return acl
         return await resolve_acl(self.parent_id)
 
     async def append_to(self, parent):
@@ -213,3 +214,8 @@ class Item(GenericItem):
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
         await self.update()
+
+    @db.transactional()
+    async def delete(self, request):
+        await self.remove()
+        return True

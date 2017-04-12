@@ -13,7 +13,7 @@ class PContext(Local):
             return None
 
     @property
-    def is_system_update(self):
+    def system_override(self):
         try:
             return self.__getattr__('__sys__')
         except AttributeError:

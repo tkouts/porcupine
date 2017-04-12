@@ -5,8 +5,7 @@ from functools import wraps
 from sanic.request import Request
 from sanic.blueprints import Blueprint
 
-from porcupine import context
-from porcupine import exceptions
+from porcupine import context, exceptions
 from porcupine.utils import permissions
 
 connector = None
@@ -31,6 +30,8 @@ async def get_item(item_id, quiet=True):
     if item is not None:
         is_deleted = await item.is_deleted()
         if not is_deleted:
+            if context.system_override:
+                return item
             access_level = await permissions.resolve(item, context.user)
             if access_level != permissions.NO_ACCESS:
                 return item
@@ -47,6 +48,9 @@ async def get_multi(ids):
         async for item in connector.get_multi(ids):
             is_deleted = await item.is_deleted()
             if not is_deleted:
+                if context.system_override:
+                    items.append(item)
+                    continue
                 access_level = await permissions.resolve(item, context.user)
                 if access_level != permissions.NO_ACCESS:
                     items.append(item)

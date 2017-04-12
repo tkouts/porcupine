@@ -249,6 +249,21 @@ class ReferenceN(Text, Acceptable):
             item_collection.remove(item)
         return added, removed
 
+    async def on_delete(self, instance, value, is_permanent):
+        super().on_delete(instance, value, is_permanent)
+        if is_permanent:
+            active_chunk_key = system.get_active_chunk_key(self.name)
+            active_chunk = getattr(instance.__storage__, active_chunk_key) - 1
+            if active_chunk > -1:
+                external_key = system.get_collection_key(instance.id,
+                                                         self.name,
+                                                         active_chunk)
+                while (await db.connector.exists(external_key))[1]:
+                    context.txn.delete_external(external_key)
+                    active_chunk -= 1
+                    external_key = system.get_collection_key(
+                        instance.id, self.name, active_chunk)
+
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
         if expand:

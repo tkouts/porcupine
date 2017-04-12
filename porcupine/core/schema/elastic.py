@@ -124,6 +124,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         for dt in to_add:
             dt.set_default(self)
 
+    def get_snapshot_of(self, attr_name):
+        return self.__snapshot__.get(attr_name,
+                                     getattr(self.__storage__, attr_name))
+
     def to_json(self):
         schema = list(self.__schema__.values())
         return {attr.name: attr.__get__(self, None)

@@ -7,7 +7,7 @@ from porcupine.utils import system
 
 
 class Transaction:
-    __slots__ = ('connector', 'options', '_items',
+    __slots__ = ('connector', 'options', '_items', '_deleted_items',
                  '_insertions', '_upsertions',
                  '_deletions', '_sd', '_appends')
 
@@ -16,6 +16,7 @@ class Transaction:
         self.connector.active_txns += 1
         self.options = options
         self._items = {}
+        self._deleted_items = {}
         self._insertions = {}
         self._upsertions = {}
         self._deletions = {}
@@ -26,12 +27,13 @@ class Transaction:
 
     def __contains__(self, key):
         return key in self._items \
+               or key in self._deleted_items \
                or key in self._insertions \
                or key in self._deletions \
                or key in self._upsertions
 
     def __getitem__(self, key):
-        if key in self._deletions:
+        if key in self._deletions or key in self._deleted_items:
             return None
         elif key in self._items:
             return self._items[key]
@@ -52,7 +54,7 @@ class Transaction:
     def delete(self, item):
         if item.id in self._items:
             del self._items[item.id]
-        self._deletions[item.id] = True
+        self._deleted_items[item.id] = item
 
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = (mutation_type, value)
@@ -86,7 +88,9 @@ class Transaction:
                 'A resource having an id of {0} already exists'.format(key))
 
     async def prepare(self):
-        # call changed attributes event handlers till snapshots are drained
+        deletions = []
+        # call event handlers
+        # till snapshots and deletions are drained
         while True:
             snapshots = {item.id: item.__snapshot__
                          for item in self._items.values()
@@ -94,8 +98,15 @@ class Transaction:
             # clear snapshots
             for item_id in snapshots:
                 self._items[item_id].__reset__()
-            # print(snapshots)
-            if snapshots:
+
+            removed_items = [item for item in self._deleted_items.values()]
+            deletions.extend(self._deleted_items.keys())
+
+            # clear deleted items
+            self._deleted_items = {}
+
+            print(snapshots, removed_items)
+            if snapshots or removed_items:
                 for item_id, snapshot in snapshots.items():
                     item = self._items[item_id]
                     for attr, old_value in snapshot.items():
@@ -103,14 +114,21 @@ class Transaction:
                             item.__class__, attr)
                         try:
                             storage = getattr(item, attr_def.storage)
-                            on_change = attr_def.on_change(
+                            _ = attr_def.on_change(
                                 item,
                                 getattr(storage, attr),
                                 old_value)
-                            if asyncio.iscoroutine(on_change):
-                                await on_change
+                            if asyncio.iscoroutine(_):
+                                await _
                         except exceptions.AttributeSetError as e:
                             raise exceptions.InvalidUsage(str(e))
+                for item in removed_items:
+                    for dt in item.__schema__.values():
+                        storage = getattr(item, dt.storage)
+                        value = getattr(storage, dt.storage_key)
+                        _ = dt.on_delete(item, value, True)
+                        if asyncio.iscoroutine(_):
+                            await _
             else:
                 break
 
@@ -136,7 +154,7 @@ class Transaction:
                                if not exists})
 
         # deletions
-        deletions = self._deletions.keys()
+        deletions.extend(self._deletions.keys())
 
         return insertions, upsertions, deletions
 
