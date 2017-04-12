@@ -1,6 +1,7 @@
 import datetime
 
 from porcupine import context, exceptions, db
+from porcupine.contract import contract
 from porcupine.datatypes import String, DateTime, Boolean, RelatorN, Integer
 from porcupine.core.datatypes.system import Acl
 from porcupine.core.context import system_override
@@ -198,3 +199,17 @@ class Item(GenericItem):
                         context.txn.upsert(parent)
             else:
                 raise exceptions.Forbidden('Forbidden')
+
+    # HTTP views
+    def get(self, request):
+        return self
+
+    @contract(accepts=dict)
+    @db.transactional()
+    async def patch(self, request):
+        for attr, value in request.json.items():
+            try:
+                setattr(self, attr, value)
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
+        await self.update()

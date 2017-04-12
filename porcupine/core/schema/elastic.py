@@ -1,6 +1,4 @@
-from porcupine import db, exceptions
 from porcupine import config
-from porcupine.contract import contract
 from porcupine.datatypes import DataType, String, ReferenceN
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.utils import system
@@ -156,16 +154,3 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         if kwargs:
             result.update(kwargs)
         return result
-
-    def get(self, request):
-        return self
-
-    @contract(accepts=dict)
-    @db.transactional()
-    async def patch(self, request):
-        for attr, value in request.json.items():
-            try:
-                setattr(self, attr, value)
-            except exceptions.AttributeSetError as e:
-                raise exceptions.InvalidUsage(str(e))
-        await self.update()
