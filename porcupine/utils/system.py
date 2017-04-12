@@ -69,10 +69,21 @@ def hash_series(*args, using='md5') -> str:
     return h.hexdigest()
 
 
+def get_blob_key(item_id: str, blob_name: str) -> str:
+    return '{0}/{1}'.format(item_id, blob_name)
+
+
+def get_active_chunk_key(collection_name: str) -> str:
+    return '{0}_'.format(collection_name)
+
+
+def get_collection_key(item_id: str, collection_name: str,
+                       chunk_no: int) -> str:
+    return '{0}/{1}/{2}'.format(item_id, collection_name, chunk_no)
+
+
 def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
-    return '{0}/{1}/{2}'.format(parent_id,
-                                attr_name,
-                                hash_series(attr_value))
+    return '{0}/{1}/{2}'.format(parent_id, attr_name, hash_series(attr_value))
 
 
 def resolve_set(raw_string: str) -> (list, float):

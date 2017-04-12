@@ -10,7 +10,7 @@ from .core.datatypes.mutable import List, Dictionary
 from .core.datatypes.reference import ReferenceN, Reference1
 from .core.datatypes.relator import Relator1, RelatorN
 from .core.datatypes.composition import Composition, Embedded
-from .core.datatypes.external import Text, File, ExternalFile
+from .core.datatypes.external import Blob, Text, File, ExternalFile
 
 __all__ = [
     'DataType',
@@ -20,5 +20,5 @@ __all__ = [
     'ReferenceN', 'Reference1',
     'Relator1', 'RelatorN',
     'Composition', 'Embedded',
-    'Text', 'File', 'ExternalFile'
+    'Blob', 'Text', 'File', 'ExternalFile'
 ]

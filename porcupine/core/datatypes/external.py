@@ -6,7 +6,8 @@ import os.path
 import shutil
 import asyncio
 
-from porcupine import db, context, exceptions
+from porcupine import db, context
+from porcupine.utils import system
 from .common import String
 from .datatype import DataType
 
@@ -54,7 +55,7 @@ class Blob(DataType):
         setattr(instance.__storage__, self.name, self.storage_info)
 
     def key_for(self, instance):
-        return '{0}/{1}'.format(instance.id, self.name)
+        return system.get_blob_key(instance.id, self.name)
 
     def snapshot(self, instance, new_value, old_value):
         if self.name not in instance.__snapshot__:

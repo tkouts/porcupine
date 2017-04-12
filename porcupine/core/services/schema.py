@@ -3,6 +3,7 @@ Schema maintenance service
 """
 import asyncio
 from porcupine import log, db, exceptions
+from porcupine.utils import system
 from .service import AbstractService
 
 
@@ -115,7 +116,7 @@ class CollectionSplitter(SchemaMaintenanceTask):
         # print('splitting collection', self.key)
         item_id, collection_name, chunk_no = self.key.split('/')
         chunk_no = int(chunk_no)
-        counter_path = '{0}_'.format(collection_name)
+        counter_path = system.get_active_chunk_key(collection_name)
         connector = db.connector
 
         # bump up active chunk number
@@ -143,55 +144,77 @@ class CollectionSplitter(SchemaMaintenanceTask):
                                      chunk_no + i + 1): chunk
                 for (i, chunk) in enumerate(chunks)
             }
-            await connector.upsert_multi(chunks)
             # TODO handle exceptions
+            await connector.upsert_multi(chunks)
 
 
 class SchemaCleaner(SchemaMaintenanceTask):
     @staticmethod
     def schema_updater(item_dict):
+        from porcupine.datatypes import Blob, ReferenceN, RelatorN
+
         item = db.connector.persist.loads(item_dict)
         item_schema = frozenset([key for key in item_dict.keys()
                                  if not key.startswith('_')
                                  and not key.endswith('_')])
         current_schema = frozenset([dt.storage_key
                                     for dt in item.__schema__.values()])
-        # remove old attributes
         for_removal = item_schema.difference(current_schema)
-        # composite_pid = ':{}'.format(self.id)
+        externals = {}
+        # remove old attributes
         for attr_name in for_removal:
             # detect if it is composite attribute
             attr_value = item_dict.pop(attr_name)
-            # if attr_value:
-            #     if isinstance(attr_value, str):
-            #         # is it an embedded data type?
-            #         item = db._db.get_item(attr_value)
-            #         if item is not None and item.parent_id == composite_pid:
-            #             Composition._remove_composite(item, True)
-            #     elif isinstance(attr_value, list):
-            #         # is it a composition data type?
-            #         item = db._db.get_item(attr_value[0])
-            #         if item is not None and item.parent_id == composite_pid:
-            #             items = db._db.get_multi(attr_value)
-            #             if all([item.parent_id == composite_pid
-            #                     for item in items]):
-            #                 for item in items:
-            #                     Composition._remove_composite(item, True)
+            if isinstance(attr_value, str):
+                if attr_value == Blob.storage_info:
+                    externals[attr_name] = (attr_value, None)
+                elif attr_value == ReferenceN.storage_info \
+                        or attr_value.startswith(RelatorN.storage_info_prefix):
+                    try:
+                        active_chunk_key = \
+                            system.get_active_chunk_key(attr_name)
+                        active_chunk = item_dict.pop(active_chunk_key)
+                    except KeyError:
+                        continue
+                    externals[attr_name] = (attr_value, active_chunk)
         # update sig
         item_dict['sig'] = type(item).__sig__
         # add cc back
         item_dict['_cc'] = item.content_class
-        return item_dict, {}
+        return item_dict, externals
 
     async def execute(self):
-        # log.info('Cleaning schema of {0}'.format(self.key))
+        from porcupine.datatypes import Blob, ReferenceN, RelatorN
+
         try:
-            success, _ = await db.connector.swap_if_not_modified(
+            success, externals = await db.connector.swap_if_not_modified(
                 self.key,
                 xform=self.schema_updater
             )
             if not success:
                 log.info('Failed to update schema of {0}'.format(self.key))
+                return
         except exceptions.NotFound:
             # the key is removed
-            pass
+            return
+
+        external_keys = []
+        for ext_name, ext_info in externals.items():
+            ext_type, active_chunk = ext_info
+            if ext_type == Blob.storage_info:
+                external_key = system.get_blob_key(self.key, ext_name)
+                if db.connector.exists(external_key):
+                    external_keys.append(external_key)
+            elif ext_type == ReferenceN.storage_info \
+                    or ext_type.startswith(RelatorN.storage_info_prefix):
+                external_key = system.get_collection_key(self.key, ext_name,
+                                                         active_chunk)
+                while db.connector.exists(external_key):
+                    external_keys.append(external_key)
+                    active_chunk -= 1
+                    external_key = system.get_collection_key(
+                        self.key, ext_name, active_chunk)
+
+        if external_keys:
+            # TODO handle exceptions
+            await db.connector.delete_multi(external_keys)

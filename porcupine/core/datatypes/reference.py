@@ -149,7 +149,8 @@ class ReferenceN(Text, Acceptable):
             current_size = len(value)
             chunks.append(value)
 
-        active_index = getattr(instance.__storage__, '{0}_'.format(self.name))
+        active_chunk_key = system.get_active_chunk_key(self.name)
+        active_index = getattr(instance.__storage__, active_chunk_key)
         if active_index > 0:
             # collection is split
             is_split = True
@@ -158,7 +159,7 @@ class ReferenceN(Text, Acceptable):
                 previous_chunk = await db.connector.get_external(
                     self.key_for(instance, chunk=active_index - 1))
                 if previous_chunk is not None:
-                    print(len(previous_chunk))
+                    # print(len(previous_chunk))
                     chunks.insert(0, previous_chunk)
                     active_index -= 1
                 else:
@@ -172,7 +173,8 @@ class ReferenceN(Text, Acceptable):
             # we need to maintain the collection
             key = self.key_for(instance)
             if current_size > split_threshold:
-                if not is_split and (current_size * (1 - dirtiness)) < split_threshold:
+                shd_compact = (current_size * (1 - dirtiness)) < split_threshold
+                if not is_split and shd_compact:
                     await SchemaMaintenance.compact_collection(key)
                 else:
                     parts = math.ceil(current_size / split_threshold)
@@ -200,15 +202,15 @@ class ReferenceN(Text, Acceptable):
             value = list(value)
         super().set_default(instance, value)
         # add active key index
-        active_key_index = '{0}_'.format(self.name)
-        setattr(instance.__storage__, active_key_index, 0)
+        active_chunk_key = system.get_active_chunk_key(self.name)
+        setattr(instance.__storage__, active_chunk_key, 0)
 
     def key_for(self, instance, chunk=None):
         if chunk is None:
             # return active chunk
-            active_key_index = '{0}_'.format(self.name)
-            chunk = getattr(instance.__storage__, active_key_index)
-        return '{0}/{1}/{2}'.format(instance.id, self.name, chunk)
+            active_chunk_key = system.get_active_chunk_key(self.name)
+            chunk = getattr(instance.__storage__, active_chunk_key)
+        return system.get_collection_key(instance.id, self.name, chunk)
 
     async def on_change(self, instance, value, old_value):
         # old_value is always None

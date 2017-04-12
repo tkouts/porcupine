@@ -1,7 +1,7 @@
 from porcupine import db, exceptions
 from porcupine import config
 from porcupine.contract import contract
-from porcupine.datatypes import DataType, Composition, String, ReferenceN
+from porcupine.datatypes import DataType, String, ReferenceN
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.utils import system
 from porcupine.core.context import system_override
@@ -27,7 +27,8 @@ class ElasticMeta(type):
                     attr.name = attr_name
                     field_spec.append(attr.storage_key)
                     if isinstance(attr, ReferenceN):
-                        field_spec.append('{0}_'.format(attr.storage_key))
+                        field_spec.append(
+                            system.get_active_chunk_key(attr.storage_key))
                         ext_spec.append(attr.storage_key)
                     if attr.indexed:
                         config.add_index(attr)
@@ -125,15 +126,15 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         for dt in to_add:
             dt.set_default(self)
 
-    def to_dict(self):
+    def to_json(self):
         schema = list(self.__schema__.values())
         return {attr.name: attr.__get__(self, None)
                 for attr in schema
                 if attr.protected is False
                 and attr.storage == '__storage__'}
 
-    # json serializer
-    toDict = to_dict
+    # ujson hook
+    toDict = to_json
 
     @property
     def content_class(self) -> str:
