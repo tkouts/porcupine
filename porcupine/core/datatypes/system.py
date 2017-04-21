@@ -1,8 +1,9 @@
 from porcupine import context, exceptions
-from porcupine.utils import permissions
+from porcupine.utils import permissions, system
 from porcupine.core.services.schema import SchemaMaintenance
 from .mutable import Dictionary
 from .common import String
+from .counter import Counter
 from .reference import ReferenceN
 
 
@@ -79,3 +80,32 @@ class Containers(Children):
             resolved = super().allowed_types
             self.accepts = tuple([x for x in resolved if x.is_collection])
         return self.accepts
+
+
+class Deleted(Counter):
+    ad_hoc = True
+
+    async def on_change(self, instance, value, old_value):
+        item_state = await super().on_change(instance, value, old_value)
+        if not instance.__is_new__:
+            if item_state == 1 or item_state == 0:
+                uniques = [dt for dt in instance.__schema__.values()
+                           if dt.unique]
+                unique_keys = []
+                for dt in uniques:
+                    storage = getattr(instance, dt.storage)
+                    unique_keys.append(system.get_key_of_unique(
+                        instance.__storage__.pid,
+                        dt.name,
+                        getattr(storage, dt.storage_key)
+                    ))
+                print(unique_keys)
+                if item_state == 1:
+                    # first time deletion
+                    for unique_key in unique_keys:
+                        context.txn.delete_external(unique_key)
+                elif item_state == 0:
+                    # item restoration
+                    for unique_key in unique_keys:
+                        context.txn.insert_external(unique_key,
+                                                    instance.__storage__.id)

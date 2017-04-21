@@ -15,11 +15,7 @@ class String(DataType):
 
 
 class Integer(DataType):
-    """Integer data type
-
-    @ivar value: The datatype's value
-    @type value: int
-    """
+    """Integer data type"""
     safe_type = int
 
     def __init__(self, default=0, **kwargs):
@@ -27,11 +23,7 @@ class Integer(DataType):
 
 
 class Float(DataType):
-    """Float data type
-
-    @ivar value: The datatype's value
-    @type value: float
-    """
+    """Float data type"""
     safe_type = float
 
     def __init__(self, default=0.0, **kwargs):
@@ -39,11 +31,7 @@ class Float(DataType):
 
 
 class Boolean(DataType):
-    """Boolean data type
-
-    @ivar value: The datatype's value
-    @type value: bool
-    """
+    """Boolean data type"""
     safe_type = bool
 
     def __init__(self, default=False, **kwargs):
@@ -63,13 +51,7 @@ class DateTime(Date):
 
 
 class Password(String):
-    """
-    Password data type.
-
-    This data type is actually storing MD5 hex digests
-    of the assigned string value.
-    """
-    digest_size = 32
+    """Password data type"""
     empty = hashlib.sha3_256(b'').hexdigest()
     protected = True
 

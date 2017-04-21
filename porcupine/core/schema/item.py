@@ -1,9 +1,9 @@
 import datetime
 
-from porcupine import context, exceptions, db
+from porcupine import context, exceptions, db, view
 from porcupine.contract import contract
-from porcupine.datatypes import String, DateTime, Boolean, RelatorN, Integer
-from porcupine.core.datatypes.system import Acl
+from porcupine.datatypes import String, DateTime, Boolean, RelatorN, Counter
+from porcupine.core.datatypes.system import Acl, Deleted
 from porcupine.core.context import system_override
 from porcupine.utils import permissions
 from porcupine.utils.system import resolve_acl, resolve_deleted
@@ -32,15 +32,17 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     @type description: L{String<porcupine.dt.String>}
     @type created: float
     """
+    is_collection = False
+
     # system attributes
-    is_collection = Boolean(readonly=True, store_as='col')
     created = DateTime(readonly=True, store_as='cr')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
     is_system = Boolean(readonly=True, store_as='sys')
     modified = DateTime(required=True, readonly=True, store_as='md')
-    deleted = Integer(readonly=True, store_as='dl')
+    deleted = Deleted(readonly=True, store_as='dl')
 
+    # common attributes
     name = String(required=True, unique=True)
     description = String(store_as='desc')
     acl = Acl(default=None)
@@ -71,8 +73,6 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
                 'or "move_to" methods instead.')
 
         if parent is not None:
-            # if isinstance(parent, str):
-            #     parent = await db.connector.get(parent)
             security = await parent.applied_acl()
         else:
             # add as root
@@ -84,7 +84,10 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
             raise exceptions.Forbidden(
                 'The user does not have write permissions '
                 'on the parent container.')
+        self._append_to(parent)
 
+    def _append_to(self, parent):
+        user = context.user
         with system_override():
             self.owner = user.id
             self.created = self.modified = \
@@ -146,18 +149,17 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         while parent.parent_id is not None:
             parent = await parent.get_parent()
             if parent is not None:
-                parents.append(parent)
+                parents.insert(0, parent)
             else:
                 # user has no access to parent
                 break
-        parents.reverse()
-        return ObjectSet(parents)
+        return parents
 
     async def full_path(self, include_self=True):
-        parents = await db.connector.get_multi(self._pids[1:])
+        parents = await self.get_all_parents()
+        if include_self and self.parent_id is not None:
+            parents.append(self)
         path = '/'.join([p.name for p in parents])
-        if include_self and self._pid is not None:
-            path = '%s/%s' % (path, self.name)
         return '/%s' % path if not path.startswith('/') else path
 
 
@@ -202,6 +204,17 @@ class Item(GenericItem):
                 raise exceptions.Forbidden('Forbidden')
 
     # HTTP views
+    @contract(accepts=bool)
+    @db.transactional()
+    async def recycled(self, request):
+        if request.json:
+            with system_override():
+                recycle_bin = await db.get_item('RB')
+            await self.recycle_to(recycle_bin)
+            return True
+        return False
+    recycled = view(put=recycled)
+
     def get(self, request):
         return self
 

@@ -39,11 +39,14 @@ context = PContext()
 
 
 class system_override:
+    def __init__(self):
+        self.override = context.system_override
+
     def __enter__(self):
         context.__sys__ = True
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        context.__sys__ = False
+        context.__sys__ = self.override
 
 
 def with_context(identity=None):

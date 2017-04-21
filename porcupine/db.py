@@ -28,10 +28,10 @@ async def get_item(item_id, quiet=True):
     """
     item = await connector.get(item_id, quiet=quiet)
     if item is not None:
+        if context.system_override:
+            return item
         is_deleted = await item.is_deleted()
         if not is_deleted:
-            if context.system_override:
-                return item
             access_level = await permissions.resolve(item, context.user)
             if access_level != permissions.NO_ACCESS:
                 return item
@@ -44,13 +44,14 @@ async def get_item(item_id, quiet=True):
 
 async def get_multi(ids):
     items = []
+    is_override = context.system_override
     if ids:
         async for item in connector.get_multi(ids):
+            if is_override:
+                items.append(item)
+                continue
             is_deleted = await item.is_deleted()
             if not is_deleted:
-                if context.system_override:
-                    items.append(item)
-                    continue
                 access_level = await permissions.resolve(item, context.user)
                 if access_level != permissions.NO_ACCESS:
                     items.append(item)

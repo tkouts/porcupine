@@ -323,6 +323,10 @@ class Removable(object):
         @return: None
         """
         async def _delete(item):
+            if item.is_system:
+                raise exceptions.Forbidden(
+                    'The object {0} is systemic and can not be removed.'
+                    .format(item.name))
             if item.is_collection:
                 children = await item.get_children()
                 await gather(*[_delete(child) for child in children])
@@ -335,141 +339,60 @@ class Removable(object):
             (user_role == permissions.AUTHOR and self.owner == user.id)
         )
 
-        if not self.is_system and can_delete:
-            # update container modification timestamp
+        if can_delete:
             with system_override():
-                parent = await db.connector.get(self.parent_id)
-                if parent is not None:
-                    # update parent
-                    if self.is_collection:
-                        parent.containers.remove(self)
-                    else:
-                        parent.items.remove(self)
-                    parent.modified = datetime.datetime.utcnow().isoformat()
-                    context.txn.upsert(parent)
+                if self.parent_id is not None:
+                    parent = await db.connector.get(self.parent_id)
+                    if parent is not None:
+                        # update parent
+                        if self.is_collection:
+                            parent.containers.remove(self)
+                        else:
+                            parent.items.remove(self)
+                        parent.modified = datetime.datetime.utcnow().isoformat()
+                        context.txn.upsert(parent)
                 await _delete(self)
         else:
             raise exceptions.Forbidden(
                 'The object was not deleted.\n'
                 'The user has insufficient permissions.')
 
-    def _recycle(self, _update_parent=True):
-        """
-        Deletes an item logically.
-        Bypasses security checks.
-
-        @return: None
-        """
-        is_deleted = self._is_deleted
-
-        if not is_deleted:
-            db._db.handle_delete(self, False)
-            # db._db.delete_item(self)
-
-        self._is_deleted = int(self._is_deleted) + 1
-        db._db.put_item(self)
-
-        if _update_parent:
-            # update parent
-            parent = db._db.get_item(self._pid, get_lock=False)
-            if self.is_collection:
-                parent._nc.decr(1)
-            else:
-                parent._ni.decr(1)
-            parent.modified = time.time()
-
-        if not is_deleted:
-            db._db.handle_post_delete(self, False)
-
-        db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-        if self.is_collection and self.children_count and \
-                (_update_parent or not db_supports_deep_indexing):
-            cursor = db._db.get_children(self._id, deep=db_supports_deep_indexing)
-            cursor.enforce_permissions = False
-            [child._recycle(False) for child in cursor]
-            cursor.close()
-
-    def _undelete(self, path_info=None):
-        """
-        Undeletes a logically deleted item.
-        Bypasses security checks.
-
-        @return: None
-        """
-        self._is_deleted = int(self._is_deleted) - 1
-        if not self._is_deleted:
-            db._db.handle_undelete(self)
-
-        if path_info is None:
-            # update parent
-            parent = db._db.get_item(self._pid, get_lock=False)
-            if self.is_collection:
-                parent._nc.incr(1)
-            else:
-                parent._ni.incr(1)
-            parent.modified = time.time()
-
-            # calculate path depth and destination _pids
-            path_depth = len(self._pids)
-            self._pids = parent._pids + [parent._id]
-            destination_pids = self._pids
-        else:
-            path_depth, destination_pids = path_info
-            # update parent ids
-            self._pids = destination_pids + self._pids[path_depth:]
-
-        db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-        if self.is_collection and self.children_count and \
-                (not path_info or not db_supports_deep_indexing):
-            cursor = db._db.get_children(self._id, deep=db_supports_deep_indexing)
-            cursor.enforce_permissions = False
-            [child._undelete((path_depth, destination_pids)) for child in cursor]
-            cursor.close()
-
-        db._db.put_item(self)
-
-    # @db.requires_transactional_context
-    def recycle(self, rb_id):
+    async def recycle_to(self, recycle_bin):
         """
         Moves the item to the specified recycle bin.
         The item then becomes inaccessible.
 
-        @param rb_id: The id of the destination container, which must be
-                      a L{RecycleBin} instance
-        @type rb_id: str
+        @param recycle_bin: The recycle bin container, which must be
+                            a L{RecycleBin} instance
+        @type recycle_bin: RecycleBin
         @return: None
         """
+        async def _recycle(item):
+            if item.is_system:
+                raise exceptions.Forbidden(
+                    'The object {0} is systemic and can not be recycled.'
+                    .format(item.name))
+            if item.is_collection:
+                children = await item.get_children()
+                await gather(*[_recycle(child) for child in children])
+
         user = context.user
-        self_ = db._db.get_item(self._id)
+        user_role = await permissions.resolve(self, user)
+        can_delete = (
+            (user_role > permissions.AUTHOR) or
+            (user_role == permissions.AUTHOR and self.owner == user.id)
+        )
 
-        user_role = permsresolver.get_access(self_, user)
-        can_delete = (user_role > permsresolver.AUTHOR) or \
-                     (user_role == permsresolver.AUTHOR and
-                      self_._owner == user._id)
-
-        if not self_._is_system and can_delete:
-            deleted = DeletedItem(self_)
-            deleted._owner = user._id
-            deleted._created = time.time()
-            deleted.modified_by = user.name
-            deleted.modified = time.time()
-            deleted._pid = rb_id
-
-            # check recycle bin's containment
-            recycle_bin = db._db.get_item(rb_id, get_lock=False)
-            if deleted.contentclass not in recycle_bin.containment:
-                raise exceptions.ContainmentError(
-                    'The target container does not accept '
-                    'objects of type\n"%s".'  % deleted.contentclass)
-
-            db._db.handle_update(deleted, None)
-            db._db.put_item(deleted)
-            db._db.handle_post_update(deleted, None)
-
-            recycle_bin._ni.incr(1)
-
-            # delete item logically
-            self_._recycle()
+        if can_delete:
+            from .recycle import DeletedItem
+            with system_override():
+                await _recycle(self)
+                deleted = DeletedItem(deleted_item=self)
+                deleted.location = await self.full_path(include_self=False)
+                await deleted.append_to(recycle_bin)
+                # mark as deleted
+                self.deleted += 1
+                context.txn.upsert(self)
         else:
             raise exceptions.Forbidden(
                 'The object was not deleted.\n'

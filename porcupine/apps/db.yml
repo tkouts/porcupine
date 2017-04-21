@@ -44,7 +44,7 @@
                 - admin
 
 - id: RB
-  type: porcupine.apps.schema.root.RecycleBin
+  type: porcupine.core.schema.recycle.RecycleBin
   name: Recycle Bin
   is_system: Yes
   acl: {}

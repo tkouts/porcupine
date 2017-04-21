@@ -2,7 +2,7 @@ import itertools
 from sanic.response import json
 from porcupine import db, view, gather, contract, exceptions, server
 from porcupine.core.datatypes.system import Items, Containers
-from porcupine.utils import permissions, system
+from porcupine.utils import system
 from .shortcut import Shortcut
 from .item import Item
 
@@ -17,13 +17,10 @@ class Container(Item):
                        Porcupine objects that this class instance can accept.
     @type containment: tuple
     """
+    is_collection = True
     containment = (Shortcut, )
     items = Items()
     containers = Containers()
-
-    def __init__(self, dict_storage=None):
-        super().__init__(dict_storage)
-        self.__storage__.col = True
 
     async def child_exists(self, name):
         """
