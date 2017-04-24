@@ -1,3 +1,5 @@
+import copy
+
 from porcupine import config
 from porcupine.datatypes import DataType, String, ReferenceN
 from porcupine.core.datatypes.system import SchemaSignature
@@ -98,6 +100,12 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 # possibly instantiated from schema maintenance service
                 pass
 
+    async def is_deleted(self):
+        return False
+
+    async def applied_acl(self):
+        return {}
+
     @property
     def __snapshot__(self):
         if self._snap is None:
@@ -125,8 +133,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             dt.set_default(self)
 
     def get_snapshot_of(self, attr_name):
-        return self.__snapshot__.get(attr_name,
-                                     getattr(self.__storage__, attr_name))
+        return self.__snapshot__.get(
+            attr_name,
+            getattr(self.__storage__, attr_name))
 
     def to_json(self):
         schema = list(self.__schema__.values())
@@ -158,3 +167,27 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         if kwargs:
             result.update(kwargs)
         return result
+
+    def clone(self, memo=None):
+        """
+        Creates an in-memory clone of the item.
+        This is a shallow copy operation meaning that the item's
+        references are not cloned.
+
+        @return: the cloned object
+        @rtype: L{Elastic}
+        """
+        if memo is None:
+            memo = {
+                '_dup_ext_': True,
+                '_id_map_': {}
+            }
+        new_id = memo['_id_map_'].get(self.id, system.generate_oid())
+        memo['_id_map_'][self.id] = new_id
+        clone = copy.deepcopy(self)
+        # call data types clone method
+        for dt in self.__schema__.values():
+            dt.clone(clone, memo)
+        with system_override():
+            clone.id = new_id
+        return clone

@@ -1,17 +1,17 @@
 import datetime
 
-from porcupine import context, exceptions, db, view
+from porcupine import context, exceptions, db
 from porcupine.contract import contract
-from porcupine.datatypes import String, DateTime, Boolean, RelatorN, Counter
-from porcupine.core.datatypes.system import Acl, Deleted
+from porcupine.datatypes import String, DateTime, Boolean, RelatorN
+from porcupine.core.datatypes.system import Acl
 from porcupine.core.context import system_override
 from porcupine.utils import permissions
-from porcupine.utils.system import resolve_acl, resolve_deleted
+from porcupine.utils.system import resolve_acl
 from .elastic import Elastic
-from .mixins import Cloneable, Movable, Removable
+from .mixins import Cloneable, Movable, Removable, Recyclable
 
 
-class GenericItem(Elastic, Cloneable, Movable, Removable):
+class GenericItem(Elastic, Removable):
     """
     Generic Item
     The base class of all Porcupine objects.
@@ -40,23 +40,28 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
     modified_by = String(required=True, readonly=True, store_as='mdby')
     is_system = Boolean(readonly=True, store_as='sys')
     modified = DateTime(required=True, readonly=True, store_as='md')
-    deleted = Deleted(readonly=True, store_as='dl')
 
     # common attributes
     name = String(required=True, unique=True)
     description = String(store_as='desc')
     acl = Acl(default=None)
 
-    async def is_deleted(self):
-        if self.deleted or self.parent_id is None:
-            return self.deleted
-        return await resolve_deleted(self.parent_id)
-
     async def applied_acl(self):
         acl = self.get_snapshot_of('acl')
         if acl is not None or self.parent_id is None:
             return acl
         return await resolve_acl(self.parent_id)
+
+    def clone(self, memo=None):
+        clone = super().clone(memo)
+        now = datetime.datetime.utcnow().isoformat()
+        user = context.user
+        with system_override():
+            clone.owner = user.id
+            clone.created = clone.modified = now
+            clone.parent_id = None
+            clone.modified_by = user.name
+        return clone
 
     async def append_to(self, parent):
         """
@@ -163,7 +168,7 @@ class GenericItem(Elastic, Cloneable, Movable, Removable):
         return '/%s' % path if not path.startswith('/') else path
 
 
-class Item(GenericItem):
+class Item(GenericItem, Cloneable, Movable, Recyclable):
     """
     Simple item with update capability.
 
@@ -204,17 +209,6 @@ class Item(GenericItem):
                 raise exceptions.Forbidden('Forbidden')
 
     # HTTP views
-    @contract(accepts=bool)
-    @db.transactional()
-    async def recycled(self, request):
-        if request.json:
-            with system_override():
-                recycle_bin = await db.get_item('RB')
-            await self.recycle_to(recycle_bin)
-            return True
-        return False
-    recycled = view(put=recycled)
-
     def get(self, request):
         return self
 
@@ -227,8 +221,3 @@ class Item(GenericItem):
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
         await self.update()
-
-    @db.transactional()
-    async def delete(self, request):
-        await self.remove()
-        return True

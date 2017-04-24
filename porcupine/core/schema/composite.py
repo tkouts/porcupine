@@ -1,5 +1,3 @@
-import copy
-
 from porcupine.datatypes import String
 from porcupine.utils import system
 from .elastic import Elastic
@@ -23,33 +21,8 @@ class Composite(Elastic):
     """
     name = String(required=True)
 
-    @property
-    def applied_acl(self):
-        return system.resolve_acl(self.parent_id[1:])
+    async def is_deleted(self):
+        return await system.resolve_deleted(self.parent_id[1:])
 
-    @property
-    def is_deleted(self):
-        return system.resolve_deleted(self.parent_id[1:])
-
-    def clone(self, memo=None):
-        """
-        Creates an in-memory clone of the item.
-        This is a shallow copy operation meaning that the item's
-        references are not cloned.
-
-        @return: the clone object
-        @rtype: L{GenericItem}
-        """
-        if memo is None:
-            memo = {
-                '_dup_ext_': True,
-                '_id_map_': {}
-            }
-        new_id = memo['_id_map_'].get(self.id, system.generate_oid())
-        memo['_id_map_'][self.id] = new_id
-        clone = copy.deepcopy(self)
-        # call data types clone method
-        for dt in self.__schema__.values():
-            dt.clone(clone, memo)
-        clone.id = new_id
-        return clone
+    async def applied_acl(self):
+        return await system.resolve_acl(self.parent_id[1:])

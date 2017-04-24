@@ -1,14 +1,15 @@
 import datetime
-import copy
 
-from porcupine import db, context, exceptions, gather
+from porcupine import db, context, exceptions, gather, view
+from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.datatypes import Embedded, Composition
+from porcupine.core.datatypes.system import Deleted
 from porcupine.utils import system, permissions
 from .elastic import Elastic
 
 
-class Cloneable(object):
+class Cloneable:
     """
     Adds cloning capabilities to Porcupine Objects.
 
@@ -124,37 +125,37 @@ class Cloneable(object):
     #         clone._ni = self._ni
     #         clone._nc = self._nc
 
-    def clone(self: Elastic, memo: dict = None):
-        """
-        Creates an in-memory clone of the item.
-        This is a shallow copy operation meaning that the item's
-        references are not cloned.
-
-        @param memo: internal helper object
-        @type memo: dict
-        @return: the clone object
-        @rtype: L{GenericItem}
-        """
-        if memo is None:
-            memo = {
-                '_dup_ext_': True,
-                '_id_map_': {}
-            }
-        new_id = memo['_id_map_'].get(self.id, system.generate_oid())
-        memo['_id_map_'][self.id] = new_id
-        clone = copy.deepcopy(self)
-        # call data types clone method
-        [dt.clone(clone, memo) for dt in self.__schema__.values()]
-        clone._id = new_id
-        now = time.time()
-        user = context.user
-        clone._owner = user.id
-        clone._created = now
-        clone._pid = None
-        clone._pids = []
-        clone.modified_by = user.name
-        clone.modified = now
-        return clone
+    # def clone(self: Elastic, memo: dict = None):
+    #     """
+    #     Creates an in-memory clone of the item.
+    #     This is a shallow copy operation meaning that the item's
+    #     references are not cloned.
+    #
+    #     @param memo: internal helper object
+    #     @type memo: dict
+    #     @return: the clone object
+    #     @rtype: L{GenericItem}
+    #     """
+    #     if memo is None:
+    #         memo = {
+    #             '_dup_ext_': True,
+    #             '_id_map_': {}
+    #         }
+    #     new_id = memo['_id_map_'].get(self.id, system.generate_oid())
+    #     memo['_id_map_'][self.id] = new_id
+    #     clone = copy.deepcopy(self)
+    #     # call data types clone method
+    #     [dt.clone(clone, memo) for dt in self.__schema__.values()]
+    #     clone._id = new_id
+    #     now = time.time()
+    #     user = context.user
+    #     clone._owner = user.id
+    #     clone._created = now
+    #     clone._pid = None
+    #     clone._pids = []
+    #     clone.modified_by = user.name
+    #     clone.modified = now
+    #     return clone
 
     # @db.requires_transactional_context
     def copy_to(self: Elastic, target):
@@ -203,7 +204,7 @@ class Cloneable(object):
                 'The user has insufficient permissions.')
 
 
-class Movable(object):
+class Movable:
     """
     Adds moving capabilities to Porcupine Objects.
 
@@ -212,18 +213,19 @@ class Movable(object):
     """
     __slots__ = ()
 
-    def _update_pids(self, path_info):
-        db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-        if self.children_count:
-            path_depth, destination_pids = path_info
-            cursor = db._db.get_children(self.id, deep=db_supports_deep_indexing)
-            cursor.enforce_permissions = False
-            for child in cursor:
-                child._pids = destination_pids + child._pids[path_depth:]
-                db._db.put_item(child)
-                if not db_supports_deep_indexing and child.is_collection:
-                    self._update_pids(path_info)
-            cursor.close()
+    # def _update_pids(self, path_info):
+    #     db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
+    #     if self.children_count:
+    #         path_depth, destination_pids = path_info
+    #         cursor = db._db.get_children(self.id,
+    #  deep=db_supports_deep_indexing)
+    #         cursor.enforce_permissions = False
+    #         for child in cursor:
+    #             child._pids = destination_pids + child._pids[path_depth:]
+    #             db._db.put_item(child)
+    #             if not db_supports_deep_indexing and child.is_collection:
+    #                 self._update_pids(path_info)
+    #         cursor.close()
 
     # @db.requires_transactional_context
     def move_to(self, target, inherit_roles=False):
@@ -304,7 +306,7 @@ class Movable(object):
                 'The user has insufficient permissions.')
 
 
-class Removable(object):
+class Removable:
     """
     Makes Porcupine objects removable.
 
@@ -357,6 +359,22 @@ class Removable(object):
                 'The object was not deleted.\n'
                 'The user has insufficient permissions.')
 
+    @db.transactional()
+    async def delete(self, request):
+        await self.remove()
+        return True
+
+
+class Recyclable:
+    __slots__ = ()
+
+    deleted = Deleted(readonly=True, store_as='dl')
+
+    async def is_deleted(self):
+        if self.deleted or self.parent_id is None:
+            return self.deleted
+        return await system.resolve_deleted(self.parent_id)
+
     async def recycle_to(self, recycle_bin):
         """
         Moves the item to the specified recycle bin.
@@ -397,3 +415,14 @@ class Removable(object):
             raise exceptions.Forbidden(
                 'The object was not deleted.\n'
                 'The user has insufficient permissions.')
+
+    @contract(accepts=bool)
+    @db.transactional()
+    async def recycled(self, request):
+        if request.json:
+            with system_override():
+                recycle_bin = await db.get_item('RB')
+            await self.recycle_to(recycle_bin)
+            return True
+        return False
+    recycled = view(put=recycled)

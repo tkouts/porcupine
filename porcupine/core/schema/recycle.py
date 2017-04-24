@@ -5,10 +5,9 @@ from porcupine import exceptions
 from porcupine.core.context import system_override
 from .item import GenericItem
 from .container import Container
-from .mixins import Removable
 
 
-class DeletedItem(GenericItem, Removable):
+class DeletedItem(GenericItem):
     del_id = String(readonly=True, required=True)
     location = String(readonly=True, required=True)
     name = String(required=True, unique=False)
@@ -34,7 +33,7 @@ class DeletedItem(GenericItem, Removable):
         deleted_item = await self.deleted_item()
         with system_override():
             deleted_item.deleted -= 1
-        context.txn.upsert(deleted_item)
+        await deleted_item.update()
         await self.remove()
 
     @contract(accepts=bool)
@@ -51,7 +50,7 @@ class DeletedItem(GenericItem, Removable):
         deleted_item = await self.deleted_item()
         if deleted_item is not None:
             await deleted_item.remove()
-        await self.remove()
+        await super().delete(request)
         return True
 
 
