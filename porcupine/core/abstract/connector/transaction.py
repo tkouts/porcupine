@@ -126,7 +126,7 @@ class Transaction:
                     for dt in item.__schema__.values():
                         storage = getattr(item, dt.storage)
                         value = getattr(storage, dt.storage_key)
-                        _ = dt.on_delete(item, value, True)
+                        _ = dt.on_delete(item, value)
                         if asyncio.iscoroutine(_):
                             await _
             else:

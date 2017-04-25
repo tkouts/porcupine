@@ -334,12 +334,15 @@ class Removable:
                 await gather(*[_delete(child) for child in children])
             context.txn.delete(item)
 
-        user = context.user
-        user_role = await permissions.resolve(self, user)
-        can_delete = (
-            (user_role > permissions.AUTHOR) or
-            (user_role == permissions.AUTHOR and self.owner == user.id)
-        )
+        if context.system_override:
+            can_delete = True
+        else:
+            user = context.user
+            user_role = await permissions.resolve(self, user)
+            can_delete = (
+                (user_role > permissions.AUTHOR) or
+                (user_role == permissions.AUTHOR and self.owner == user.id)
+            )
 
         if can_delete:
             with system_override():

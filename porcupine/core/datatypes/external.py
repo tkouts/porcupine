@@ -69,9 +69,8 @@ class Blob(DataType):
         if value is not None:
             context.txn.put_external(self.key_for(instance), value)
 
-    def on_delete(self, instance, value, is_permanent):
-        if is_permanent:
-            context.txn.delete_external(self.key_for(instance))
+    def on_delete(self, instance, value):
+        context.txn.delete_external(self.key_for(instance))
 
 
 class Text(Blob):
@@ -126,8 +125,8 @@ class ExternalFile(String):
             shutil.copyfile(old_filename, new_filename)
             self.__set__(instance, new_filename)
 
-    def on_delete(self, instance, value, is_permanent):
-        if is_permanent and self.remove_file_on_deletion:
+    def on_delete(self, instance, value):
+        if self.remove_file_on_deletion:
             try:
                 os.remove(value)
             except OSError:

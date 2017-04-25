@@ -115,7 +115,7 @@ class DataType:
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 
-    def on_delete(self, instance, value, is_permanent):
+    def on_delete(self, instance, value):
         if self.unique:
             unique_key = get_key_of_unique(instance.__storage__.pid,
                                            self.name,

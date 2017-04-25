@@ -3,6 +3,7 @@ Porcupine reference data types
 ==============================
 """
 from porcupine import exceptions, db, context
+from porcupine.core.context import system_override
 from .reference import Reference1, ReferenceN, ItemCollection, \
     ItemReference, Acceptable
 
@@ -97,24 +98,16 @@ class Relator1(Reference1, RelatorBase):
             if old_ref_item:
                 self.remove_reference(instance, old_ref_item)
 
-    # def on_delete(self, instance, value, is_permanent):
-    #     if not instance._is_deleted:
-    #         if value and self.respects_references:
-    #             raise exceptions.ReferentialIntegrityError(
-    #                 'Cannot delete object "{}" '.format(instance.name) +
-    #                 'because it is referenced by other objects.')
-    #         if self.cascade_delete:
-    #             db._db.get_item(value)._recycle()
-    #     if is_permanent and value:
-    #         if self.cascade_delete:
-    #             db._db.get_item(value)._delete()
-    #         else:
-    #             # remove reference
-    #             self._remove_reference(value, instance.id)
-    #
-    # def on_undelete(self, instance, value):
-    #     if self.cascade_delete:
-    #         db._db.get_item(value)._undelete()
+    async def on_delete(self, instance, value):
+        super().on_delete(instance, value)
+        if value:
+            ref_item = await db.connector.get(value)
+            if ref_item:
+                if self.cascade_delete:
+                    with system_override():
+                        await ref_item.remove()
+                else:
+                    self.remove_reference(instance, ref_item)
 
 
 class RelatorCollection(ItemCollection):
@@ -164,31 +157,23 @@ class RelatorN(ReferenceN, RelatorBase):
             return self
         return RelatorCollection(self, instance)
 
+    @property
+    def storage_info(self):
+        return '{0}:{1}'.format(self.storage_info_prefix, self.rel_attr)
+
     async def on_change(self, instance, value, old_value):
         added, _ = await super().on_change(instance, value, old_value)
         if instance.__is_new__:
             for item in added:
                 self.add_reference(instance, item)
 
-    @property
-    def storage_info(self):
-        return '{0}:{1}'.format(self.storage_info_prefix, self.rel_attr)
-
-    # def on_delete(self, instance, value, is_permanent):
-    #     if not instance._is_deleted:
-    #         if value and self.respects_references:
-    #             raise exceptions.ReferentialIntegrityError(
-    #                 'Cannot delete object "{}" '.format(instance.name) +
-    #                 'because it is being referenced by other objects.')
-    #         if self.cascade_delete:
-    #             [db._db.get_item(id)._recycle() for id in value]
-    #     if is_permanent:
-    #         if self.cascade_delete:
-    #             [db._db.get_item(id)._delete() for id in value]
-    #         else:
-    #             # remove all references
-    #             self._remove_references(value, instance.id)
-    #
-    # def on_undelete(self, instance, value):
-    #     if self.cascade_delete:
-    #         [db._db.get_item(oid)._undelete() for oid in value]
+    async def on_delete(self, instance, value):
+        ref_ids = await self.fetch(instance, set_storage=False)
+        async for ref_item in db.connector.get_multi(ref_ids):
+            if self.cascade_delete:
+                with system_override():
+                    await ref_item.remove()
+            else:
+                self.remove_reference(instance, ref_item)
+        # remove collection documents
+        await super().on_delete(instance, value)
