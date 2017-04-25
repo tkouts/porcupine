@@ -28,49 +28,14 @@ class Shortcut(Item):
     def create(target):
         """Helper method for creating shortcuts of items.
 
-        @param target: The id of the item or the item object itself
-        @type target: str OR L{Item}
+        @param target: The target item
+        @type target: L{Item}
         @return: L{Shortcut}
         """
-        if isinstance(target, str):
-            target = db.connector.get(target)
         shortcut = Shortcut()
         shortcut.name = target.name
         shortcut.target = target.id
         return shortcut
-
-    async def append_to(self, parent):
-        if self.target:
-            target = await self.get_target()
-            if target.is_collection:
-                containment_dt = parent.__class__.containers
-            else:
-                containment_dt = parent.__class__.items
-            if not containment_dt.accepts_item(target):
-                raise exceptions.ContainmentError(parent, 'children', target)
-        return await super().append_to(parent)
-
-    async def copy_to(self, target_container):
-        target = await self.get_target()
-        if target.is_collection:
-            containment_dt = target_container.__class__.containers
-        else:
-            containment_dt = target_container.__class__.items
-        if not containment_dt.accepts_item(target):
-            raise exceptions.ContainmentError(target_container,
-                                              'children', target)
-        return super().copy_to(target_container)
-
-    async def move_to(self, target_container, inherit_roles=False):
-        target = await self.get_target()
-        if target.is_collection:
-            containment_dt = target_container.__class__.containers
-        else:
-            containment_dt = target_container.__class__.items
-        if not containment_dt.accepts_item(target):
-            raise exceptions.ContainmentError(target_container,
-                                              'children', target)
-        return super().move_to(target_container, inherit_roles)
 
     async def update(self):
         parent = await db.connector.get(self.parent_id)

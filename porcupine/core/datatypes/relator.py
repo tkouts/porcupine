@@ -21,14 +21,14 @@ class RelatorBase(Acceptable):
             self.respects_references = kwargs['respects_references']
         self.name = None
 
-    def add_reference(self, instance, item):
-        if not self.accepts_item(item):
+    async def add_reference(self, instance, item):
+        if not await self.accepts_item(item):
             raise exceptions.ContainmentError(instance,
                                               self.name, item)
         rel_attr_value = getattr(item, self.rel_attr)
         if isinstance(rel_attr_value, RelatorCollection):
             # call super add to avoid recursion
-            super(RelatorCollection, rel_attr_value).add(instance)
+            await super(RelatorCollection, rel_attr_value).add(instance)
         elif isinstance(rel_attr_value, RelatorItem):
             setattr(item, self.rel_attr, instance.id)
             # if not item.__is_new__:
@@ -92,7 +92,7 @@ class Relator1(Reference1, RelatorBase):
     async def on_change(self, instance, value, old_value):
         ref_item = await super().on_change(instance, value, old_value)
         if ref_item:
-            self.add_reference(instance, ref_item)
+            await self.add_reference(instance, ref_item)
         if old_value:
             old_ref_item = await db.connector.get(old_value)
             if old_ref_item:
@@ -116,9 +116,9 @@ class RelatorCollection(ItemCollection):
         return [item for item in items
                 if self._desc.rel_attr in item.__schema__]
 
-    def add(self, item):
-        super().add(item)
-        self._desc.add_reference(self._inst, item)
+    async def add(self, item):
+        await super().add(item)
+        await self._desc.add_reference(self._inst, item)
 
     def remove(self, item):
         super().remove(item)
@@ -165,7 +165,7 @@ class RelatorN(ReferenceN, RelatorBase):
         added, _ = await super().on_change(instance, value, old_value)
         if instance.__is_new__:
             for item in added:
-                self.add_reference(instance, item)
+                await self.add_reference(instance, item)
 
     async def on_delete(self, instance, value):
         ref_ids = await self.fetch(instance, set_storage=False)

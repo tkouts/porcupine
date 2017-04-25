@@ -27,7 +27,7 @@ class Acceptable:
             self.accepts_resolved = True
         return self.accepts
 
-    def accepts_item(self, item):
+    async def accepts_item(self, item) -> bool:
         return isinstance(item, self.allowed_types)
 
 
@@ -78,7 +78,7 @@ class Reference1(String, Acceptable):
             except (NotFound, Forbidden):
                 # TODO: change wording
                 raise InvalidUsage('Invalid item {0}'.format(value))
-            if not self.accepts_item(ref_item):
+            if not await self.accepts_item(ref_item):
                 raise ContainmentError(instance, self.name, ref_item)
             return ref_item
 
@@ -112,8 +112,8 @@ class ItemCollection:
     async def items(self):
         return await db.get_multi(await self.get())
 
-    def add(self, item):
-        if not self._desc.accepts_item(item):
+    async def add(self, item):
+        if not await self._desc.accepts_item(item):
             raise ContainmentError(self._inst, self._desc.name, item)
         if self._inst.__is_new__:
             storage = getattr(self._inst, self._desc.storage)
@@ -227,7 +227,7 @@ class ReferenceN(Text, Acceptable):
                 ref_items = await db.get_multi(value)
                 # check containment
                 for item in ref_items:
-                    if not self.accepts_item(item):
+                    if not await self.accepts_item(item):
                         raise ContainmentError(instance, self.name, item)
                 if ref_items:
                     # write external
@@ -252,7 +252,7 @@ class ReferenceN(Text, Acceptable):
         removed = await db.get_multi(removed_ids)
         item_collection = getattr(instance, self.name)
         for item in added:
-            item_collection.add(item)
+            await item_collection.add(item)
         for item in removed:
             item_collection.remove(item)
         return added, removed

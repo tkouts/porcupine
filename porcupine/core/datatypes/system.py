@@ -1,9 +1,11 @@
-from porcupine import context, exceptions
+from porcupine import context, exceptions, db
 from porcupine.utils import permissions, system
 from porcupine.core.services.schema import SchemaMaintenance
 from .mutable import Dictionary
 from .common import String, Boolean
 from .reference import ReferenceN
+
+Shortcut = None
 
 
 class Acl(Dictionary):
@@ -44,11 +46,18 @@ class Children(ReferenceN):
             return self
         return super().__get__(instance, owner)
 
-    def accepts_item(self, item):
+    async def accepts_item(self, item):
+        global Shortcut
+        if Shortcut is None:
+            from porcupine.schema import Shortcut
         if context.user.id == 'system':
             # allow for system
             return True
-        return super().accepts_item(item)
+        if isinstance(item, Shortcut):
+            target = await db.connector.get(item.target)
+            if target:
+                await super().accepts_item(target)
+        return await super().accepts_item(item)
 
     # HTTP views
 

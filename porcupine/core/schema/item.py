@@ -77,22 +77,19 @@ class GenericItem(Elastic, Removable):
                 'Object already exists. Use "copy_to" '
                 'or "move_to" methods instead.')
 
-        if parent is not None:
-            security = await parent.applied_acl()
-        else:
-            # add as root
-            security = {}
-
         user = context.user
-        user_role = await permissions.resolve_acl(security, user)
-        if user_role == permissions.READER:
-            raise exceptions.Forbidden(
-                'The user does not have write permissions '
-                'on the parent container.')
-        self._append_to(parent)
+        if not context.system_override:
+            if parent is not None:
+                security = await parent.applied_acl()
+            else:
+                # add as root
+                security = {}
+            user_role = await permissions.resolve_acl(security, user)
+            if user_role == permissions.READER:
+                raise exceptions.Forbidden(
+                    'The user does not have write permissions '
+                    'on the parent container.')
 
-    def _append_to(self, parent):
-        user = context.user
         with system_override():
             self.owner = user.id
             self.created = self.modified = \
@@ -104,23 +101,28 @@ class GenericItem(Elastic, Removable):
             context.txn.insert(self)
             if parent is not None:
                 if self.is_collection:
-                    parent.containers.add(self)
+                    await parent.containers.add(self)
                 else:
-                    parent.items.add(self)
+                    await parent.items.add(self)
                 parent.modified = self.modified
                 context.txn.upsert(parent)
 
-    def is_contained_in(self, item_id: str) -> bool:
+    async def is_contained_in(self, item) -> bool:
         """
         Checks if the item is contained in the specified container.
 
-        @param item_id: The id of the container
-        @type item_id: str
+        @param item: The item to check against
+        @type item: Elastic
         @rtype: bool
         """
-        return item_id == self.id or item_id in self._pids
+        parent = await self.get_parent()
+        while parent:
+            if parent.id == item.id:
+                return True
+            parent = await parent.get_parent()
+        return False
 
-    async def get_parent(self):
+    async def get_parent(self) -> Elastic:
         """
         Returns the parent container
 

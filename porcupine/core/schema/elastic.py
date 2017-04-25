@@ -9,7 +9,6 @@ from .storage import storage
 
 
 class ElasticMeta(type):
-
     def __new__(mcs, name, bases, dct):
         if '__slots__' not in dct:
             dct['__slots__'] = ()

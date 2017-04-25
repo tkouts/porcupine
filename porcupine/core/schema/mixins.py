@@ -213,97 +213,65 @@ class Movable:
     """
     __slots__ = ()
 
-    # def _update_pids(self, path_info):
-    #     db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-    #     if self.children_count:
-    #         path_depth, destination_pids = path_info
-    #         cursor = db._db.get_children(self.id,
-    #  deep=db_supports_deep_indexing)
-    #         cursor.enforce_permissions = False
-    #         for child in cursor:
-    #             child._pids = destination_pids + child._pids[path_depth:]
-    #             db._db.put_item(child)
-    #             if not db_supports_deep_indexing and child.is_collection:
-    #                 self._update_pids(path_info)
-    #         cursor.close()
-
-    # @db.requires_transactional_context
-    def move_to(self, target, inherit_roles=False):
+    async def move_to(self, target) -> None:
         """
         Moves the item to the designated target.
 
-        @param target: The id of the target container or the container object
-                       itself
-        @type target: str OR L{Container}
+        @param target: The target container
+        @type target: L{Container}
         @return: None
-        @raise L{porcupine.exceptions.ObjectNotFound}:
-            If the target container does not exist.
         """
+        if self.is_system:
+            raise exceptions.Forbidden(
+                'The object {0} is systemic and can not be moved'
+                .format(self.name))
+
         user = context.user
-        user_role = permsresolver.get_access(self, user)
-        can_move = user_role > permsresolver.AUTHOR \
-            or (user_role == permsresolver.AUTHOR and self.owner == user.id)
+        user_role = await permissions.resolve(self, user)
+        can_move = (
+            (user_role > permissions.AUTHOR) or
+            (user_role == permissions.AUTHOR and self.owner == user.id)
+        )
+        user_role2 = await permissions.resolve(target, user)
 
-        parent_id = self._pid
-        if isinstance(target, (str, bytes)):
-            target = db._db.get_item(target, get_lock=False)
-
-        if target is None or target._is_deleted:
-            raise exceptions.ObjectNotFound(
-                'The target container does not exist.')
-
-        content_class = self.contentclass
-
-        user_role2 = permsresolver.get_access(target, user)
-
-        if self.is_collection and target.is_contained_in(self.id):
-            raise exceptions.ContainmentError(
-                'Cannot move item to destination.\n'
+        if self.is_collection and await target.is_contained_in(self):
+            raise exceptions.InvalidUsage(
+                'Cannot move item to destination. '
                 'The destination is contained in the source.')
 
-        if not self._is_system and can_move and user_role2 > permsresolver.READER:
-            if content_class not in target.containment:
-                raise exceptions.ContainmentError(
-                    'The target container does not accept '
-                    'objects of type\n"%s".' % content_class)
+        if can_move and user_role2 > permissions.READER:
+            with system_override():
+                now = datetime.datetime.utcnow().isoformat()
+                parent_id = self.parent_id
+                self.parent_id = target.id
+                self.modified = now
+                parent = await db.connector.get(parent_id)
 
-            # db._db.delete_item(self)
-            old_item = db._db.get_item(self._id)
-            self._pid = target.id
-            self._pids = target._pids + [target.id]
+                # update target and parent
+                if self.is_collection:
+                    await target.containers.add(self)
+                    parent.containers.remove(self)
+                else:
+                    await target.items.add(self)
+                    parent.items.remove(self)
 
-            # calculate path depth and destination _pids
-            path_info = (len(old_item._pids), self._pids)
-
-            if inherit_roles:
-                self.inherit_roles = True
-                if target.security != self.security:
-                    self._apply_security(target, False)
-            else:
-                self.inherit_roles = False
-            self.modified = time.time()
-
-            db._db.handle_update(self, old_item)
-            db._db.put_item(self)
-
-            parent = db._db.get_item(parent_id, get_lock=False)
-            # update target and parent
-            if self.is_collection:
-                target._nc.incr(1)
-                parent._nc.decr(1)
-            else:
-                target._ni.incr(1)
-                parent._ni.decr(1)
-            target.modified = time.time()
-            parent.modified = time.time()
-            db._db.handle_post_update(self, old_item)
-
-            if self.is_collection:
-                self._update_pids(path_info)
+                target.modified = now
+                parent.modified = now
+                context.txn.upsert(self)
+                context.txn.upsert(parent)
+                context.txn.upsert(target)
         else:
             raise exceptions.Forbidden(
                 'The object was not moved.\n'
                 'The user has insufficient permissions.')
+
+    @contract(accepts=str)
+    @db.transactional()
+    async def parent(self, request):
+        target = await db.get_item(request.json, quiet=False)
+        await self.move_to(target)
+        return True
+    parent = view(put=parent)
 
 
 class Removable:
@@ -327,40 +295,37 @@ class Removable:
         async def _delete(item):
             if item.is_system:
                 raise exceptions.Forbidden(
-                    'The object {0} is systemic and can not be removed.'
+                    'The object {0} is systemic and can not be removed'
                     .format(item.name))
             if item.is_collection:
                 children = await item.get_children()
                 await gather(*[_delete(child) for child in children])
             context.txn.delete(item)
 
-        if context.system_override:
-            can_delete = True
-        else:
+        if not context.system_override:
             user = context.user
             user_role = await permissions.resolve(self, user)
             can_delete = (
                 (user_role > permissions.AUTHOR) or
                 (user_role == permissions.AUTHOR and self.owner == user.id)
             )
+            if not can_delete:
+                raise exceptions.Forbidden(
+                    'The object was not deleted.\n'
+                    'The user has insufficient permissions.')
 
-        if can_delete:
-            with system_override():
-                if self.parent_id is not None:
-                    parent = await db.connector.get(self.parent_id)
-                    if parent is not None:
-                        # update parent
-                        if self.is_collection:
-                            parent.containers.remove(self)
-                        else:
-                            parent.items.remove(self)
-                        parent.modified = datetime.datetime.utcnow().isoformat()
-                        context.txn.upsert(parent)
-                await _delete(self)
-        else:
-            raise exceptions.Forbidden(
-                'The object was not deleted.\n'
-                'The user has insufficient permissions.')
+        with system_override():
+            if self.parent_id is not None:
+                parent = await db.connector.get(self.parent_id)
+                if parent is not None:
+                    # update parent
+                    if self.is_collection:
+                        parent.containers.remove(self)
+                    else:
+                        parent.items.remove(self)
+                    parent.modified = datetime.datetime.utcnow().isoformat()
+                    context.txn.upsert(parent)
+            await _delete(self)
 
     @db.transactional()
     async def delete(self, request):
@@ -384,7 +349,7 @@ class Recyclable:
         async def _recycle(item):
             if item.is_system:
                 raise exceptions.Forbidden(
-                    'The object {0} is systemic and can not be recycled.'
+                    'The object {0} is systemic and can not be recycled'
                     .format(item.name))
             if item.is_collection:
                 children = await item.get_children()

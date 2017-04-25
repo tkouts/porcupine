@@ -28,7 +28,7 @@ class DeletedItem(GenericItem):
             raise exceptions.InvalidUsage(
                 'Cannot directly append this item. '
                 'Use the "recycle" method instead.')
-        self._append_to(recycle_bin)
+        await super().append_to(recycle_bin)
 
     async def restore(self):
         deleted_item = await self.deleted_item()
