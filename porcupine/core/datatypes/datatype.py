@@ -69,7 +69,8 @@ class DataType:
         if value is None:
             value = self._default
         storage = getattr(instance, self.storage)
-        self.snapshot(instance, value, getattr(storage, self.storage_key))
+        # add to snapshot in order to validate
+        instance.__snapshot__[self.storage_key] = value
         setattr(storage, self.storage_key, value)
 
     def snapshot(self, instance, new_value, previous_value):

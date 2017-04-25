@@ -40,13 +40,14 @@ class Shortcut(Item):
         return shortcut
 
     async def append_to(self, parent):
-        target = await self.get_target()
-        if target.is_collection:
-            containment_dt = parent.__class__.containers
-        else:
-            containment_dt = parent.__class__.items
-        if not containment_dt.accepts_item(target):
-            raise exceptions.ContainmentError(parent, 'children', target)
+        if self.target:
+            target = await self.get_target()
+            if target.is_collection:
+                containment_dt = parent.__class__.containers
+            else:
+                containment_dt = parent.__class__.items
+            if not containment_dt.accepts_item(target):
+                raise exceptions.ContainmentError(parent, 'children', target)
         return await super().append_to(parent)
 
     async def copy_to(self, target_container):

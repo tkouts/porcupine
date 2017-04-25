@@ -9,7 +9,7 @@ from porcupine.utils import system
 class Transaction:
     __slots__ = ('connector', 'options', '_items', '_deleted_items',
                  '_insertions', '_upsertions',
-                 '_deletions', '_sd', '_appends', '_ad_hoc_mutations')
+                 '_deletions', '_sd', '_appends')
 
     def __init__(self, connector, **options):
         self.connector = connector
@@ -24,9 +24,6 @@ class Transaction:
         # sub document mutations
         self._sd = defaultdict(dict)
         self._appends = defaultdict(str)
-
-        # ad hoc counters
-        self._ad_hoc_mutations = defaultdict(dict)
 
     def __contains__(self, key):
         return key in self._items \
@@ -59,12 +56,7 @@ class Transaction:
             del self._items[item.id]
         self._deleted_items[item.id] = item
 
-    def mutate(self, item, path, mutation_type, value, ad_hoc=False):
-        if ad_hoc and mutation_type == self.connector.SUB_DOC_COUNTER:
-            self._ad_hoc_mutations[item.id][path] = (mutation_type, -value)
-            return self.connector.mutate_in(item.id, {
-                path: (mutation_type, value)
-            })
+    def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = (mutation_type, value)
 
     def append(self, key, value):
@@ -179,26 +171,13 @@ class Transaction:
         # insertions
         if insertions:
             # first transaction phase - make sure all keys are non-existing
-            # otherwise rollback and raise
+            # otherwise rollback successful insertions and raise
             success, existing_key, inserted = \
                 await connector.insert_multi(insertions)
             if not success:
                 # rollback
-                rollback_tasks = []
                 if inserted:
-                    task = connector.delete_multi(inserted)
-                    if isawaitable(task):
-                        tasks.append(task)
-                for item_id, mutations in self._ad_hoc_mutations.items():
-                    task = connector.mutate_in(item_id, mutations)
-                    if isawaitable(task):
-                        tasks.append(task)
-                if rollback_tasks:
-                    completed, _ = await asyncio.wait(rollback_tasks)
-                    errors = [task.exception() for task in rollback_tasks]
-                    if any(errors):
-                        # TODO: log errors
-                        pass
+                    await connector.delete_multi(inserted)
                 self.raise_exists(existing_key)
 
         # upsertions

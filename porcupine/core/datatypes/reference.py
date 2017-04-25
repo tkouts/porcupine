@@ -87,6 +87,13 @@ class Reference1(String, Acceptable):
             value = super().__get__(instance, None)
             super().__set__(instance, memo['_id_map_'].get(value, value))
 
+    async def get(self, instance, request, expand=False):
+        expand = expand or 'expand' in request.args
+        value = super().get(instance, request)
+        if expand:
+            return await value.item()
+        return value
+
 
 class ItemCollection:
     __slots__ = ('_desc', '_inst')

@@ -21,8 +21,5 @@ class Composite(Elastic):
     """
     name = String(required=True)
 
-    async def is_deleted(self):
-        return await system.resolve_deleted(self.parent_id[1:])
-
     async def applied_acl(self):
-        return await system.resolve_acl(self.parent_id[1:])
+        return await system.resolve_acl(self.parent_id)

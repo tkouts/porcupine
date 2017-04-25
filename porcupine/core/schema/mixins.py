@@ -368,13 +368,6 @@ class Removable:
 class Recyclable:
     __slots__ = ()
 
-    deleted = Deleted(readonly=True, store_as='dl')
-
-    async def is_deleted(self):
-        if self.deleted or self.parent_id is None:
-            return self.deleted
-        return await system.resolve_deleted(self.parent_id)
-
     async def recycle_to(self, recycle_bin):
         """
         Moves the item to the specified recycle bin.
@@ -409,7 +402,7 @@ class Recyclable:
                 deleted.location = await self.full_path(include_self=False)
                 await deleted.append_to(recycle_bin)
                 # mark as deleted
-                self.deleted += 1
+                self.deleted = True
                 context.txn.upsert(self)
         else:
             raise exceptions.Forbidden(
