@@ -1,6 +1,8 @@
 from porcupine import context, exceptions, db
+from porcupine.contract import contract
 from porcupine.utils import permissions, system
 from porcupine.core.services.schema import SchemaMaintenance
+from porcupine.core.context import system_override
 from .mutable import Dictionary
 from .common import String, Boolean
 from .reference import ReferenceN
@@ -91,6 +93,8 @@ class Containers(Children):
 
 
 class Deleted(Boolean):
+    readonly = True
+
     async def on_change(self, instance, value, old_value):
         super().on_change(instance, value, old_value)
         if not instance.__is_new__:
@@ -114,3 +118,27 @@ class Deleted(Boolean):
                 for unique_key in unique_keys:
                     context.txn.insert_external(unique_key,
                                                 instance.__storage__.id)
+
+    @contract(accepts=bool)
+    @db.transactional()
+    async def put(self, instance, request):
+        if request.json:
+            with system_override():
+                recycle_bin = await db.get_item('RB')
+            await instance.recycle_to(recycle_bin)
+            return True
+        return False
+
+
+class ParentId(String):
+    readonly = True
+    allow_none = True
+
+    @contract(accepts=str)
+    @db.transactional()
+    async def put(self, instance, request):
+        target_id = request.json
+        if target_id != instance.parent_id:
+            target = await db.get_item(request.json, quiet=False)
+            await instance.move_to(target)
+        return True

@@ -1,10 +1,9 @@
 import datetime
 
-from porcupine import db, context, exceptions, gather, view
-from porcupine.contract import contract
+from porcupine import db, context, exceptions, gather
 from porcupine.core.context import system_override
 from porcupine.datatypes import Embedded, Composition
-from porcupine.core.datatypes.system import Deleted
+from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.utils import system, permissions
 from .elastic import Elastic
 
@@ -213,6 +212,8 @@ class Movable:
     """
     __slots__ = ()
 
+    parent_id = ParentId(default=None, store_as='pid')
+
     async def move_to(self, target) -> None:
         """
         Moves the item to the designated target.
@@ -239,39 +240,31 @@ class Movable:
                 'Cannot move item to destination. '
                 'The destination is contained in the source.')
 
-        if can_move and user_role2 > permissions.READER:
-            with system_override():
-                now = datetime.datetime.utcnow().isoformat()
-                parent_id = self.parent_id
-                self.parent_id = target.id
-                self.modified = now
-                parent = await db.connector.get(parent_id)
-
-                # update target and parent
-                if self.is_collection:
-                    await target.containers.add(self)
-                    parent.containers.remove(self)
-                else:
-                    await target.items.add(self)
-                    parent.items.remove(self)
-
-                target.modified = now
-                parent.modified = now
-                context.txn.upsert(self)
-                context.txn.upsert(parent)
-                context.txn.upsert(target)
-        else:
+        if not can_move or user_role2 < permissions.AUTHOR:
             raise exceptions.Forbidden(
-                'The object was not moved.\n'
+                'The object was not moved. '
                 'The user has insufficient permissions.')
 
-    @contract(accepts=str)
-    @db.transactional()
-    async def parent(self, request):
-        target = await db.get_item(request.json, quiet=False)
-        await self.move_to(target)
-        return True
-    parent = view(put=parent)
+        with system_override():
+            now = datetime.datetime.utcnow().isoformat()
+            parent_id = self.parent_id
+            self.parent_id = target.id
+            self.modified = now
+            parent = await db.connector.get(parent_id)
+
+            # update target and parent
+            if self.is_collection:
+                await target.containers.add(self)
+                parent.containers.remove(self)
+            else:
+                await target.items.add(self)
+                parent.items.remove(self)
+
+            target.modified = now
+            parent.modified = now
+            context.txn.upsert(self)
+            context.txn.upsert(parent)
+            context.txn.upsert(target)
 
 
 class Removable:
@@ -336,6 +329,8 @@ class Removable:
 class Recyclable:
     __slots__ = ()
 
+    deleted = Deleted(store_as='dl')
+
     async def recycle_to(self, recycle_bin):
         """
         Moves the item to the specified recycle bin.
@@ -361,29 +356,17 @@ class Recyclable:
             (user_role > permissions.AUTHOR) or
             (user_role == permissions.AUTHOR and self.owner == user.id)
         )
-
-        if can_delete:
-            from .recycle import DeletedItem
-            with system_override():
-                await _recycle(self)
-                deleted = DeletedItem(deleted_item=self)
-                deleted.location = await self.full_path(include_self=False)
-                await deleted.append_to(recycle_bin)
-                # mark as deleted
-                self.deleted = True
-                context.txn.upsert(self)
-        else:
+        if not can_delete:
             raise exceptions.Forbidden(
-                'The object was not deleted.\n'
+                'The object was not deleted. '
                 'The user has insufficient permissions.')
 
-    @contract(accepts=bool)
-    @db.transactional()
-    async def recycled(self, request):
-        if request.json:
-            with system_override():
-                recycle_bin = await db.get_item('RB')
-            await self.recycle_to(recycle_bin)
-            return True
-        return False
-    recycled = view(put=recycled)
+        from .recycle import DeletedItem
+        with system_override():
+            await _recycle(self)
+            deleted = DeletedItem(deleted_item=self)
+            deleted.location = await self.full_path(include_self=False)
+            await deleted.append_to(recycle_bin)
+            # mark as deleted
+            self.deleted = True
+            context.txn.upsert(self)

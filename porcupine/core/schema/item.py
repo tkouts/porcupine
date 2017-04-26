@@ -170,7 +170,7 @@ class GenericItem(Elastic, Removable):
         return '/%s' % path if not path.startswith('/') else path
 
 
-class Item(GenericItem, Cloneable, Movable, Recyclable):
+class Item(Cloneable, Movable, Recyclable, GenericItem):
     """
     Simple item with update capability.
 

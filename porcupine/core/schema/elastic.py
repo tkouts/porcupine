@@ -2,7 +2,7 @@ import copy
 
 from porcupine import config
 from porcupine.datatypes import DataType, String, ReferenceN
-from porcupine.core.datatypes.system import SchemaSignature, Deleted
+from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.utils import system
 from porcupine.core.context import system_override
 from .storage import storage
@@ -64,7 +64,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     id = String(readonly=True)
     parent_id = String(readonly=True, allow_none=True,
                        default=None, store_as='pid')
-    deleted = Deleted(readonly=True, store_as='dl')
     sig = SchemaSignature()
 
     def __init__(self, dict_storage=None):
