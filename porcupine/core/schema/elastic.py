@@ -1,3 +1,4 @@
+import asyncio
 import copy
 
 from porcupine import config
@@ -59,6 +60,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     __record__ = None
     __ext_record__ = None
 
+    is_collection = False
     event_handlers = []
 
     id = String(readonly=True)
@@ -99,12 +101,12 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 # possibly instantiated from schema maintenance service
                 pass
 
-    async def is_deleted(self):
-        if self.deleted or self.parent_id is None:
-            return self.deleted
-        return await system.resolve_deleted(self.parent_id)
+    @staticmethod
+    async def is_deleted():
+        return False
 
-    async def applied_acl(self):
+    @staticmethod
+    async def applied_acl():
         return {}
 
     @property
@@ -158,10 +160,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         return '{0}.{1}'.format(self.__class__.__module__,
                                 self.__class__.__name__)
 
-    def custom_view(self, *args, **kwargs):
-        if not args and not kwargs:
-            return self
-
+    def custom_view(self, *args, **kwargs) -> dict:
         result = {
             key: getattr(self, key) for key in args
         }
@@ -169,7 +168,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             result.update(kwargs)
         return result
 
-    def clone(self, memo=None):
+    async def clone(self, memo=None):
         """
         Creates an in-memory clone of the item.
         This is a shallow copy operation meaning that the item's
@@ -188,7 +187,11 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         clone = copy.deepcopy(self)
         # call data types clone method
         for dt in self.__schema__.values():
-            dt.clone(clone, memo)
+            _ = dt.clone(clone, memo)
+            if asyncio.iscoroutine(_):
+                await _
         with system_override():
             clone.id = new_id
+            clone.parent_id = None
+        clone.__is_new__ = True
         return clone

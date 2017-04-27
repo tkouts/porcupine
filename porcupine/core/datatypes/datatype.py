@@ -58,19 +58,17 @@ class DataType:
     def __set__(self, instance, value):
         self.validate_value(value, instance)
         storage = getattr(instance, self.storage)
+        # if not instance.__is_new__:
         self.snapshot(instance, value, getattr(storage, self.storage_key))
         setattr(storage, self.storage_key, value)
-
-    def __delete__(self, instance):
-        if self.storage_key in instance.__storage__:
-            del instance.__storage__[self.storage_key]
 
     def set_default(self, instance, value=None):
         if value is None:
             value = self._default
         storage = getattr(instance, self.storage)
         # add to snapshot in order to validate
-        instance.__snapshot__[self.storage_key] = value
+        if not instance.__is_new__:
+            instance.__snapshot__[self.storage_key] = value
         setattr(storage, self.storage_key, value)
 
     def snapshot(self, instance, new_value, previous_value):
@@ -100,18 +98,24 @@ class DataType:
     def clone(self, instance, memo):
         pass
 
-    def on_change(self, instance, value, old_value):
+    # event handlers
+
+    def on_create(self, instance, value):
         self.validate(value)
         if self.unique:
             unique_key = get_key_of_unique(instance.__storage__.pid,
                                            self.name,
                                            value)
             context.txn.insert_external(unique_key, instance.__storage__.id)
-            if not instance.__is_new__:
-                old_unique_key = get_key_of_unique(
-                    instance.get_snapshot_of('pid'), self.name, old_value)
-                context.txn.delete_external(old_unique_key)
-        if not instance.__is_new__:
+
+    def on_change(self, instance, value, old_value):
+        # print(instance, instance.__is_new__)
+        DataType.on_create(self, instance, value)
+        if self.unique:
+            old_unique_key = get_key_of_unique(
+                instance.get_snapshot_of('pid'), self.name, old_value)
+            context.txn.delete_external(old_unique_key)
+        if self.storage == '__storage__':
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 
@@ -126,6 +130,7 @@ class DataType:
         pass
 
     # HTTP views
+
     def get(self, instance, request):
         return getattr(instance, self.name)
 

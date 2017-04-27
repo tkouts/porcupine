@@ -20,13 +20,13 @@ class Blob(DataType):
     allow_none = True
     storage_info = '_blob_'
     storage = '__externals__'
+    type_error_message = "{0}() got an unexpected keyword argument '{1}'"
 
     def __init__(self, default=None, **kwargs):
-        type_error_message = "{0}() got an unexpected keyword argument '{1}'"
-        for kwarg in ('store_as', 'unique', 'indexed'):
+        for kwarg in ('store_as', 'indexed'):
             if kwarg in kwargs:
                 raise TypeError(
-                    type_error_message.format(self.__class__.__name__, kwarg))
+                    self.type_error_message.format(type(self).__name__, kwarg))
         super().__init__(default, **kwargs)
 
     async def fetch(self, instance, set_storage=True):
@@ -48,8 +48,8 @@ class Blob(DataType):
         return self.fetch(instance)
 
     def set_default(self, instance, value=None):
-        if value is None:
-            value = self._default
+        # if value is None:
+        #     value = self._default
         super().set_default(instance, value)
         # add external info
         setattr(instance.__storage__, self.name, self.storage_info)
@@ -59,15 +59,23 @@ class Blob(DataType):
 
     def snapshot(self, instance, new_value, old_value):
         if self.name not in instance.__snapshot__:
-            if not instance.__is_new__ or new_value:
+            if new_value:
                 instance.__snapshot__[self.name] = None
 
     def clone(self, instance, memo):
         pass
 
+    def on_create(self, instance, value):
+        super().on_create(instance, value)
+        if value is not None:
+            context.txn.insert_external(self.key_for(instance), value)
+
     def on_change(self, instance, value, old_value):
+        super().on_change(instance, value, old_value)
         if value is not None:
             context.txn.put_external(self.key_for(instance), value)
+        else:
+            self.on_delete(instance, value)
 
     def on_delete(self, instance, value):
         context.txn.delete_external(self.key_for(instance))

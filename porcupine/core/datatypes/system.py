@@ -97,27 +97,26 @@ class Deleted(Boolean):
 
     async def on_change(self, instance, value, old_value):
         super().on_change(instance, value, old_value)
-        if not instance.__is_new__:
-            uniques = [dt for dt in instance.__schema__.values()
-                       if dt.unique]
-            unique_keys = []
-            for dt in uniques:
-                storage = getattr(instance, dt.storage)
-                unique_keys.append(system.get_key_of_unique(
-                    instance.__storage__.pid,
-                    dt.name,
-                    getattr(storage, dt.storage_key)
-                ))
-            # print(unique_keys)
-            if value:
-                # soft deletion
-                for unique_key in unique_keys:
-                    context.txn.delete_external(unique_key)
-            else:
-                # item restoration
-                for unique_key in unique_keys:
-                    context.txn.insert_external(unique_key,
-                                                instance.__storage__.id)
+        uniques = [dt for dt in instance.__schema__.values()
+                   if dt.unique]
+        unique_keys = []
+        for dt in uniques:
+            storage = getattr(instance, dt.storage)
+            unique_keys.append(system.get_key_of_unique(
+                instance.__storage__.pid,
+                dt.name,
+                getattr(storage, dt.storage_key)
+            ))
+        # print(unique_keys)
+        if value:
+            # soft deletion
+            for unique_key in unique_keys:
+                context.txn.delete_external(unique_key)
+        else:
+            # item restoration
+            for unique_key in unique_keys:
+                context.txn.insert_external(unique_key,
+                                            instance.__storage__.id)
 
     @contract(accepts=bool)
     @db.transactional()

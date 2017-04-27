@@ -18,189 +18,91 @@ class Cloneable:
     __slots__ = ()
 
     @staticmethod
-    def _prepare_id_map(item, id_map, is_root=False):
-        children = []
-        db_supports_deep_indexing = db._db._db_handle.supports_deep_indexing
-
-        if '.' in item.id:
-            path = item.id.split('.')[:-1]
-            new_path = [id_map.get(oid, oid) for oid in path]
-            new_path.append(system.generate_oid())
-            id_map[item.id] = '.'.join(new_path)
-        else:
-            id_map[item.id] = system.generate_oid()
+    async def _prepare_id_map(item, id_map, is_root=False):
+        all_items = []
+        id_map[item.id] = system.generate_oid()
 
         if not is_root:
-            children.append(item)
+            all_items.append(item)
 
         for attr_name, attr_def in item.__schema__.items():
             if isinstance(attr_def, Embedded):
-                attr = getattr(item, attr_name)
-                if attr:
-                    Cloneable._prepare_id_map(attr, id_map)
+                # TODO: revisit
+                embedded = await getattr(item, attr_name)
+                if embedded is not None:
+                    await Cloneable._prepare_id_map(embedded, id_map)
             elif isinstance(attr_def, Composition):
-                attr = getattr(item, attr_name)
-                [Cloneable._prepare_id_map(i, id_map) for i in attr]
+                items = await getattr(item, attr_name).items()
+                await gather(*[Cloneable._prepare_id_map(i, id_map)
+                               for i in items])
 
-        if isinstance(item, GenericItem) \
-                and item.is_collection \
-                and item.children_count \
-                and (is_root or not db_supports_deep_indexing):
-            cursor = db._db.get_children(item.id,
-                                         deep=db_supports_deep_indexing)
-            for child in cursor:
-                children += Cloneable._prepare_id_map(child, id_map)
-            cursor.close()
-        return children
+        if item.is_collection:
+            # runs with system override - exclude deleted
+            children = [Cloneable._prepare_id_map(child, id_map)
+                        for child in await item.get_children()
+                        if not child.deleted]
+            for items in await gather(*children):
+                all_items += items
+        return all_items
 
     @staticmethod
-    def _write_clone(item, memo, target):
+    async def _write_clone(item, memo, target):
         id_map = memo['_id_map_']
-        clone = item.clone(memo)
+        clone = await item.clone(memo)
 
         if target is not None:
-            clone.inherit_roles = False
+            # clone.inherit_roles = False
             copy_num = 1
             original_name = clone.name
-            while target.child_exists(clone.name):
+            while await target.child_exists(clone.name):
                 copy_num += 1
-                clone.name = '{} ({})'.format(original_name, copy_num)
+                clone.name = '{0} ({1})'.format(original_name, copy_num)
+            # update target
+            now = datetime.datetime.utcnow().isoformat()
+            if clone.is_collection:
+                await target.containers.add(clone)
+            else:
+                await target.items.add(clone)
+            target.modified = now
+            context.txn.upsert(target)
 
-        clone._pid = id_map.get(item.parent_id, item.parent_id)
-        clone._pids = memo['_dest_pids_'] + \
-            [id_map[pid] for pid in item._pids[memo['_source_depth_']:]]
+        clone.parent_id = id_map[item.parent_id]
+        context.txn.insert(clone)
+        return clone
 
-        db._db.handle_update(clone, None, check_unique=False)
-        db._db.put_item(clone)
-        db._db.handle_post_update(clone, None)
-
-        if clone.is_collection:
-            if clone.children_count:
-                reversed_ids = {v: k for k, v in id_map.items()}
-                # clear any items created by event handlers
-                [child.delete() for child in clone.get_children()
-                 if child.id not in reversed_ids]
-            # maintain the same values for _nc and _ni as the original
-            clone._ni = item._ni
-            clone._nc = item._nc
-
-    def _copy(self: Elastic, target: Elastic, memo: dict) -> None:
-        all_children = Cloneable._prepare_id_map(self, memo['_id_map_'], True)
+    async def _copy(self: Elastic, target: Elastic, memo: dict):
+        all_children = await Cloneable._prepare_id_map(
+            self, memo['_id_map_'], True)
         memo['_id_map_'][self.parent_id] = target.id
-        memo['_dest_pids_'] = target._pids + [target.id]
-        memo['_source_depth_'] = len(self._pids)
-        Cloneable._write_clone(self, memo, target)
+        clone = await Cloneable._write_clone(self, memo, target)
         for item in all_children:
-            Cloneable._write_clone(item, memo, None)
-            # item._write_clone(memo, None)
+            await Cloneable._write_clone(item, memo, None)
+        return clone
 
-    # def _write_clone(self, memo, target):
-    #     id_map = memo['_id_map_']
-    #     clone = self.clone(memo)
-    #
-    #     if target is not None:
-    #         clone.inherit_roles = False
-    #         copy_num = 1
-    #         original_name = clone.name
-    #         while target.child_exists(clone.name):
-    #             copy_num += 1
-    #             clone.name = '%s (%d)' % (original_name, copy_num)
-    #
-    #     clone._pid = id_map.get(self._pid, self._pid)
-    #     clone._pids = memo['_dest_pids_'] + [id_map[pid]
-    #           for pid in self._pids[memo['_source_depth_']:]]
-    #
-    #     db._db.handle_update(clone, None, check_unique=False)
-    #     db._db.put_item(clone)
-    #     db._db.handle_post_update(clone, None)
-    #
-    #     if clone.is_collection:
-    #         if clone.children_count:
-    #             reversed_ids = {v: k for k, v in id_map.items()}
-    #             # clear any items created by event handlers
-    #             [child.delete() for child in clone.get_children()
-    #              if child._id not in reversed_ids]
-    #         # maintain the same values for _nc and _ni as the original
-    #         clone._ni = self._ni
-    #         clone._nc = self._nc
-
-    # def clone(self: Elastic, memo: dict = None):
-    #     """
-    #     Creates an in-memory clone of the item.
-    #     This is a shallow copy operation meaning that the item's
-    #     references are not cloned.
-    #
-    #     @param memo: internal helper object
-    #     @type memo: dict
-    #     @return: the clone object
-    #     @rtype: L{GenericItem}
-    #     """
-    #     if memo is None:
-    #         memo = {
-    #             '_dup_ext_': True,
-    #             '_id_map_': {}
-    #         }
-    #     new_id = memo['_id_map_'].get(self.id, system.generate_oid())
-    #     memo['_id_map_'][self.id] = new_id
-    #     clone = copy.deepcopy(self)
-    #     # call data types clone method
-    #     [dt.clone(clone, memo) for dt in self.__schema__.values()]
-    #     clone._id = new_id
-    #     now = time.time()
-    #     user = context.user
-    #     clone._owner = user.id
-    #     clone._created = now
-    #     clone._pid = None
-    #     clone._pids = []
-    #     clone.modified_by = user.name
-    #     clone.modified = now
-    #     return clone
-
-    # @db.requires_transactional_context
-    def copy_to(self: Elastic, target):
+    async def copy_to(self: Elastic, target):
         """
         Copies the item to the designated target.
 
-        @param target: The id of the target container or the container object
-                       itself
-        @type target: str OR L{Container}
-        @return: None
-        @raise L{porcupine.exceptions.ObjectNotFound}:
-            If the target container does not exist.
+        @param target: The target container
+        @type target: L{Container}
+        @return: L{Item}
         """
-        if isinstance(target, str):
-            target = db._db.get_item(target, get_lock=False)
-
-        if target is None or target._is_deleted:
-            raise exceptions.ObjectNotFound(
-                'The target container does not exist.')
-
-        content_class = self.contentclass
-
-        if self.is_collection and target.is_contained_in(self.id):
-            raise exceptions.ContainmentError(
-                'Cannot copy item to destination.\n'
+        if self.is_collection and await target.is_contained_in(self):
+            raise exceptions.InvalidUsage(
+                'Cannot copy item to destination. '
                 'The destination is contained in the source.')
 
         # check permissions on target folder
         user = context.user
-        user_role = permsresolver.get_access(target, user)
-        if not self._is_system and user_role > permsresolver.READER:
-            if content_class not in target.containment:
-                raise exceptions.ContainmentError(
-                    'The target container does not accept '
-                    'objects of type\n"%s".' % content_class)
-            self._copy(target, {'_dup_ext_': True, '_id_map_': {}})
-            # update parent
-            if self.is_collection:
-                target._nc.incr(1)
-            else:
-                target._ni.incr(1)
-            target.modified = time.time()
-        else:
+        user_role = await permissions.resolve(target, user)
+        if user_role < permissions.AUTHOR:
             raise exceptions.Forbidden(
-                'The object was not copied.\n'
+                'The object was not copied. '
                 'The user has insufficient permissions.')
+        with system_override():
+            return await self._copy(target,
+                                    {'_dup_ext_': True,
+                                     '_id_map_': {}})
 
 
 class Movable:
@@ -330,6 +232,11 @@ class Recyclable:
     __slots__ = ()
 
     deleted = Deleted(store_as='dl')
+
+    async def is_deleted(self):
+        if self.deleted or self.parent_id is None:
+            return self.deleted
+        return await system.resolve_deleted(self.parent_id)
 
     async def recycle_to(self, recycle_bin):
         """

@@ -32,8 +32,6 @@ class GenericItem(Elastic, Removable):
     @type description: L{String<porcupine.dt.String>}
     @type created: float
     """
-    is_collection = False
-
     # system attributes
     created = DateTime(readonly=True, store_as='cr')
     owner = String(required=True, readonly=True, store_as='own')
@@ -52,14 +50,13 @@ class GenericItem(Elastic, Removable):
             return acl
         return await resolve_acl(self.parent_id)
 
-    def clone(self, memo=None):
-        clone = super().clone(memo)
+    async def clone(self, memo=None):
+        clone = await super().clone(memo)
         now = datetime.datetime.utcnow().isoformat()
         user = context.user
         with system_override():
             clone.owner = user.id
             clone.created = clone.modified = now
-            clone.parent_id = None
             clone.modified_by = user.name
         return clone
 

@@ -70,8 +70,8 @@ class Reference1(String, Acceptable):
         if value:
             return ItemReference(value)
 
-    async def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
+    async def on_create(self, instance, value):
+        super().on_create(instance, value)
         if value:
             try:
                 ref_item = await db.get_item(value, quiet=False)
@@ -82,14 +82,17 @@ class Reference1(String, Acceptable):
                 raise ContainmentError(instance, self.name, ref_item)
             return ref_item
 
+    async def on_change(self, instance, value, old_value):
+        super().on_change(instance, value, old_value)
+        return await self.on_create(instance, value)
+
     def clone(self, instance, memo):
-        if '_id_map_' in memo:
-            value = super().__get__(instance, None)
-            super().__set__(instance, memo['_id_map_'].get(value, value))
+        value = super().__get__(instance, None)
+        super().__set__(instance, memo['_id_map_'].get(value, value))
 
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
-        value = super().get(instance, request)
+        value = getattr(instance, self.name)
         if expand:
             return await value.item()
         return value
@@ -119,7 +122,7 @@ class ItemCollection:
             storage = getattr(self._inst, self._desc.storage)
             collection = getattr(storage, self._desc.name)
             if item.id not in collection:
-                self._desc.snapshot(self._inst, True, None)
+                # self._desc.snapshot(self._inst, True, None)
                 collection.append(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),
@@ -131,7 +134,7 @@ class ItemCollection:
             collection = getattr(storage, self._desc.name)
             if item.id in collection:
                 # add snapshot to trigger on_change
-                self._desc.snapshot(self._inst, True, None)
+                # self._desc.snapshot(self._inst, True, None)
                 collection.remove(item.id)
         else:
             context.txn.append(self._desc.key_for(self._inst),
@@ -144,6 +147,9 @@ class ReferenceN(Text, Acceptable):
     allow_none = False
 
     def __init__(self, default=(), **kwargs):
+        if 'required' in kwargs:
+            raise TypeError(
+                self.type_error_message.format(type(self).__name__, 'required'))
         super().__init__(default, **kwargs)
         Acceptable.__init__(self, **kwargs)
 
@@ -220,23 +226,30 @@ class ReferenceN(Text, Acceptable):
             chunk = getattr(instance.__storage__, active_chunk_key)
         return system.get_collection_key(instance.id, self.name, chunk)
 
+    async def clone(self, instance, memo):
+        ids = await getattr(instance, self.name).get()
+        print(ids)
+        print([memo['_id_map_'].get(oid, oid) for oid in ids])
+        self.__set__(instance,
+                     [memo['_id_map_'].get(oid, oid) for oid in ids])
+
+    async def on_create(self, instance, value):
+        if value:
+            ref_items = await db.get_multi(value)
+            # check containment
+            for item in ref_items:
+                if not await self.accepts_item(item):
+                    raise ContainmentError(instance, self.name, item)
+            if ref_items:
+                # write external
+                super().on_create(instance,
+                                  ' '.join([i.id for i in ref_items]))
+        else:
+            ref_items = []
+        return ref_items, []
+
     async def on_change(self, instance, value, old_value):
         # old_value is always None
-        if instance.__is_new__:
-            if value:
-                ref_items = await db.get_multi(value)
-                # check containment
-                for item in ref_items:
-                    if not await self.accepts_item(item):
-                        raise ContainmentError(instance, self.name, item)
-                if ref_items:
-                    # write external
-                    super().on_change(instance,
-                                      ' '.join([i.id for i in ref_items]),
-                                      old_value)
-            else:
-                ref_items = []
-            return ref_items, []
         # need to compute deltas
         old_ids = await self.fetch(instance, set_storage=False)
         new_value = frozenset(value)
@@ -273,6 +286,7 @@ class ReferenceN(Text, Acceptable):
 
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
+        value = getattr(instance, self.name)
         if expand:
-            return await getattr(instance, self.name).items()
-        return await getattr(instance, self.name).get()
+            return await value.items()
+        return await value.get()

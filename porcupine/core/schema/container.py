@@ -32,12 +32,9 @@ class Container(Item):
 
         @rtype: bool
         """
-        child_id = await db.connector.get_raw(
-                system.get_key_of_unique(self.id, 'name', name))
-        if child_id is None:
-            return False
-        else:
-            return True
+        unique_name_key = system.get_key_of_unique(self.id, 'name', name)
+        _, exists = await db.connector.exists(unique_name_key)
+        return exists
 
     async def get_child_by_name(self, name, resolve_shortcuts=False):
         """
@@ -89,59 +86,68 @@ class Container(Item):
         """
         return await self.containers.items()
 
-    def has_items(self):
-        """
-        Checks if the container has at least one non-container child.
-
-        @rtype: bool
-        """
-        return self._ni > 0
-
-    def has_containers(self):
-        """
-        Checks if the container has at least one child container.
-
-        @rtype: bool
-        """
-        return self._nc > 0
-
-    @property
-    def children_count(self):
-        """The total number of the container's children"""
-        return self._ni + self._nc
-
-    @property
-    def items_count(self):
-        """The number of the items contained"""
-        return self._ni
-
-    @property
-    def containers_count(self):
-        """The number of containers contained"""
-        return self._nc
+    # def has_items(self):
+    #     """
+    #     Checks if the container has at least one non-container child.
+    #
+    #     @rtype: bool
+    #     """
+    #     return self._ni > 0
+    #
+    # def has_containers(self):
+    #     """
+    #     Checks if the container has at least one child container.
+    #
+    #     @rtype: bool
+    #     """
+    #     return self._nc > 0
+    #
+    # @property
+    # def children_count(self):
+    #     """The total number of the container's children"""
+    #     return self._ni + self._nc
+    #
+    # @property
+    # def items_count(self):
+    #     """The number of the items contained"""
+    #     return self._ni
+    #
+    # @property
+    # def containers_count(self):
+    #     """The number of containers contained"""
+    #     return self._nc
 
     @view
     async def children(self, request):
+        # TODO: add support for resolve_shortcuts
         return await self.get_children()
 
     @children.http_post
-    @contract.is_new_item()
+    # @contract.is_new_item()
     @db.transactional()
     async def children(self, request):
-        item_dict = request.json
-        # TODO: handle invalid type exception
-        item_type = system.get_rto_by_name(item_dict.pop('type'))
-        new_item = item_type()
-        try:
-            for attr, value in item_dict.items():
-                setattr(new_item, attr, value)
-            await new_item.append_to(self)
-        except exceptions.AttributeSetError as e:
-            raise exceptions.InvalidUsage(str(e))
+        if 'source' in request.args:
+            # copy operation
+            source = await db.get_item(request.args['source'][0], quiet=False)
+            # TODO: handle items with no copy capability
+            new_item = await source.copy_to(self)
+        else:
+            # new item
+            item_dict = request.json
+            # TODO: handle invalid type exception
+            item_type = system.get_rto_by_name(item_dict.pop('type'))
+            new_item = item_type()
+            try:
+                for attr, value in item_dict.items():
+                    setattr(new_item, attr, value)
+                await new_item.append_to(self)
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
+
         location = server.url_for('resources.resource_handler',
                                   item_id=new_item.id)
         return json(
-            new_item.id,
+            new_item,
             status=201,
             headers={
                 'Location': location

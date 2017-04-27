@@ -89,10 +89,14 @@ class Relator1(Reference1, RelatorBase):
         if value:
             return RelatorItem(value, self)
 
-    async def on_change(self, instance, value, old_value):
-        ref_item = await super().on_change(instance, value, old_value)
+    async def on_create(self, instance, value):
+        ref_item = await super().on_create(instance, value)
         if ref_item:
             await self.add_reference(instance, ref_item)
+
+    async def on_change(self, instance, value, old_value):
+        super().on_change(instance, value, old_value)
+        await self.on_create(instance, value)
         if old_value:
             old_ref_item = await db.connector.get(old_value)
             if old_ref_item:
@@ -161,11 +165,17 @@ class RelatorN(ReferenceN, RelatorBase):
     def storage_info(self):
         return '{0}:{1}'.format(self.storage_info_prefix, self.rel_attr)
 
+    async def on_create(self, instance, value):
+        added, _ = await super().on_create(instance, value)
+        for item in added:
+            await self.add_reference(instance, item)
+
     async def on_change(self, instance, value, old_value):
-        added, _ = await super().on_change(instance, value, old_value)
-        if instance.__is_new__:
-            for item in added:
-                await self.add_reference(instance, item)
+        added, removed = await super().on_change(instance, value, old_value)
+        for item in added:
+            await self.add_reference(instance, item)
+        for item in removed:
+            self.remove_reference(instance, item)
 
     async def on_delete(self, instance, value):
         ref_ids = await self.fetch(instance, set_storage=False)
