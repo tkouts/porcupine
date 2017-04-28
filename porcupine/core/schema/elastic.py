@@ -61,6 +61,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     __ext_record__ = None
 
     is_collection = False
+    is_deleted = False
     event_handlers = []
 
     id = String(readonly=True)
@@ -100,9 +101,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 # running outside context
                 # possibly instantiated from schema maintenance service
                 pass
-
-    async def is_deleted(self):
-        return False
 
     async def applied_acl(self):
         return {}

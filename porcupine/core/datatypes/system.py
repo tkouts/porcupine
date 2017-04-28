@@ -4,7 +4,8 @@ from porcupine.utils import permissions, system
 from porcupine.core.services.schema import SchemaMaintenance
 from porcupine.core.context import system_override
 from .mutable import Dictionary
-from .common import String, Boolean
+from .common import String
+from .counter import Counter
 from .reference import ReferenceN
 
 Shortcut = None
@@ -92,31 +93,8 @@ class Containers(Children):
         return self.accepts
 
 
-class Deleted(Boolean):
+class Deleted(Counter):
     readonly = True
-
-    async def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
-        uniques = [dt for dt in instance.__schema__.values()
-                   if dt.unique]
-        unique_keys = []
-        for dt in uniques:
-            storage = getattr(instance, dt.storage)
-            unique_keys.append(system.get_key_of_unique(
-                instance.__storage__.pid,
-                dt.name,
-                getattr(storage, dt.storage_key)
-            ))
-        # print(unique_keys)
-        if value:
-            # soft deletion
-            for unique_key in unique_keys:
-                context.txn.delete_external(unique_key)
-        else:
-            # item restoration
-            for unique_key in unique_keys:
-                context.txn.insert_external(unique_key,
-                                            instance.__storage__.id)
 
     @contract(accepts=bool)
     @db.transactional()

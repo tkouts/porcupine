@@ -32,9 +32,7 @@ class DeletedItem(GenericItem):
 
     async def restore(self):
         deleted_item = await self.deleted_item()
-        with system_override():
-            deleted_item.deleted = False
-        await deleted_item.update()
+        await deleted_item.restore()
         await self.remove()
 
     @contract(accepts=bool)

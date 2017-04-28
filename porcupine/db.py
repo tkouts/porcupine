@@ -30,8 +30,7 @@ async def get_item(item_id, quiet=True):
     if item is not None:
         if context.system_override:
             return item
-        is_deleted = await item.is_deleted()
-        if not is_deleted:
+        if not item.is_deleted:
             access_level = await permissions.resolve(item, context.user)
             if access_level != permissions.NO_ACCESS:
                 return item
@@ -50,8 +49,7 @@ async def get_multi(ids):
             if is_override:
                 items.append(item)
                 continue
-            is_deleted = await item.is_deleted()
-            if not is_deleted:
+            if not item.is_deleted:
                 access_level = await permissions.resolve(item, context.user)
                 if access_level != permissions.NO_ACCESS:
                     items.append(item)

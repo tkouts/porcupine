@@ -2,7 +2,7 @@ import datetime
 
 from porcupine import db, context, exceptions, gather
 from porcupine.core.context import system_override
-from porcupine.datatypes import Embedded, Composition
+from porcupine.datatypes import Embedded, Composition, DataType
 from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.utils import system, permissions
 from .elastic import Elastic
@@ -231,14 +231,41 @@ class Removable:
 class Recyclable:
     __slots__ = ()
 
-    deleted = Deleted(store_as='dl')
+    is_deleted = Deleted(store_as='dl')
 
-    async def is_deleted(self):
-        if self.deleted or self.parent_id is None:
-            return self.deleted
-        return await system.resolve_deleted(self.parent_id)
+    async def restore(self) -> None:
+        def restore_unique_keys(item) -> None:
+            uniques = [dt for dt in item.__schema__.values()
+                       if dt.unique]
+            for data_type in uniques:
+                storage = getattr(item, data_type.storage)
+                value = getattr(storage, data_type.storage_key)
+                DataType.on_create(data_type, item, value)
 
-    async def recycle_to(self, recycle_bin):
+        async def restore(item) -> None:
+            # mark as deleted
+            self.is_deleted -= 1
+            context.txn.upsert(item)
+            if item.is_collection:
+                children = await item.get_children()
+                await gather(*[restore(child) for child in children])
+
+        user = context.user
+        user_role = await permissions.resolve(self, user)
+        can_restore = (
+            (user_role > permissions.AUTHOR) or
+            (user_role == permissions.AUTHOR and self.owner == user.id)
+        )
+        if not can_restore:
+            raise exceptions.Forbidden(
+                'The object was not restored. '
+                'The user has insufficient permissions.')
+
+        with system_override():
+            restore_unique_keys(self)
+            await restore(self)
+
+    async def recycle_to(self, recycle_bin) -> None:
         """
         Moves the item to the specified recycle bin.
         The item then becomes inaccessible.
@@ -248,14 +275,25 @@ class Recyclable:
         @type recycle_bin: RecycleBin
         @return: None
         """
-        async def _recycle(item):
+        def remove_unique_keys(item) -> None:
+            uniques = [dt for dt in item.__schema__.values()
+                       if dt.unique]
+            for data_type in uniques:
+                storage = getattr(item, data_type.storage)
+                value = getattr(storage, data_type.storage_key)
+                DataType.on_delete(data_type, item, value)
+
+        async def recycle(item) -> None:
             if item.is_system:
                 raise exceptions.Forbidden(
                     'The object {0} is systemic and can not be recycled'
                     .format(item.name))
+            # mark as deleted
+            self.is_deleted += 1
+            context.txn.upsert(item)
             if item.is_collection:
                 children = await item.get_children()
-                await gather(*[_recycle(child) for child in children])
+                await gather(*[recycle(child) for child in children])
 
         user = context.user
         user_role = await permissions.resolve(self, user)
@@ -270,10 +308,8 @@ class Recyclable:
 
         from .recycle import DeletedItem
         with system_override():
-            await _recycle(self)
+            remove_unique_keys(self)
+            await recycle(self)
             deleted = DeletedItem(deleted_item=self)
             deleted.location = await self.full_path(include_self=False)
             await deleted.append_to(recycle_bin)
-            # mark as deleted
-            self.deleted = True
-            context.txn.upsert(self)

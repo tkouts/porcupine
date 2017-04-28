@@ -11,7 +11,7 @@ from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
 
 
-class GenericItem(Elastic, Removable):
+class GenericItem(Removable, Elastic):
     """
     Generic Item
     The base class of all Porcupine objects.
