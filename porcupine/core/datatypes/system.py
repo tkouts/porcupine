@@ -11,16 +11,43 @@ from .reference import ReferenceN
 Shortcut = None
 
 
-class Acl(Dictionary):
-    allow_none = True
+class AclValue(system.FrozenDict):
+    __slots__ = ('_desc', '_inst')
 
-    async def on_change(self, instance, value, old_value):
-        user_role = await permissions.resolve(instance, context.user)
+    def __init__(self, descriptor: Dictionary, instance, acl):
+        super().__init__(acl)
+        self._desc = descriptor
+        self._inst = instance
+
+    async def reset(self, acl):
+        # check user permissions
+        user_role = await permissions.resolve(self._inst, context.user)
         if user_role < permissions.COORDINATOR:
             raise exceptions.Forbidden(
                 'The user does not have permissions '
                 'to modify the access control list.')
-        super().on_change(instance, value, old_value)
+        super(type(self._desc), self._desc).__set__(self._inst, acl)
+
+
+class Acl(Dictionary):
+    protected = True
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._default = None
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        dct = super().__get__(instance, owner) or {}
+        return AclValue(self, instance, dct)
+
+    def __set__(self, instance, value):
+        raise AttributeError('Cannot directly set the ACL. '
+                             'Use the reset method instead.')
+
+    async def on_change(self, instance, value, old_value):
+        pass
 
 
 class SchemaSignature(String):

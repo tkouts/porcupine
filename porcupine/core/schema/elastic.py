@@ -102,8 +102,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 # possibly instantiated from schema maintenance service
                 pass
 
-    async def applied_acl(self):
-        return {}
+    # async def applied_acl(self):
+    #     return {}
 
     @property
     def __snapshot__(self):

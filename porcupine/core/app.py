@@ -63,7 +63,10 @@ class App(Blueprint):
 
         with system_override():
             for attr, value in item_dict.items():
-                setattr(item, attr, value)
+                if attr == 'acl':
+                    await getattr(item, attr).reset(value)
+                else:
+                    setattr(item, attr, value)
 
         if item.__is_new__:
             await item.append_to(parent)

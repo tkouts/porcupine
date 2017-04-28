@@ -6,7 +6,6 @@ from porcupine.datatypes import String, DateTime, Boolean, RelatorN
 from porcupine.core.datatypes.system import Acl
 from porcupine.core.context import system_override
 from porcupine.utils import permissions
-from porcupine.utils.system import resolve_acl
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
 
@@ -36,19 +35,16 @@ class GenericItem(Removable, Elastic):
     created = DateTime(readonly=True, store_as='cr')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
-    is_system = Boolean(readonly=True, store_as='sys')
     modified = DateTime(required=True, readonly=True, store_as='md')
+
+    # security attributes
+    is_system = Boolean(readonly=True, store_as='sys')
+    roles_inherited = Boolean(default=True, store_as='ri')
+    acl = Acl(default=None)
 
     # common attributes
     name = String(required=True, unique=True)
     description = String(store_as='desc')
-    acl = Acl(default=None)
-
-    async def applied_acl(self):
-        acl = self.get_snapshot_of('acl')
-        if acl is not None or self.parent_id is None:
-            return acl
-        return await resolve_acl(self.parent_id)
 
     async def clone(self, memo=None):
         clone = await super().clone(memo)
@@ -77,7 +73,7 @@ class GenericItem(Removable, Elastic):
         user = context.user
         if not context.system_override:
             if parent is not None:
-                security = await parent.applied_acl()
+                security = parent.__storage__.acl
             else:
                 # add as root
                 security = {}
@@ -94,6 +90,8 @@ class GenericItem(Removable, Elastic):
             self.modified_by = user.name
             if parent is not None:
                 self.parent_id = parent.id
+            if self.__storage__.acl is None:
+                self.__storage__.acl = parent.__storage__.acl
 
             context.txn.insert(self)
             if parent is not None:

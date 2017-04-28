@@ -80,6 +80,7 @@ class Transaction:
 
     def put_external(self, key, value):
         if key in self._insertions:
+            self._insertions[key] = value
             return
         self._upsertions[key] = value
 

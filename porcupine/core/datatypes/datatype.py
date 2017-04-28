@@ -93,7 +93,8 @@ class DataType:
         @return: None
         """
         if self.required and not value:
-            raise ValueError('Attribute {0} is mandatory.'.format(self.name))
+            raise ValueError('Attribute {0} is mandatory. '
+                             'Got {1}.'.format(self.name, value))
 
     def clone(self, instance, memo):
         pass
@@ -109,7 +110,6 @@ class DataType:
             context.txn.insert_external(unique_key, instance.__storage__.id)
 
     def on_change(self, instance, value, old_value):
-        # print(instance, instance.__is_new__)
         DataType.on_create(self, instance, value)
         if self.unique:
             old_unique_key = get_key_of_unique(

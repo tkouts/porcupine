@@ -4,9 +4,6 @@ import functools
 import collections
 import cbor
 
-from porcupine import db
-from porcupine.core.context import context_cacheable
-
 
 VALID_ID_CHARS = [
     chr(x) for x in
@@ -132,45 +129,22 @@ def locate_descriptor_by_storage_key(cls, key):
             return desc
 
 
-@context_cacheable(1000)
-async def get_item_state(item_id):
-    return await db.connector.get_partial(
-        item_id, 'pid', 'acl', 'dl', 'sys',
-        snapshot=True)
-
-
-@context_cacheable(100)
-async def resolve_deleted(item_id):
-    state = await get_item_state(item_id)
-    while not state['dl'] and state['pid'] is not None:
-        if state['sys']:
-            break
-        state = await get_item_state(state['pid'])
-    return state['dl']
-
-
-@context_cacheable(100)
-async def resolve_acl(object_id):
-    state = await get_item_state(object_id)
-    while state['acl'] is None and state['pid'] is not None:
-        state = await get_item_state(state['pid'])
-    return state['acl']
-
-
-class FrozenDict(collections.Mapping, collections.Hashable):
-    __slots__ = ('__dct', )
+class FrozenDict(collections.Mapping):
+    __slots__ = ('_dct', )
 
     def __init__(self, dct):
-        self.__dct = dct
+        self._dct = dct
 
     def __getitem__(self, item):
-        return self.__dct[item]
+        return self._dct[item]
 
     def __iter__(self):
-        return iter(self.__dct)
+        return iter(self._dct)
 
     def __len__(self):
-        return len(self.__dct)
+        return len(self._dct)
 
-    def __hash__(self):
-        return frozenset(self.__dct.items()).__hash__()
+    def to_dict(self):
+        return {**self._dct}
+
+    toDict = to_dict

@@ -20,6 +20,3 @@ class Composite(Elastic):
     @see: L{porcupine.datatypes.Composition}
     """
     name = String(required=True)
-
-    async def applied_acl(self):
-        return await system.resolve_acl(self.parent_id)
