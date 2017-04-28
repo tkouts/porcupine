@@ -21,7 +21,7 @@ async def resolve(item, user):
 
 
 async def resolve_acl(acl, user_or_group):
-    # print(security_descriptor, user_or_group)
+    # print(acl, user_or_group)
     member_of = set()
     if user_or_group is not None:
         if await user_or_group.is_admin():

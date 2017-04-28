@@ -1,6 +1,7 @@
 import random
 import hashlib
 import functools
+import collections
 import cbor
 
 from porcupine import db
@@ -13,6 +14,12 @@ VALID_ID_CHARS = [
     list(range(ord('A'), ord('Z'))) +
     list(range(ord('0'), ord('9')))
 ]
+
+
+def chunks(l, n):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
 
 
 def generate_oid(length: int=8) -> str:
@@ -148,3 +155,22 @@ async def resolve_acl(object_id):
     while state['acl'] is None and state['pid'] is not None:
         state = await get_item_state(state['pid'])
     return state['acl']
+
+
+class FrozenDict(collections.Mapping, collections.Hashable):
+    __slots__ = ('__dct', )
+
+    def __init__(self, dct):
+        self.__dct = dct
+
+    def __getitem__(self, item):
+        return self.__dct[item]
+
+    def __iter__(self):
+        return iter(self.__dct)
+
+    def __len__(self):
+        return len(self.__dct)
+
+    def __hash__(self):
+        return frozenset(self.__dct.items()).__hash__()

@@ -101,12 +101,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 # possibly instantiated from schema maintenance service
                 pass
 
-    @staticmethod
-    async def is_deleted():
+    async def is_deleted(self):
         return False
 
-    @staticmethod
-    async def applied_acl():
+    async def applied_acl(self):
         return {}
 
     @property
@@ -182,8 +180,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 '_dup_ext_': True,
                 '_id_map_': {}
             }
-        new_id = memo['_id_map_'].get(self.id, system.generate_oid())
-        memo['_id_map_'][self.id] = new_id
+        new_id = memo['_id_map_'].setdefault(self.id, system.generate_oid())
         clone = copy.deepcopy(self)
         # call data types clone method
         for dt in self.__schema__.values():

@@ -65,12 +65,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
         return await self.get_partial_raw(object_id, *paths)
 
     async def get_multi(self, object_ids):
-
-        def chunks(l, n):
-            """Yield successive n-sized chunks from l."""
-            for i in range(0, len(l), n):
-                yield l[i:i + n]
-
         loads = self.persist.loads
         if context.txn is not None:
             txn = context.txn
@@ -82,7 +76,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
             object_ids = [object_id for object_id in object_ids
                           if object_id not in txn]
         if object_ids:
-            for chunk in chunks(object_ids, self.multi_fetch_chunk_size):
+            for chunk in system.chunks(object_ids, self.multi_fetch_chunk_size):
                 batch = await self.get_multi_raw(chunk)
                 for raw_item in batch:
                     if raw_item is not None:
