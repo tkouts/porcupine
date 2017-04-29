@@ -54,9 +54,8 @@ class Transaction:
         self._inserted_items[item.id] = item
 
     def upsert(self, item):
-        if item.id in self._inserted_items:
-            return
-        self._items[item.id] = item
+        if item.id not in self._inserted_items:
+            self._items[item.id] = item
 
     def delete(self, item):
         if item.id in self._inserted_items:

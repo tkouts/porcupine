@@ -78,32 +78,27 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
         if self.__is_new__:
             # new item
-            dict_storage['id'] = system.generate_oid()
-            dict_storage['sig'] = self.__class__.__sig__
             self.__storage__ = self.__record__(**dict_storage)
             # initialize storage with default values
-            self.__add_defaults()
-        elif dict_storage['sig'] == self.__class__.__sig__:
+            self.__add_defaults(list(self.__schema__.values()))
+            self.__storage__.id = system.generate_oid()
+            self.__storage__.sig = type(self).__sig__
+        elif dict_storage['sig'] == type(self).__sig__:
             self.__storage__ = self.__record__(**dict_storage)
         else:
             # construct new record that fits the new schema and the old one
-            field_spec = frozenset(self.__record__.fields() +
-                                   tuple(dict_storage.keys()))
+            old_schema = tuple(dict_storage.keys())
+            new_schema = self.__record__.fields()
+            field_spec = frozenset(new_schema + old_schema)
             record = storage(type(self).__name__, field_spec)
             self.__storage__ = record(**dict_storage)
             # update storage with default values of added attributes
-            self.__add_defaults()
+            additions = [dt for dt in self.__schema__.values()
+                         if dt.storage_key not in old_schema]
+            self.__add_defaults(additions)
             # change sig to trigger schema update
-            try:
-                with system_override():
-                    self.sig = str(id(self))
-            except ValueError:
-                # running outside context
-                # possibly instantiated from schema maintenance service
-                pass
-
-    # async def applied_acl(self):
-    #     return {}
+            with system_override():
+                self.sig = str(id(self))
 
     @property
     def __snapshot__(self):
@@ -123,12 +118,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     def __repr__(self):
         return repr(self.__storage__)
 
-    def __add_defaults(self):
-        to_add = [
-            dt for dt in list(self.__schema__.values())
-            if getattr(getattr(self, dt.storage), dt.storage_key) is None
-        ]
-        for dt in to_add:
+    def __add_defaults(self, data_types):
+        for dt in data_types:
             dt.set_default(self)
 
     def get_snapshot_of(self, attr_name):

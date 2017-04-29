@@ -56,6 +56,7 @@ class SchemaSignature(String):
     protected = True
 
     async def on_change(self, instance, value, old_value):
+        super().on_change(instance, value, old_value)
         await SchemaMaintenance.clean_schema(instance.id)
 
 

@@ -39,8 +39,8 @@ class GenericItem(Removable, Elastic):
 
     # security attributes
     is_system = Boolean(readonly=True, store_as='sys')
-    roles_inherited = Boolean(default=True, store_as='ri')
-    acl = Acl(default=None)
+    # roles_inherited = Boolean(default=True, store_as='ri')
+    acl = Acl()
 
     # common attributes
     name = String(required=True, unique=True)

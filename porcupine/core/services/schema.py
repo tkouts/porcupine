@@ -153,12 +153,12 @@ class SchemaCleaner(SchemaMaintenanceTask):
     def schema_updater(item_dict):
         from porcupine.datatypes import Blob, ReferenceN, RelatorN
 
-        item = db.connector.persist.loads(item_dict)
+        clazz = system.get_rto_by_name(item_dict['_cc'])
         item_schema = frozenset([key for key in item_dict.keys()
                                  if not key.startswith('_')
                                  and not key.endswith('_')])
         current_schema = frozenset([dt.storage_key
-                                    for dt in item.__schema__.values()])
+                                    for dt in clazz.__schema__.values()])
         for_removal = item_schema.difference(current_schema)
         externals = {}
         # remove old attributes
@@ -178,9 +178,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
                         continue
                     externals[attr_name] = (attr_value, active_chunk)
         # update sig
-        item_dict['sig'] = type(item).__sig__
-        # add cc back
-        item_dict['_cc'] = item.content_class
+        item_dict['sig'] = clazz.__sig__
         return item_dict, externals
 
     async def execute(self):

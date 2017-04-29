@@ -32,11 +32,7 @@ class DataType:
 
     def validate_value(self, value, instance):
         if instance is not None:
-            try:
-                system_override = context.system_override
-            except ValueError:
-                # running outside the event loop, assume yes
-                system_override = True
+            system_override = context.system_override
             if self.readonly and not system_override:
                 raise AttributeError(
                     'Attribute {0} of {1} is readonly'.format(

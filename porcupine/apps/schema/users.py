@@ -18,8 +18,8 @@ class SystemUser(Item):
         if self.__is_new__:
             # direct assignment of id. don't try this at home!
             self.__storage__.id = 'system'
-            self.name = 'SYSTEM'
-            self.description = 'System User'
+            self.__storage__.name = 'SYSTEM'
+            self.__storage__.description = 'System User'
 
     @staticmethod
     async def is_admin():
