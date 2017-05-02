@@ -1,4 +1,4 @@
-from porcupine import context, exceptions, db
+from porcupine import context, exceptions, db, gather
 from porcupine.contract import contract
 from porcupine.utils import permissions, system
 from porcupine.core.services.schema import SchemaMaintenance
@@ -47,12 +47,16 @@ class Acl(Dictionary):
                              'Use the reset method instead.')
 
     async def apply_acl(self, container, acl, old_acl):
+        tasks = []
         children = await container.get_children()
         for child in children:
             if child.acl == old_acl:
                 super().on_change(child, acl, old_acl)
                 if child.is_collection:
-                    await self.apply_acl(child, acl, old_acl)
+                    tasks.append(self.apply_acl(child, acl, old_acl))
+                    # await self.apply_acl(child, acl, old_acl)
+        if tasks:
+            await gather(*tasks)
 
     async def on_change(self, instance, value, old_value):
         super().on_change(instance, value, old_value)
@@ -142,6 +146,7 @@ class Containers(Children):
 
 class Deleted(Counter):
     readonly = True
+    protected = True
 
     @contract(accepts=bool)
     @db.transactional()
