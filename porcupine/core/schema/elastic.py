@@ -1,5 +1,6 @@
 import asyncio
 import copy
+from typing import List, ClassVar, Dict
 
 from porcupine import config
 from porcupine.datatypes import DataType, String, ReferenceN
@@ -55,12 +56,12 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @cvar event_handlers: A list containing all the object's event handlers.
     @type event_handlers: list
     """
-    __schema__ = {}
-    __sig__ = ''
-    __record__ = None
-    __ext_record__ = None
+    __schema__: ClassVar[Dict[str, DataType]] = {}
+    __sig__: ClassVar[str] = ''
+    __record__: ClassVar[storage] = None
+    __ext_record__: ClassVar[storage] = None
 
-    is_collection = False
+    is_collection: ClassVar[bool] = False
     is_deleted = False
     event_handlers = []
 
@@ -107,27 +108,27 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         return self._snap
 
     @property
-    def __externals__(self):
+    def __externals__(self) -> storage:
         if self._ext is None:
             self._ext = self.__ext_record__()
         return self._ext
 
-    def __reset__(self):
+    def __reset__(self) -> None:
         self._snap = {}
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.__storage__)
 
-    def __add_defaults(self, data_types):
+    def __add_defaults(self, data_types: List[DataType]) -> None:
         for dt in data_types:
             dt.set_default(self)
 
-    def get_snapshot_of(self, attr_name):
+    def get_snapshot_of(self, attr_name: str):
         return self.__snapshot__.get(
             attr_name,
             getattr(self.__storage__, attr_name))
 
-    def to_json(self):
+    def to_json(self) -> dict:
         schema = list(self.__schema__.values())
         return {attr.name: attr.__get__(self, None)
                 for attr in schema
@@ -155,7 +156,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             result.update(kwargs)
         return result
 
-    async def clone(self, memo=None):
+    async def clone(self, memo: dict=None) -> 'Elastic':
         """
         Creates an in-memory clone of the item.
         This is a shallow copy operation meaning that the item's

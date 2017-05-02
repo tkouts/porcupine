@@ -36,7 +36,7 @@ class Acl(Dictionary):
         super().__init__(**kwargs)
         self._default = None
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance, owner) -> [AclValue, 'Acl']:
         if instance is None:
             return self
         dct = super().__get__(instance, owner) or {}
@@ -46,8 +46,27 @@ class Acl(Dictionary):
         raise AttributeError('Cannot directly set the ACL. '
                              'Use the reset method instead.')
 
+    async def apply_acl(self, container, acl, old_acl):
+        children = await container.get_children()
+        for child in children:
+            if child.acl == old_acl:
+                super().on_change(child, acl, old_acl)
+                if child.is_collection:
+                    await self.apply_acl(child, acl, old_acl)
+
     async def on_change(self, instance, value, old_value):
-        pass
+        super().on_change(instance, value, old_value)
+        if instance.is_collection:
+            with system_override():
+                await self.apply_acl(instance, value, old_value)
+
+    @contract(accepts=dict)
+    @db.transactional()
+    async def put(self, instance, request):
+        acl = request.json
+        await self.__get__(instance, None).reset(acl)
+        await instance.update()
+        return True
 
 
 class SchemaSignature(String):

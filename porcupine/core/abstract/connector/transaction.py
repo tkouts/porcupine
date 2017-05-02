@@ -9,8 +9,8 @@ from porcupine.utils import system
 class Transaction:
     __slots__ = ('connector', 'options',
                  '_inserted_items', '_items', '_deleted_items',
-                 '_insertions', '_upsertions',
-                 '_deletions', '_sd', '_appends')
+                 '_insertions', '_upsertions', '_deletions',
+                 '_sd', '_appends')
 
     def __init__(self, connector, **options):
         self.connector = connector

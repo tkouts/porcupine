@@ -46,7 +46,7 @@ class GenericItem(Removable, Elastic):
     name = String(required=True, unique=True)
     description = String(store_as='desc')
 
-    async def clone(self, memo=None):
+    async def clone(self, memo: dict=None):
         clone = await super().clone(memo)
         now = datetime.datetime.utcnow().isoformat()
         user = context.user
@@ -56,13 +56,12 @@ class GenericItem(Removable, Elastic):
             clone.modified_by = user.name
         return clone
 
-    async def append_to(self, parent):
+    async def append_to(self, parent) -> None:
         """
         Adds the item to the specified container.
 
-        @param parent: The id of the destination container or the container
-                       itself
-        @type parent: str OR L{Container}
+        @param parent: The destination container 
+        @type parent: L{Container}
         @return: None
         """
         if not self.__is_new__:
