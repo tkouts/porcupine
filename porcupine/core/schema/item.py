@@ -15,21 +15,20 @@ class GenericItem(Removable, Elastic):
     Generic Item
     The base class of all Porcupine objects.
 
-    @cvar is_collection: A boolean indicating if the object is a container.
-    @type is_collection: bool
-    @ivar modified_by: The display name of the last modifier.
-    @type modified_by: str
-    :ivar acl: The object's security descriptor. This is a dictionary
+    :ivar modified_by: The display name of the last modifier.
+    :type modified_by: str
+    :cvar acl: The object's security descriptor. This is a dictionary
                whose keys are the users' IDs and the values are the roles.
-    @type acl: dict
+    :type acl: dict
 
-    @ivar modified: The last modification date, handled by the server.
-    @type modified: float
-    @ivar name: The display name of the object.
-    @type name: L{String<porcupine.dt.String>}
-    @ivar description: A short description.
-    @type description: L{String<porcupine.dt.String>}
-    @type created: float
+    :cvar created: The creation date, handled by the server.
+    :type created: str
+    :ivar modified: The last modification date, handled by the server.
+    :type modified: str
+    :cvar name: The display name of the object.
+    :type name: L{String<porcupine.dt.String>}
+    :cvar description: A short description.
+    :type description: str
     """
     # system attributes
     created = DateTime(readonly=True, store_as='cr')
@@ -38,7 +37,7 @@ class GenericItem(Removable, Elastic):
     modified = DateTime(required=True, readonly=True, store_as='md')
 
     # security attributes
-    is_system = Boolean(readonly=True, store_as='sys')
+    is_system = Boolean(readonly=True, protected=True, store_as='sys')
     # roles_inherited = Boolean(default=True, store_as='ri')
     acl = Acl()
 

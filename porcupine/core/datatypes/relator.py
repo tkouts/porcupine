@@ -21,28 +21,30 @@ class RelatorBase(Acceptable):
             self.respects_references = kwargs['respects_references']
         self.name = None
 
-    async def add_reference(self, instance, item):
-        if not await self.accepts_item(item):
-            raise exceptions.ContainmentError(instance,
-                                              self.name, item)
-        rel_attr_value = getattr(item, self.rel_attr)
-        if isinstance(rel_attr_value, RelatorCollection):
-            # call super add to avoid recursion
-            await super(RelatorCollection, rel_attr_value).add(instance)
-        elif isinstance(rel_attr_value, RelatorItem):
-            setattr(item, self.rel_attr, instance.id)
-            # if not item.__is_new__:
-            context.txn.upsert(item)
+    async def add_reference(self, instance, *items):
+        for item in items:
+            # if not await self.accepts_item(item):
+            #     raise exceptions.ContainmentError(instance,
+            #                                       self.name, item)
+            rel_attr_value = getattr(item, self.rel_attr)
+            if isinstance(rel_attr_value, RelatorCollection):
+                # call super add to avoid recursion
+                await super(RelatorCollection, rel_attr_value).add(instance)
+            elif isinstance(rel_attr_value, RelatorItem):
+                setattr(item, self.rel_attr, instance.id)
+                # if not item.__is_new__:
+                context.txn.upsert(item)
 
-    def remove_reference(self, instance, item):
-        rel_attr_value = getattr(item, self.rel_attr)
-        if isinstance(rel_attr_value, RelatorCollection):
-            # call super remove to avoid recursion
-            super(RelatorCollection, rel_attr_value).remove(instance)
-        elif isinstance(rel_attr_value, RelatorItem):
-            setattr(item, self.rel_attr, None)
-            # if not item.__is_new__:
-            context.txn.upsert(item)
+    def remove_reference(self, instance, *items):
+        for item in items:
+            rel_attr_value = getattr(item, self.rel_attr)
+            if isinstance(rel_attr_value, RelatorCollection):
+                # call super remove to avoid recursion
+                super(RelatorCollection, rel_attr_value).remove(instance)
+            elif isinstance(rel_attr_value, RelatorItem):
+                setattr(item, self.rel_attr, None)
+                # if not item.__is_new__:
+                context.txn.upsert(item)
 
 
 class RelatorItem(ItemReference):
@@ -120,13 +122,13 @@ class RelatorCollection(ItemCollection):
         return [item for item in items
                 if self._desc.rel_attr in item.__schema__]
 
-    async def add(self, item):
-        await super().add(item)
-        await self._desc.add_reference(self._inst, item)
+    async def add(self, *items):
+        await super().add(*items)
+        await self._desc.add_reference(self._inst, *items)
 
-    def remove(self, item):
-        super().remove(item)
-        self._desc.remove_reference(self._inst, item)
+    def remove(self, *items):
+        super().remove(*items)
+        self._desc.remove_reference(self._inst, *items)
 
 
 class RelatorN(ReferenceN, RelatorBase):
@@ -167,15 +169,12 @@ class RelatorN(ReferenceN, RelatorBase):
 
     async def on_create(self, instance, value):
         added, _ = await super().on_create(instance, value)
-        for item in added:
-            await self.add_reference(instance, item)
+        await self.add_reference(instance, *added)
 
     async def on_change(self, instance, value, old_value):
         added, removed = await super().on_change(instance, value, old_value)
-        for item in added:
-            await self.add_reference(instance, item)
-        for item in removed:
-            self.remove_reference(instance, item)
+        await self.add_reference(instance, *added)
+        self.remove_reference(instance, *removed)
 
     async def on_delete(self, instance, value):
         ref_ids = await self.fetch(instance, set_storage=False)

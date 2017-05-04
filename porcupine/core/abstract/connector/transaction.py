@@ -117,13 +117,15 @@ class Transaction:
             insertions.update({i.__storage__.id: dumps(i)
                                for i in inserted_items})
 
-            snapshots = {item.id: item.__snapshot__
-                         for item in self._items.values()
-                         if item.__snapshot__}
+            snapshots = {i.__storage__.id: i.__snapshot__
+                         for i in self._items.values()
+                         if i.__snapshot__}
 
             # clear snapshots
             for item in inserted_items:
                 item.__reset__()
+                # clear new flag
+                item.__is_new__ = False
                 # add to items so that later can be modified
                 self._items[item.id] = item
             for item_id in snapshots:
@@ -190,7 +192,8 @@ class Transaction:
         if self._appends:
             # make sure externals with appends are initialized
             append_keys = list(self._appends.keys())
-            tasks = [connector.exists(key) for key in append_keys
+            tasks = [connector.exists(key)
+                     for key in append_keys
                      if key not in insertions]
             completed, _ = await asyncio.wait(tasks)
             keys_exist = [c.result() for c in completed]

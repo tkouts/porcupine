@@ -1,5 +1,3 @@
-from porcupine.datatypes import String
-from porcupine.utils import system
 from .elastic import Elastic
 
 
@@ -19,4 +17,11 @@ class Composite(Elastic):
 
     @see: L{porcupine.datatypes.Composition}
     """
-    name = String(required=True)
+
+    # @property
+    # async def is_deleted(self):
+    #     return await db.connector.get(self.parent_id).is_deleted
+    #
+    # @property
+    # async def acl(self):
+    #     return await db.connector.get(self.parent_id).acl

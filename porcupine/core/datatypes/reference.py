@@ -115,30 +115,30 @@ class ItemCollection:
     async def items(self):
         return await db.get_multi(await self.get())
 
-    async def add(self, item):
-        if not await self._desc.accepts_item(item):
-            raise ContainmentError(self._inst, self._desc.name, item)
-        if self._inst.__is_new__:
-            storage = getattr(self._inst, self._desc.storage)
-            collection = getattr(storage, self._desc.name)
-            if item.id not in collection:
-                # self._desc.snapshot(self._inst, True, None)
-                collection.append(item.id)
-        else:
-            context.txn.append(self._desc.key_for(self._inst),
-                               ' {0}'.format(item.id))
+    async def add(self, *items):
+        for item in items:
+            if not await self._desc.accepts_item(item):
+                raise ContainmentError(self._inst, self._desc.name, item)
+            if self._inst.__is_new__:
+                storage = getattr(self._inst, self._desc.storage)
+                collection = getattr(storage, self._desc.name)
+                if item.id not in collection:
+                    collection.append(item.id)
+            else:
+                context.txn.append(self._desc.key_for(self._inst),
+                                   ' {0}'.format(item.id))
 
-    def remove(self, item):
-        if self._inst.__is_new__:
-            storage = getattr(self._inst, self._desc.storage)
-            collection = getattr(storage, self._desc.name)
-            if item.id in collection:
-                # add snapshot to trigger on_change
-                # self._desc.snapshot(self._inst, True, None)
-                collection.remove(item.id)
-        else:
-            context.txn.append(self._desc.key_for(self._inst),
-                               ' -{0}'.format(item.id))
+    def remove(self, *items):
+        for item in items:
+            if self._inst.__is_new__:
+                storage = getattr(self._inst, self._desc.storage)
+                collection = getattr(storage, self._desc.name)
+                if item.id in collection:
+                    # add snapshot to trigger on_change
+                    collection.remove(item.id)
+            else:
+                context.txn.append(self._desc.key_for(self._inst),
+                                   ' -{0}'.format(item.id))
 
 
 class ReferenceN(Text, Acceptable):
@@ -228,10 +228,7 @@ class ReferenceN(Text, Acceptable):
 
     async def clone(self, instance, memo):
         ids = await getattr(instance, self.name).get()
-        print(ids)
-        print([memo['_id_map_'].get(oid, oid) for oid in ids])
-        self.__set__(instance,
-                     [memo['_id_map_'].get(oid, oid) for oid in ids])
+        self.__set__(instance, [memo['_id_map_'].get(oid, oid) for oid in ids])
 
     async def on_create(self, instance, value):
         if value:
@@ -264,10 +261,8 @@ class ReferenceN(Text, Acceptable):
         added = await db.get_multi(added_ids)
         removed = await db.get_multi(removed_ids)
         item_collection = getattr(instance, self.name)
-        for item in added:
-            await item_collection.add(item)
-        for item in removed:
-            item_collection.remove(item)
+        await item_collection.add(*added)
+        item_collection.remove(*removed)
         return added, removed
 
     async def on_delete(self, instance, value):
@@ -275,14 +270,15 @@ class ReferenceN(Text, Acceptable):
         active_chunk_key = system.get_active_chunk_key(self.name)
         active_chunk = getattr(instance.__storage__, active_chunk_key) - 1
         if active_chunk > -1:
-            external_key = system.get_collection_key(instance.id,
-                                                     self.name,
-                                                     active_chunk)
-            while (await db.connector.exists(external_key))[1]:
+            while True:
+                external_key = system.get_collection_key(instance.id,
+                                                         self.name,
+                                                         active_chunk)
+                _, key_exists = await db.connector.exists(external_key)
+                if not key_exists:
+                    break
                 context.txn.delete_external(external_key)
                 active_chunk -= 1
-                external_key = system.get_collection_key(
-                    instance.id, self.name, active_chunk)
 
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args

@@ -28,7 +28,7 @@ def generate_oid(length: int=8) -> str:
     return ''.join(random.sample(VALID_ID_CHARS, length))
 
 
-@functools.lru_cache()
+@functools.lru_cache(maxsize=None)
 def get_rto_by_name(name: str):
     """
     This function returns a runtime object by name.
@@ -122,7 +122,7 @@ def get_descriptor_by_storage_key(cls, key):
     return locate_descriptor_by_storage_key(cls, key)
 
 
-@functools.lru_cache()
+@functools.lru_cache(maxsize=None)
 def locate_descriptor_by_storage_key(cls, key):
     for desc in cls.__schema__.values():
         if desc.storage_key == key:

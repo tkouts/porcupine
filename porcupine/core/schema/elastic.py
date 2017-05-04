@@ -53,8 +53,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     The object schema is automatically updated the next time the
     object is written in the database.
 
-    @cvar event_handlers: A list containing all the object's event handlers.
-    @type event_handlers: list
+    :cvar event_handlers: A list containing all the object's event handlers.
+    :type event_handlers: list
+    :cvar is_collection: A boolean indicating if the object is a container.
+    :type is_collection: bool
     """
     __schema__: ClassVar[Dict[str, DataType]] = {}
     __sig__: ClassVar[str] = ''
@@ -62,7 +64,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     __ext_record__: ClassVar[storage] = None
 
     is_collection: ClassVar[bool] = False
-    is_deleted = False
+    is_deleted: ClassVar[bool] = False
     event_handlers = []
 
     id = String(readonly=True)
