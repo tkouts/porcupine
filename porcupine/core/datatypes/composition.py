@@ -3,7 +3,7 @@ Porcupine composition data types
 ================================
 """
 from porcupine import db, exceptions, context
-from porcupine.contract import is_new_item
+from porcupine.contract import contract
 from porcupine.utils import system
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
@@ -97,7 +97,7 @@ class Composition(ReferenceN):
     async def get(self, instance, request, expand=False):
         return await super().get(instance, request, expand=True)
 
-    @is_new_item()
+    @contract(accepts=dict)
     @db.transactional()
     async def post(self, instance, request):
         """
@@ -108,15 +108,13 @@ class Composition(ReferenceN):
         """
         collection = getattr(instance, self.name)
         item_dict = request.json
-        # TODO: handle invalid type exception
-        item_type = system.get_rto_by_name(item_dict.pop('type'))
-        new_item = item_type()
+        item_dict.setdefault('type', self.allowed_types[0])
         try:
-            for attr, value in item_dict.items():
-                setattr(new_item, attr, value)
-            await collection.add(new_item)
+            composite = Composite.new_from_dict(item_dict)
+            await collection.add(composite)
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
+        return composite
 
     @db.transactional()
     async def put(self, instance, request):
@@ -124,19 +122,14 @@ class Composition(ReferenceN):
         collection = self.__get__(instance, None)
         for item_dict in request.json:
             composite_id = item_dict.pop('id', None)
-            item_type = item_dict.pop('type', None)
-            if composite_id:
-                composite = await collection.get_item_by_id(composite_id)
-            else:
-                if item_type is None:
-                    item_type = self.allowed_types[0]
-                else:
-                    # TODO: handle invalid type exception
-                    item_type = system.get_rto_by_name(item_type)
-                composite = item_type()
             try:
-                for attr, value in item_dict.items():
-                    setattr(composite, attr, value)
+                if composite_id:
+                    item_dict.pop('type', None)
+                    composite = await collection.get_item_by_id(composite_id)
+                    composite.apply_patch(item_dict)
+                else:
+                    item_dict.setdefault('type', self.allowed_types[0])
+                    composite = Composite.new_from_dict(item_dict)
                 composites.append(composite)
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))

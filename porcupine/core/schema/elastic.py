@@ -67,10 +67,20 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     is_deleted: ClassVar[bool] = False
     event_handlers = []
 
-    id = String(readonly=True)
+    id = String(required=True, readonly=True)
     parent_id = String(readonly=True, allow_none=True,
                        default=None, store_as='pid')
     sig = SchemaSignature()
+
+    @staticmethod
+    def new_from_dict(dct: dict) -> 'Elastic':
+        item_type = dct.pop('type')
+        if isinstance(item_type, str):
+            # TODO: handle invalid type exception
+            item_type = system.get_rto_by_name(item_type)
+        new_item = item_type()
+        new_item.apply_patch(dct)
+        return new_item
 
     def __init__(self, dict_storage=None):
         if dict_storage is None:
@@ -132,10 +142,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     def to_json(self) -> dict:
         schema = list(self.__schema__.values())
-        return {attr.name: attr.__get__(self, None)
-                for attr in schema
-                if attr.protected is False
-                and attr.storage == '__storage__'}
+        return self.custom_view(*[data_type.name for data_type in schema
+                                  if not data_type.protected
+                                  and data_type.storage == '__storage__'])
 
     # ujson hook
     toDict = to_json
@@ -149,6 +158,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         """
         return '{0}.{1}'.format(self.__class__.__module__,
                                 self.__class__.__name__)
+
+    def apply_patch(self, patch: dict) -> None:
+        for attr, value in patch.items():
+            setattr(self, attr, value)
 
     def custom_view(self, *args, **kwargs) -> dict:
         result = {

@@ -133,13 +133,8 @@ class Container(Item):
             new_item = await source.copy_to(self)
         else:
             # new item
-            item_dict = request.json
-            # TODO: handle invalid type exception
-            item_type = system.get_rto_by_name(item_dict.pop('type'))
-            new_item = item_type()
             try:
-                for attr, value in item_dict.items():
-                    setattr(new_item, attr, value)
+                new_item = Container.new_from_dict(request.json)
                 await new_item.append_to(self)
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
@@ -152,4 +147,3 @@ class Container(Item):
             headers={
                 'Location': location
             })
-
