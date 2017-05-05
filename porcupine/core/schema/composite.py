@@ -1,3 +1,4 @@
+from porcupine import db, context
 from .elastic import Elastic
 
 
@@ -17,11 +18,24 @@ class Composite(Elastic):
 
     @see: L{porcupine.datatypes.Composition}
     """
+    @property
+    async def item(self):
+        parent = await db.connector.get(self.parent_id)
+        while isinstance(parent, Composite):
+            parent = await db.connector.get(parent.parent_id)
+        return parent
 
-    # @property
-    # async def is_deleted(self):
-    #     return await db.connector.get(self.parent_id).is_deleted
-    #
-    # @property
-    # async def acl(self):
-    #     return await db.connector.get(self.parent_id).acl
+    @property
+    async def is_deleted(self):
+        parent = await self.item
+        return parent.is_deleted
+
+    @property
+    async def acl(self):
+        parent = await self.item
+        return parent.acl
+
+    async def update(self):
+        context.txn.upsert(self)
+        item = await self.item
+        await item.update()

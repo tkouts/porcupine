@@ -192,16 +192,16 @@ class Item(Cloneable, Movable, Recyclable, GenericItem):
             user = context.user
             user_role = await permissions.resolve(self, user)
 
-            if user_role > permissions.READER:
-                with system_override():
-                    self.modified_by = user.name
-                    self.modified = datetime.datetime.utcnow().isoformat()
-                    context.txn.upsert(self)
-                    if parent is not None:
-                        parent.modified = self.modified
-                        context.txn.upsert(parent)
-            else:
+            if user_role < permissions.AUTHOR:
                 raise exceptions.Forbidden('Forbidden')
+
+            with system_override():
+                self.modified_by = user.name
+                self.modified = datetime.datetime.utcnow().isoformat()
+                context.txn.upsert(self)
+                if parent is not None:
+                    parent.modified = self.modified
+                    context.txn.upsert(parent)
 
     # HTTP views
     def get(self, request):

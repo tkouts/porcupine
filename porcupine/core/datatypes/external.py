@@ -59,7 +59,7 @@ class Blob(DataType):
 
     def snapshot(self, instance, new_value, old_value):
         if self.name not in instance.__snapshot__:
-            if new_value:
+            if new_value is not None:
                 instance.__snapshot__[self.name] = None
 
     def clone(self, instance, memo):
@@ -101,7 +101,6 @@ class ExternalFile(String):
     Data type for linking external files. Its value
     is a string which contains the path to the file.
     """
-    safe_type = str
     allow_none = True
     remove_file_on_deletion = True
 

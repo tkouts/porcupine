@@ -59,7 +59,7 @@ def with_context(identity=None):
         """
         @wraps(func)
         async def context_wrapper(*args, **kwargs):
-            with Context(locals=(context,)):
+            with Context(locals=(context, )):
                 user = identity
                 if user is None:
                     session = args[0].session

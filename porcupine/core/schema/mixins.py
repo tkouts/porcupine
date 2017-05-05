@@ -70,7 +70,7 @@ class Cloneable:
         context.txn.insert(clone)
         return clone
 
-    async def _copy(self: Elastic, target: Elastic, memo: dict):
+    async def _copy(self, target: Elastic, memo: dict):
         all_children = await Cloneable._prepare_id_map(
             self, memo['_id_map_'], True)
         memo['_id_map_'][self.parent_id] = target.id
@@ -79,7 +79,7 @@ class Cloneable:
             await Cloneable._write_clone(item, memo, None)
         return clone
 
-    async def copy_to(self: Elastic, target):
+    async def copy_to(self, target):
         """
         Copies the item to the designated target.
 

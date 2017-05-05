@@ -3,23 +3,39 @@ Porcupine composition data types
 ================================
 """
 from porcupine import db, exceptions, context
+from porcupine.contract import is_new_item
+from porcupine.utils import system
+from porcupine.core.context import system_override
+from porcupine.core.schema.composite import Composite
 from .reference import ReferenceN, ItemCollection
 from .datatype import DataType
-from porcupine.utils import system
-
-Composite = None
 
 
 class EmbeddedCollection(ItemCollection):
-    async def add(self, item):
-        if not item.__is_new__:
-            raise TypeError('Can only add new items to composition')
-        await super().add(item)
-        context.txn.insert(item)
+    async def get_item_by_id(self, item_id):
+        with system_override():
+            return await super().get_item_by_id(item_id)
 
-    def remove(self, item):
-        super().remove(item)
-        context.txn.delete(item)
+    async def items(self):
+        with system_override():
+            return await super().items()
+
+    async def add(self, *composites):
+        with system_override():
+            await super().add(*composites)
+            for composite in composites:
+                if not composite.__is_new__:
+                    raise TypeError('Can only add new items to composition')
+                composite.parent_id = self._inst.id
+                context.txn.insert(composite)
+        await self._inst.update()
+
+    async def remove(self, *composites):
+        with system_override():
+            await super().remove(*composites)
+            for composite in composites:
+                context.txn.delete(composite)
+        await self._inst.update()
 
 
 class Composition(ReferenceN):
@@ -43,24 +59,90 @@ class Composition(ReferenceN):
             if not composite.__is_new__:
                 # TODO: revisit
                 raise TypeError('Can only add new items to composition')
+            with system_override():
+                composite.parent_id = instance.id
             context.txn.insert(composite)
-        await super().on_create(instance, [c.__storage__.id for c in value])
+        with system_override():
+            await super().on_create(instance, [c.__storage__.id for c in value])
 
     async def on_change(self, instance, value, old_value):
-        for composite in value:
-            if composite.__is_new__:
-                context.txn.insert(composite)
-            else:
-                context.txn.upsert(composite)
-        await super().on_change(instance,
-                                [c.__storage__.id for c in value],
-                                None)
+        old_ids = frozenset(await self.fetch(instance, set_storage=False))
+        collection = self.__get__(instance, None)
+        new_ids = frozenset([c.__storage__.id for c in value])
+        removed_ids = old_ids.difference(new_ids)
+        added = []
+
+        with system_override():
+            for composite in value:
+                if composite.__is_new__:
+                    composite.parent_id = instance.id
+                    context.txn.insert(composite)
+                    added.append(composite)
+                else:
+                    context.txn.upsert(composite)
+            removed = await db.get_multi(removed_ids)
+            for item in removed:
+                context.txn.delete(item)
+            await super(EmbeddedCollection, collection).remove(*removed)
+            await super(EmbeddedCollection, collection).add(*added)
 
     async def on_delete(self, instance, value):
-        composites = await self.__get__(instance, None).items()
-        for composite in composites:
+        composite_ids = await self.fetch(instance, set_storage=False)
+        async for composite in db.connector.get_multi(composite_ids):
             context.txn.delete(composite)
+        # remove collection documents
         await super().on_delete(instance, value)
+
+    # HTTP views
+    async def get(self, instance, request, expand=False):
+        return await super().get(instance, request, expand=True)
+
+    @is_new_item()
+    @db.transactional()
+    async def post(self, instance, request):
+        """
+        Adds a new composite to the collection
+        :param instance: 
+        :param request: 
+        :return: 
+        """
+        collection = getattr(instance, self.name)
+        item_dict = request.json
+        # TODO: handle invalid type exception
+        item_type = system.get_rto_by_name(item_dict.pop('type'))
+        new_item = item_type()
+        try:
+            for attr, value in item_dict.items():
+                setattr(new_item, attr, value)
+            await collection.add(new_item)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+
+    @db.transactional()
+    async def put(self, instance, request):
+        composites = []
+        collection = self.__get__(instance, None)
+        for item_dict in request.json:
+            composite_id = item_dict.pop('id', None)
+            item_type = item_dict.pop('type', None)
+            if composite_id:
+                composite = await collection.get_item_by_id(composite_id)
+            else:
+                if item_type is None:
+                    item_type = self.allowed_types[0]
+                else:
+                    # TODO: handle invalid type exception
+                    item_type = system.get_rto_by_name(item_type)
+                composite = item_type()
+            try:
+                for attr, value in item_dict.items():
+                    setattr(composite, attr, value)
+                composites.append(composite)
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
+        setattr(instance, self.name, composites)
+        await instance.update()
+        return composites
 
 
 class Embedded(DataType):
@@ -107,10 +189,6 @@ class Embedded(DataType):
         self.on_update(instance, value, None)
 
     def on_update(self, instance, value, old_value):
-        global Composite
-        if Composite is None:
-            from porcupine.schema import Composite
-
         nested = self.nested
         # variable to detect change from external -> nested
         should_remove_external = False

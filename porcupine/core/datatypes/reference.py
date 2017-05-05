@@ -2,9 +2,11 @@ import math
 
 from porcupine import db, context
 from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
-    InvalidUsage
+    InvalidUsage, AttributeSetError
 from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.utils import system
+from porcupine.core.context import system_override
+from porcupine.contract import contract
+from porcupine.utils import system, permissions
 from .external import Text
 from .common import String
 
@@ -112,10 +114,23 @@ class ItemCollection:
             await self._desc.fetch(self._inst)
         return tuple(getattr(storage, name))
 
+    async def get_item_by_id(self, item_id):
+        ids = await self.get()
+        if item_id in ids:
+            return await db.get_item(item_id, quiet=False)
+
     async def items(self):
         return await db.get_multi(await self.get())
 
+    async def _check_permissions_and_raise(self):
+        user = context.user
+        user_role = await permissions.resolve(self._inst, user)
+        if user_role < permissions.AUTHOR:
+            raise Forbidden('Forbidden')
+
     async def add(self, *items):
+        if not context.system_override:
+            await self._check_permissions_and_raise()
         for item in items:
             if not await self._desc.accepts_item(item):
                 raise ContainmentError(self._inst, self._desc.name, item)
@@ -128,7 +143,9 @@ class ItemCollection:
                 context.txn.append(self._desc.key_for(self._inst),
                                    ' {0}'.format(item.id))
 
-    def remove(self, *items):
+    async def remove(self, *items):
+        if not context.system_override:
+            await self._check_permissions_and_raise()
         for item in items:
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
@@ -260,9 +277,10 @@ class ReferenceN(Text, Acceptable):
         removed_ids = old_value.difference(new_value)
         added = await db.get_multi(added_ids)
         removed = await db.get_multi(removed_ids)
-        item_collection = getattr(instance, self.name)
-        await item_collection.add(*added)
-        item_collection.remove(*removed)
+        item_collection = self.__get__(instance, None)
+        with system_override():
+            await item_collection.add(*added)
+            await item_collection.remove(*removed)
         return added, removed
 
     async def on_delete(self, instance, value):
@@ -282,7 +300,24 @@ class ReferenceN(Text, Acceptable):
 
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
-        value = getattr(instance, self.name)
+        collection = getattr(instance, self.name)
         if expand:
-            return await value.items()
-        return await value.get()
+            return await collection.items()
+        return await collection.get()
+
+    @contract(accepts=str)
+    @db.transactional()
+    async def post(self, instance, request):
+        """
+        Adds an item to the collection
+        :param instance: 
+        :param request: 
+        :return: 
+        """
+        item = await db.get_item(request.json, quiet=False)
+        collection = getattr(instance, self.name)
+        try:
+            await collection.add(item)
+        except AttributeSetError as e:
+            raise InvalidUsage(str(e))
+        return True
