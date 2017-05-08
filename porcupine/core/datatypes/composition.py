@@ -4,14 +4,23 @@ Porcupine composition data types
 """
 from porcupine import db, exceptions, context
 from porcupine.contract import contract
-from porcupine.utils import system
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
-from .reference import ReferenceN, ItemCollection
+from .reference import ReferenceN, ItemCollection, Reference1
 from .datatype import DataType
 
 
 class EmbeddedCollection(ItemCollection):
+    __slots__ = ()
+
+    def new(self, clazz=None) -> Composite:
+        composite_type = clazz or self._desc.allowed_types[0]
+        with system_override():
+            composite = composite_type()
+            composite.id = '{0}.{1}.{2}'.format(
+                self._inst.id, self._desc.name, composite.id)
+        return composite
+
     async def get_item_by_id(self, item_id):
         with system_override():
             return await super().get_item_by_id(item_id)
@@ -45,6 +54,8 @@ class Composition(ReferenceN):
 
     @see: L{porcupine.schema.Composite}
     """
+    storage_info = '_compN_'
+
     def __get__(self, instance, owner):
         if instance is None:
             return self
@@ -108,28 +119,36 @@ class Composition(ReferenceN):
         """
         collection = getattr(instance, self.name)
         item_dict = request.json
-        item_dict.setdefault('type', self.allowed_types[0])
+        # item_dict.setdefault('type', self.allowed_types[0])
         try:
-            composite = Composite.new_from_dict(item_dict)
+            composite = collection.new()  # Composite.new_from_dict(item_dict)
+            composite.apply_patch(item_dict)
             await collection.add(composite)
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         return composite
 
+    @contract(accepts=list)
     @db.transactional()
     async def put(self, instance, request):
+        """
+        Resets the collection
+        :param instance: 
+        :param request: 
+        :return: 
+        """
         composites = []
         collection = self.__get__(instance, None)
         for item_dict in request.json:
             composite_id = item_dict.pop('id', None)
             try:
                 if composite_id:
-                    item_dict.pop('type', None)
                     composite = await collection.get_item_by_id(composite_id)
                     composite.apply_patch(item_dict)
                 else:
-                    item_dict.setdefault('type', self.allowed_types[0])
-                    composite = Composite.new_from_dict(item_dict)
+                    # item_dict.setdefault('type', self.allowed_types[0])
+                    composite = collection.new()
+                    composite.apply_patch(item_dict)
                 composites.append(composite)
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
@@ -138,126 +157,123 @@ class Composition(ReferenceN):
         return composites
 
 
-class Embedded(DataType):
-    """
-    This data type is used for embedding a single composite objects to
-    the assigned content type.
+class EmbeddedItem:
+    __slots__ = ('_desc', '_inst')
 
-    @var composite_class: the name of the content class that can be embedded.
+    def __init__(self, descriptor: 'Embedded', instance):
+        self._desc = descriptor
+        self._inst = instance
+
+    def new(self, clazz=None) -> Composite:
+        composite_type = clazz or self._desc.allowed_types[0]
+        with system_override():
+            composite = composite_type()
+            composite.id = self._desc.key_for(self._inst)
+        return composite
+
+    async def item(self):
+        with system_override():
+            composite_id = self._desc.key_for(self._inst)
+            return await db.get_item(composite_id)
+
+
+class Embedded(Reference1):
+    """
+    This data type is used for embedding a composite object to
+    another item.
 
     @see: L{porcupine.schema.Composite}
     """
-    safe_type = object
-    allow_none = True
-    composite_class = ''
-    nested = False
-
-    def __init__(self, default=None, **kwargs):
-        super(Embedded, self).__init__(default, **kwargs)
-        if 'composite_class' in kwargs:
-            self.composite_class = kwargs['composite_class']
-        if 'nested' in kwargs:
-            self.nested = kwargs['nested']
+    safe_type = Composite
+    storage_info = '_comp1_'
+    storage = '__externals__'
+    # TODO: disallow unique
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        value = DataType.__get__(self, instance, owner)
-        if value is None:
-            return None
-        elif isinstance(value, str):
-            value = instance._dict['bag'][self.name] = db._db.get_item(value)
-        elif isinstance(value, dict):
-            # nested
-            value = instance._dict['bag'][self.name] = \
-                db._db._persist.loads(value)
-        return value
+        return EmbeddedItem(self, instance)
 
-    def clone(self, instance, memo):
-        embedded = self.__get__(instance, instance.__class__)
-        if embedded is not None:
-            self.__set__(instance, embedded.clone(memo))
+    def __set__(self, instance, composite):
+        if composite and not composite.__is_new__:
+            # TODO: revisit
+            raise TypeError(
+                'Can only set new composite items to {0}'.format(self.name))
+        super().__set__(instance, composite)
 
-    def on_create(self, instance, value):
-        self.on_update(instance, value, None)
+    def set_default(self, instance, value=None):
+        super().set_default(instance, value)
+        # add external info
+        setattr(instance.__storage__, self.name, self.storage_info)
 
-    def on_update(self, instance, value, old_value):
-        nested = self.nested
-        # variable to detect change from external -> nested
-        should_remove_external = False
+    def key_for(self, instance):
+        return '{0}.{1}'.format(instance.id, self.name)
 
-        if value is not None:
-            if isinstance(value, Composite):
-                if nested and '.' not in value.id:
-                    value._id = '%s.%s.%s' % (instance.id, self.name, value.id)
-                elif not nested and '.' in value.id:
-                    value._id = value.id.split('.')[-1]
-                value._pid = ':%s' % instance.id
+    def snapshot(self, instance, composite, previous_value):
+        storage_key = self.storage_key
+        if storage_key not in instance.__snapshot__:
+            instance.__snapshot__[storage_key] = previous_value
+
+    async def clone(self, instance, memo):
+        embedded = self.__get__(instance, None)
+        composite = await embedded.item()
+        if composite:
+            self.__set__(instance, composite.clone(memo))
+
+    async def on_create(self, instance, composite):
+        if composite is not None:
+            context.txn.insert(composite)
+            with system_override():
+                await super().on_create(instance, composite.__storage__.id)
+        else:
+            await super().on_create(instance, None)
+        # storage = getattr(instance, self.storage)
+        # setattr(storage, self.storage_key, composite.__storage__.id)
+
+    async def on_change(self, instance, composite, old_value):
+        if composite is None:
+            self.validate(None)
+            await self.on_delete(instance, None)
+        else:
+            await self.on_create(instance, composite)
+
+    async def on_delete(self, instance, value):
+        embedded = self.__get__(instance, None)
+        composite = await embedded.item()
+        if composite:
+            context.txn.delete(composite)
+
+    # HTTP views
+    async def get(self, instance, request, expand=True):
+        embedded = await self.__get__(instance, None).item()
+        return embedded
+
+    @contract(accepts=dict, optional=True)
+    @db.transactional()
+    async def put(self, instance, request):
+        """
+        Resets the collection
+        :param instance: 
+        :param request: 
+        :return: 
+        """
+        value = self.__get__(instance, None)
+        item_dict = request.json
+        try:
+            if item_dict is None:
+                setattr(instance, self.name, None)
+                await instance.update()
+                return None
             else:
-                raise exceptions.ContainmentError(
-                    'Invalid object type "{}" in composition.'.format(
-                        value.__class__.__name__))
-
-            # check containment
-            composite_type = system.get_rto_by_name(self.composite_class)
-
-            if not isinstance(value, composite_type):
-                raise exceptions.ContainmentError(
-                    'Invalid content class "{}" in composition.'.format(
-                        value.contentclass))
-
-        # get previous value
-        if old_value is not None:
-            if (value and value.id) != old_value.id:
-                Composition._remove_composite(old_value, nested=nested)
-            # detect schema change
-            should_remove_external = nested and '.' not in old_value.id
-
-        if value is not None:
-            is_new = value.id != (old_value and old_value.id)
-            db._db.handle_update(value, None if is_new else old_value)
-            if not nested:
-                db._db.put_item(value)
-                setattr(instance, self.name, value.id)
-            else:
-                setattr(instance, self.name, db._db._persist.dumps(value))
-
-        if should_remove_external:
-            db._db.delete_item(old_value)
-
-    def on_delete(self, instance, value, is_permanent):
-        if value is not None:
-            # do not rely on definition - inspect current schema
-            # the schema will be updated when the item is restored
-            nested = '.' in value.id
-            Composition._remove_composite(value, is_permanent, nested=nested)
-            # restore correct format in bag
-            if not is_permanent:
-                if not nested:
-                    setattr(instance, self.name, value.id)
+                embedded = await value.item()
+                if embedded:
+                    embedded.apply_patch(item_dict)
+                    await embedded.update()
                 else:
-                    setattr(instance, self.name, db._db._persist.dumps(value))
-
-    def on_undelete(self, instance, value):
-        if value is not None:
-            nested = self.nested
-            value._is_deleted = 0
-
-            if nested and '.' not in value.id:
-                db._db.delete_item(value)
-                value._id = '{0}.{1}.{2}'.format(
-                    instance.id, self.name, value.id)
-            elif not nested and '.' in value.id:
-                db._db.handle_delete(value, True, execute_event_handlers=False)
-                value._id = value.id.split('.')[-1]
-                db._db.handle_update(value, None, execute_event_handlers=False)
-
-            db._db.handle_undelete(value)
-            if not nested:
-                db._db.put_item(value)
-
-            # restore correct format in bag
-            if not nested:
-                setattr(instance, self.name, value.id)
-            else:
-                setattr(instance, self.name, db._db._persist.dumps(value))
+                    embedded = value.new()
+                    embedded.apply_patch(item_dict)
+                    setattr(instance, self.name, embedded)
+                    await instance.update()
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+        return embedded

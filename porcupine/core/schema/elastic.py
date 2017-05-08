@@ -26,11 +26,15 @@ class ElasticMeta(type):
                 if isinstance(attr, DataType):
                     schema[attr_name] = attr
                     attr.name = attr_name
-                    field_spec.append(attr.storage_key)
-                    if isinstance(attr, ReferenceN):
-                        field_spec.append(
-                            system.get_active_chunk_key(attr.storage_key))
+                    if attr.storage == '__storage__':
+                        field_spec.append(attr.storage_key)
+                    else:
                         ext_spec.append(attr.storage_key)
+                        if hasattr(attr, 'storage_info'):
+                            field_spec.append(attr.storage_key)
+                        if isinstance(attr, ReferenceN):
+                            field_spec.append(
+                                system.get_active_chunk_key(attr.storage_key))
                     if attr.indexed:
                         config.add_index(attr)
             except AttributeError:

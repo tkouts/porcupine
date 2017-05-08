@@ -44,10 +44,7 @@ class ItemReference(str):
         @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
         @return: The referenced object, otherwise None
         """
-        item = None
-        if self:
-            item = await db.get_item(self)
-        return item
+        return await db.get_item(self)
 
 
 class Reference1(String, Acceptable):

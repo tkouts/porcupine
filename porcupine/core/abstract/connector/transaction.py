@@ -174,7 +174,7 @@ class Transaction:
 
                 for item in removed_items:
                     # execute on delete handlers
-                    for dt in item.__schema__.values():
+                    for dt in list(item.__schema__.values()):
                         storage = getattr(item, dt.storage)
                         value = getattr(storage, dt.storage_key)
                         _ = dt.on_delete(item, value)

@@ -18,7 +18,7 @@ class Container(Item):
     @type containment: tuple
     """
     is_collection = True
-    containment = (Shortcut, )
+    containment = ()
     items = Items()
     containers = Containers()
 

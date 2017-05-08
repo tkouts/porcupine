@@ -18,16 +18,23 @@ class Composite(Elastic):
 
     @see: L{porcupine.datatypes.Composition}
     """
+    def __init__(self, dict_storage=None):
+        super().__init__(dict_storage)
+        if self.__is_new__ and not context.system_override:
+            raise TypeError('Composite objects cannot be instantiated')
+
     @property
     async def item(self):
-        parent = await db.connector.get(self.parent_id)
-        while isinstance(parent, Composite):
-            parent = await db.connector.get(parent.parent_id)
-        return parent
+        item_id = self.id.split('.')[0]
+        return await db.connector.get(item_id)
 
     @property
     async def is_deleted(self):
         parent = await self.item
+        if parent is None:
+            # stale composite
+            # TODO: remove from DB
+            return 1
         return parent.is_deleted
 
     @property
