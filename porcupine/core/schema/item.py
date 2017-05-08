@@ -31,6 +31,8 @@ class GenericItem(Removable, Elastic):
     :type description: str
     """
     # system attributes
+    parent_id = String(readonly=True, allow_none=True,
+                       default=None, store_as='pid')
     created = DateTime(readonly=True, store_as='cr')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')

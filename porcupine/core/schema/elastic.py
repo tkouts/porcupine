@@ -72,8 +72,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     event_handlers = []
 
     id = String(required=True, readonly=True)
-    parent_id = String(readonly=True, allow_none=True,
-                       default=None, store_as='pid')
     sig = SchemaSignature()
 
     @staticmethod

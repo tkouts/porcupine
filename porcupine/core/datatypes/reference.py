@@ -128,6 +128,7 @@ class ItemCollection:
     async def add(self, *items):
         if not context.system_override:
             await self._check_permissions_and_raise()
+        collection_key = self._desc.key_for(self._inst)
         for item in items:
             if not await self._desc.accepts_item(item):
                 raise ContainmentError(self._inst, self._desc.name, item)
@@ -137,22 +138,20 @@ class ItemCollection:
                 if item.id not in collection:
                     collection.append(item.id)
             else:
-                context.txn.append(self._desc.key_for(self._inst),
-                                   ' {0}'.format(item.id))
+                context.txn.append(collection_key, ' {0}'.format(item.id))
 
     async def remove(self, *items):
         if not context.system_override:
             await self._check_permissions_and_raise()
+        collection_key = self._desc.key_for(self._inst)
         for item in items:
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
                 collection = getattr(storage, self._desc.name)
                 if item.id in collection:
-                    # add snapshot to trigger on_change
                     collection.remove(item.id)
             else:
-                context.txn.append(self._desc.key_for(self._inst),
-                                   ' -{0}'.format(item.id))
+                context.txn.append(collection_key, ' -{0}'.format(item.id))
 
 
 class ReferenceN(Text, Acceptable):

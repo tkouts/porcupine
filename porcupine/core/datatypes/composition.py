@@ -7,7 +7,6 @@ from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
 from .reference import ReferenceN, ItemCollection, Reference1
-from .datatype import DataType
 
 
 class EmbeddedCollection(ItemCollection):
@@ -35,7 +34,6 @@ class EmbeddedCollection(ItemCollection):
             for composite in composites:
                 if not composite.__is_new__:
                     raise TypeError('Can only add new items to composition')
-                composite.parent_id = self._inst.id
                 context.txn.insert(composite)
         await self._inst.update()
 
@@ -70,8 +68,6 @@ class Composition(ReferenceN):
             if not composite.__is_new__:
                 # TODO: revisit
                 raise TypeError('Can only add new items to composition')
-            with system_override():
-                composite.parent_id = instance.id
             context.txn.insert(composite)
         with system_override():
             await super().on_create(instance, [c.__storage__.id for c in value])
@@ -82,20 +78,20 @@ class Composition(ReferenceN):
         new_ids = frozenset([c.__storage__.id for c in value])
         removed_ids = old_ids.difference(new_ids)
         added = []
-
         with system_override():
             for composite in value:
                 if composite.__is_new__:
-                    composite.parent_id = instance.id
+                    # composite.parent_id = instance.id
                     context.txn.insert(composite)
                     added.append(composite)
                 else:
                     context.txn.upsert(composite)
-            removed = await db.get_multi(removed_ids)
-            for item in removed:
-                context.txn.delete(item)
-            await super(EmbeddedCollection, collection).remove(*removed)
             await super(EmbeddedCollection, collection).add(*added)
+            if removed_ids:
+                removed = await db.get_multi(removed_ids)
+                for item in removed:
+                    context.txn.delete(item)
+                await super(EmbeddedCollection, collection).remove(*removed)
 
     async def on_delete(self, instance, value):
         composite_ids = await self.fetch(instance, set_storage=False)

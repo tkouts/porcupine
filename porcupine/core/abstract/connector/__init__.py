@@ -1,6 +1,6 @@
 import abc
 
-from porcupine import context, exceptions
+from porcupine import context
 from porcupine.config import settings
 from porcupine.core.abstract.connector.join import Join
 from porcupine.core.abstract.connector.persist import DefaultPersistence
@@ -105,6 +105,9 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     def insert_multi(self, insertions):
         raise NotImplementedError
 
+    def init_multi(self, initializations):
+        raise NotImplementedError
+
     def upsert_multi(self, upsertions):
         raise NotImplementedError
 
@@ -204,130 +207,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
         else:
             c_join = Join(self, cur_list)
             return c_join
-
-    # event handling
-    def handle_update(self, item, old_item,
-                      check_unique=True, execute_event_handlers=True):
-        if old_item is not None:
-            # check for schema modifications
-            item.update_schema()
-        if execute_event_handlers and item.event_handlers:
-            if old_item is not None:
-                # update
-                for handler in item.event_handlers:
-                    handler.on_update(item, old_item)
-            else:
-                # create
-                for handler in item.event_handlers:
-                    handler.on_create(item)
-
-        # validate schema
-        for attr_name, attr_def in item.__schema__.items():
-            attr_def.validate(item)
-
-            new_attr = getattr(item, attr_name)
-            if old_item:
-                old_attr = getattr(old_item, attr_name)
-                old_pid = old_item.parent_id
-            else:
-                old_attr = None
-                old_pid = item.parent_id
-
-            if hasattr(item, '_owner') \
-                    and (new_attr != old_attr or item.parent_id != old_pid):
-                # check unique constraints
-                if attr_name in self.indexes and self.indexes[attr_name].unique:
-                    if check_unique:
-                        ind = self.indexes[attr_name]
-                        doc_id = ind.exists(item.parent_id, new_attr)
-                        if doc_id and doc_id != (item.id or self.root_id):
-                            context.txn.abort()
-                            raise exceptions.DBAlreadyExists
-                    if old_attr:
-                        atomic_key = '{}_{}'.format(
-                            attr_name,
-                            system.hash_series(old_attr).hexdigest()
-                        )
-                        self.delete_atomic(old_pid, atomic_key)
-                    if item.parent_id is not None:
-                        atomic_key = '{}_{}'.format(
-                            attr_name,
-                            system.hash_series(new_attr).hexdigest()
-                        )
-                        self.set_atomic(item.parent_id, atomic_key, item.id)
-
-            # call data type's handler
-            if old_item:
-                # it is an update
-                attr_def.on_update(item, new_attr, old_attr)
-            else:
-                # it is a new object
-                attr_def.on_create(item, new_attr)
-
-    @staticmethod
-    def handle_post_update(item, old_item):
-        if item.event_handlers:
-            if old_item is not None:
-                # update
-                for handler in item.event_handlers:
-                    handler.on_post_update(item, old_item)
-            else:
-                # create
-                for handler in item.event_handlers:
-                    handler.on_post_create(item)
-
-    def handle_delete(self, item, is_permanent, execute_event_handlers=True):
-        if execute_event_handlers and item.event_handlers:
-            for handler in item.event_handlers:
-                handler.on_delete(item, is_permanent)
-
-        for attr_name, attr_def in item.__schema__.items():
-            try:
-                attr = getattr(item, attr_name)
-            except AttributeError:
-                continue
-
-            if hasattr(item, '_owner'):
-                if attr_name in self.indexes \
-                        and self.indexes[attr_name].unique \
-                        and not item.is_deleted:
-                    atomic_key = '{}_{}'.format(
-                        attr_name,
-                        system.hash_series(attr).hexdigest()
-                    )
-                    self.delete_atomic(item.parent_id, atomic_key)
-
-            # call data type's handler
-            attr_def.on_delete(item, attr, is_permanent)
-
-    @staticmethod
-    def handle_post_delete(item, is_permanent):
-        if item.event_handlers:
-            for handler in item.event_handlers:
-                handler.on_post_delete(item, is_permanent)
-
-    def handle_undelete(self, item):
-        for attr_name, attr_def in item.__schema__.items():
-            try:
-                attr = getattr(item, attr_name)
-            except AttributeError:
-                continue
-
-            if hasattr(item, '_owner'):
-                if attr_name in self.indexes and self.indexes[attr_name].unique:
-                    ind = self.indexes[attr_name]
-                    doc_id = ind.exists(item.parent_id, attr)
-                    if doc_id and doc_id != (item.id or self.root_id):
-                        context.txn.abort()
-                        raise exceptions.DBAlreadyExists
-                    atomic_key = '{}_{}'.format(
-                        attr_name,
-                        system.hash_series(attr).hexdigest()
-                    )
-                    self.set_atomic(item.parent_id, atomic_key, item.id)
-
-            # call data type's handler
-            attr_def.on_undelete(item, attr)
 
     # management
     # @abc.abstractmethod

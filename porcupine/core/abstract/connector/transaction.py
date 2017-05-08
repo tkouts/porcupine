@@ -192,18 +192,21 @@ class Transaction:
         if self._appends:
             # make sure externals with appends are initialized
             append_keys = list(self._appends.keys())
-            tasks = [connector.exists(key)
-                     for key in append_keys
-                     if key not in insertions]
-            completed, _ = await asyncio.wait(tasks)
-            keys_exist = [c.result() for c in completed]
-            insertions.update({key: '' for key, exists in keys_exist
-                               if not exists})
+            # tasks = [connector.exists(key)
+            #          for key in append_keys
+            #          if key not in insertions]
+            # completed, _ = await asyncio.wait(tasks)
+            # keys_exist = [c.result() for c in completed]
+            # initializations = {key: '' for key, exists in keys_exist
+            #                    if not exists}
+            initializations = {key: '' for key in append_keys}
+        else:
+            initializations = {}
 
         # update deletions with externals
         deletions.extend(self._deletions.keys())
 
-        return insertions, upsertions, deletions
+        return insertions, initializations, upsertions, deletions
 
     async def commit(self):
         """
@@ -211,7 +214,7 @@ class Transaction:
 
         @return: None
         """
-        insertions, upsertions, deletions = await self.prepare()
+        insertions, init, upsertions, deletions = await self.prepare()
         connector = self.connector
 
         tasks = []
@@ -226,6 +229,12 @@ class Transaction:
                 if inserted:
                     await connector.delete_multi(inserted)
                 self.raise_exists(existing_key)
+
+        # initializations
+        if init:
+            task = connector.init_multi(init)
+            if isawaitable(task):
+                tasks.append(task)
 
         # upsertions
         if upsertions:

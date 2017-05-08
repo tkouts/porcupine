@@ -113,8 +113,9 @@ def resolve_set(raw_string: str) -> (list, float):
             total_count += 1
             if oid.startswith('-'):
                 key = oid[1:]
+                dirty_count += 1
                 if key in uniques:
-                    dirty_count += 2
+                    dirty_count += 1
                     del uniques[key]
             else:
                 if oid in uniques:

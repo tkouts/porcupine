@@ -64,21 +64,8 @@ class SchemaMaintenanceTask:
 class CollectionCompacter(SchemaMaintenanceTask):
     @staticmethod
     def compact_set(raw_string):
-        uniques = {}
-        for oid in raw_string.split(' '):
-            if oid:
-                if oid.startswith('-'):
-                    key = oid[1:]
-                    if key in uniques:
-                        del uniques[key]
-                    else:
-                        uniques[oid] = None
-                else:
-                    removal_key = '-{0}'.format(oid)
-                    if removal_key in uniques:
-                        del uniques[removal_key]
-                    uniques[oid] = None
-        return ' '.join(uniques.keys()), True
+        compacted, _ = system.resolve_set(raw_string)
+        return ' '.join(compacted), True
 
     async def execute(self):
         try:
