@@ -74,7 +74,7 @@ class CollectionCompacter(SchemaMaintenanceTask):
                 xform=self.compact_set
             )
             if not success:
-                log.info('Failed to compact {0}'.format(self.key))
+                log.info('Failed to compact collection {0}'.format(self.key))
         except exceptions.NotFound:
             # the key is removed
             pass

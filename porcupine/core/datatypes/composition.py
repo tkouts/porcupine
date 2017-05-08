@@ -3,6 +3,7 @@ Porcupine composition data types
 ================================
 """
 from porcupine import db, exceptions, context
+from porcupine.utils import system
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
@@ -16,8 +17,9 @@ class EmbeddedCollection(ItemCollection):
         composite_type = clazz or self._desc.allowed_types[0]
         with system_override():
             composite = composite_type()
-            composite.id = '{0}.{1}.{2}'.format(
-                self._inst.id, self._desc.name, composite.id)
+            composite.id = system.get_composite_id(self._inst.id,
+                                                   self._desc.name,
+                                                   composite.id)
         return composite
 
     async def get_item_by_id(self, item_id):
@@ -203,7 +205,7 @@ class Embedded(Reference1):
         setattr(instance.__storage__, self.name, self.storage_info)
 
     def key_for(self, instance):
-        return '{0}.{1}'.format(instance.id, self.name)
+        return system.get_composite_id(instance.id, self.name)
 
     def snapshot(self, instance, composite, previous_value):
         storage_key = self.storage_key
@@ -223,8 +225,6 @@ class Embedded(Reference1):
                 await super().on_create(instance, composite.__storage__.id)
         else:
             await super().on_create(instance, None)
-        # storage = getattr(instance, self.storage)
-        # setattr(storage, self.storage_key, composite.__storage__.id)
 
     async def on_change(self, instance, composite, old_value):
         if composite is None:

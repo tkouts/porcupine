@@ -90,7 +90,13 @@ def get_collection_key(item_id: str, collection_name: str,
 
 
 def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
-    return '{0}/{1}/{2}'.format(parent_id, attr_name, hash_series(attr_value))
+    return '{0}>{1}>{2}'.format(parent_id, attr_name, hash_series(attr_value))
+
+
+def get_composite_id(parent_id: str, comp_name: str, comp_id: str=None) -> str:
+    if comp_id is None:
+        return '{0}.{1}'.format(parent_id, comp_name)
+    return '{0}.{1}.{2}'.format(parent_id, comp_name, comp_id)
 
 
 async def resolve_visibility(item, user) -> Optional[int]:

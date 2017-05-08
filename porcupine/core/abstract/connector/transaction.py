@@ -93,9 +93,9 @@ class Transaction:
 
     @staticmethod
     def raise_exists(key):
-        if '/' in key:
+        if '>' in key:
             # unique constraint
-            _, attr_name, _ = key.split('/')
+            _, attr_name, _ = key.split('>')
             raise exceptions.DBAlreadyExists(
                 'A resource having the same {0} already exists'
                 .format(attr_name))
