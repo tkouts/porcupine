@@ -1,6 +1,7 @@
 """
 Helper module for resolving object permissions
 """
+import inspect
 
 from porcupine import db
 from porcupine.core.context import context_cacheable
@@ -17,7 +18,10 @@ COORDINATOR = 8
 
 
 async def resolve(item, user):
-    return await resolve_acl(item.acl, user)
+    acl = item.acl
+    if inspect.isawaitable(acl):
+        acl = await acl
+    return await resolve_acl(acl, user)
 
 
 async def resolve_acl(acl, user_or_group):

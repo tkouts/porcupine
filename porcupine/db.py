@@ -6,7 +6,7 @@ from sanic.request import Request
 from sanic.blueprints import Blueprint
 
 from porcupine import context, exceptions
-from porcupine.utils import permissions
+from porcupine.utils import system, permissions
 
 connector = None
 
@@ -30,9 +30,9 @@ async def get_item(item_id, quiet=True):
     if item is not None:
         if context.system_override:
             return item
-        if not item.is_deleted:
-            access_level = await permissions.resolve(item, context.user)
-            if access_level != permissions.NO_ACCESS:
+        visibility = await system.resolve_visibility(item, context.user)
+        if visibility is not None:
+            if visibility:
                 return item
             elif not quiet:
                 raise exceptions.Forbidden('Forbidden')
@@ -43,16 +43,16 @@ async def get_item(item_id, quiet=True):
 
 async def get_multi(ids):
     items = []
+    user = context.user
     is_override = context.system_override
     if ids:
         async for item in connector.get_multi(ids):
             if is_override:
                 items.append(item)
                 continue
-            if not item.is_deleted:
-                access_level = await permissions.resolve(item, context.user)
-                if access_level != permissions.NO_ACCESS:
-                    items.append(item)
+            visibility = await system.resolve_visibility(item, user)
+            if visibility:
+                items.append(item)
     return items
 
 

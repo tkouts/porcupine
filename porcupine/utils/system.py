@@ -1,8 +1,11 @@
 import random
+import inspect
 import hashlib
 import functools
 import collections
 import cbor
+from typing import Optional
+from .permissions import resolve
 
 
 VALID_ID_CHARS = [
@@ -88,6 +91,15 @@ def get_collection_key(item_id: str, collection_name: str,
 
 def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
     return '{0}/{1}/{2}'.format(parent_id, attr_name, hash_series(attr_value))
+
+
+async def resolve_visibility(item, user) -> Optional[int]:
+    is_deleted = item.is_deleted
+    if inspect.isawaitable(is_deleted):
+        is_deleted = await is_deleted
+    if is_deleted:
+        return None
+    return await resolve(item, user)
 
 
 def resolve_set(raw_string: str) -> (list, float):
