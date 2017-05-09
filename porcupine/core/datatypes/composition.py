@@ -2,6 +2,7 @@
 Porcupine composition data types
 ================================
 """
+from typing import Type
 from porcupine import db, exceptions, context
 from porcupine.utils import system
 from porcupine.contract import contract
@@ -13,7 +14,7 @@ from .reference import ReferenceN, ItemCollection, Reference1
 class EmbeddedCollection(ItemCollection):
     __slots__ = ()
 
-    def new(self, clazz=None) -> Composite:
+    def new(self, clazz: Type[Composite]=None) -> Composite:
         composite_type = clazz or self._desc.allowed_types[0]
         with system_override():
             composite = composite_type()

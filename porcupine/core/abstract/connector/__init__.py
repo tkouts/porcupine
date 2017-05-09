@@ -2,6 +2,7 @@ import abc
 
 from porcupine import context
 from porcupine.config import settings
+from porcupine.exceptions import DBAlreadyExists
 from porcupine.core.abstract.connector.join import Join
 from porcupine.core.abstract.connector.persist import DefaultPersistence
 from porcupine.utils import system
@@ -26,6 +27,19 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     # Sub Document Mutation Codes
     SUB_DOC_UPSERT_MUT = 0
     SUB_DOC_COUNTER = 1
+
+    @staticmethod
+    def raise_exists(key):
+        if '>' in key:
+            # unique constraint
+            container_id, attr_name, _ = key.split('>')
+            raise DBAlreadyExists(
+                'A resource having the same {0} in {1} already exists'
+                .format(attr_name, container_id))
+        else:
+            # item
+            raise DBAlreadyExists(
+                'A resource having an ID of {0} already exists'.format(key))
 
     def __init__(self):
         # create index map
@@ -105,7 +119,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     def insert_multi(self, insertions):
         raise NotImplementedError
 
-    def init_multi(self, initializations):
+    def initialize_multi(self, initializations):
         raise NotImplementedError
 
     def upsert_multi(self, upsertions):

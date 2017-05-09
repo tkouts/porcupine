@@ -25,7 +25,7 @@ class Transaction:
 
         # sub document mutations
         self._sd = defaultdict(dict)
-        self._appends = defaultdict(str)
+        self._appends = defaultdict(list)
 
     def __contains__(self, key):
         return key in self._items \
@@ -50,7 +50,7 @@ class Transaction:
 
     def insert(self, item):
         if item.id in self._inserted_items:
-            self.raise_exists(item.id)
+            self.connector.raise_exists(item.id)
         self._inserted_items[item.id] = item
 
     def upsert(self, item):
@@ -70,11 +70,11 @@ class Transaction:
 
     def append(self, key, value):
         if value not in self._appends[key]:
-            self._appends[key] += value
+            self._appends[key].append(value)
 
     def insert_external(self, key, value):
         if key in self._insertions:
-            self.raise_exists(key)
+            self.connector.raise_exists(key)
         self._insertions[key] = value
 
     def put_external(self, key, value):
@@ -90,19 +90,6 @@ class Transaction:
             if key is self._upsertions:
                 del self._upsertions[key]
             self._deletions[key] = True
-
-    @staticmethod
-    def raise_exists(key):
-        if '>' in key:
-            # unique constraint
-            _, attr_name, _ = key.split('>')
-            raise exceptions.DBAlreadyExists(
-                'A resource having the same {0} already exists'
-                .format(attr_name))
-        else:
-            # item
-            raise exceptions.DBAlreadyExists(
-                'A resource having an ID of {0} already exists'.format(key))
 
     async def prepare(self):
         connector = self.connector
@@ -221,44 +208,38 @@ class Transaction:
         # insertions
         if insertions:
             # first transaction phase - make sure all keys are non-existing
-            # otherwise rollback successful insertions and raise
-            success, existing_key, inserted = \
-                await connector.insert_multi(insertions)
-            if not success:
-                # rollback
-                if inserted:
-                    await connector.delete_multi(inserted)
-                self.raise_exists(existing_key)
+            await connector.insert_multi(insertions)
 
         # initializations
         if init:
-            task = connector.init_multi(init)
+            task = connector.initialize_multi(init)
             if isawaitable(task):
-                tasks.append(task)
+                tasks.append(asyncio.ensure_future(task))
 
         # upsertions
         if upsertions:
             task = connector.upsert_multi(upsertions)
             if isawaitable(task):
-                tasks.append(task)
+                tasks.append(asyncio.ensure_future(task))
 
         # sub document mutations
         for item_id, mutations in self._sd.items():
             task = connector.mutate_in(item_id, mutations)
             if isawaitable(task):
-                tasks.append(task)
+                tasks.append(asyncio.ensure_future(task))
 
         # appends
         if self._appends:
-            task = connector.append_multi(self._appends)
+            appends = {k: ''.join(v) for k, v in self._appends.items()}
+            task = connector.append_multi(appends)
             if isawaitable(task):
-                tasks.append(task)
+                tasks.append(asyncio.ensure_future(task))
 
         # deletions
         if deletions:
             task = connector.delete_multi(deletions)
             if isawaitable(task):
-                tasks.append(task)
+                tasks.append(asyncio.ensure_future(task))
 
         if tasks:
             completed, _ = await asyncio.wait(tasks)

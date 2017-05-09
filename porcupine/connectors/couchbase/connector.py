@@ -86,18 +86,24 @@ class Couchbase(AbstractConnector):
 
     async def insert_multi(self, insertions):
         try:
-            await self.init_multi(insertions)
-            return True, None, None
+            await self.bucket.insert_multi(insertions,
+                                           format=couchbase.FMT_AUTO)
         except KeyExistsError as e:
             existing_key = e.key
             inserted = [key
                         for key, result in e.all_results.items()
                         if result.rc == 0]
-            return False, existing_key, inserted
+            # rollback
+            if inserted:
+                await self.delete_multi(inserted)
+            self.raise_exists(existing_key)
 
-    def init_multi(self, initializations):
-        return self.bucket.insert_multi(initializations,
-                                        format=couchbase.FMT_AUTO)
+    async def initialize_multi(self, initializations):
+        try:
+            await self.bucket.insert_multi(initializations,
+                                           format=couchbase.FMT_AUTO)
+        except KeyExistsError:
+            pass
 
     def upsert_multi(self, upsertions):
         return self.bucket.upsert_multi(upsertions, format=couchbase.FMT_AUTO)
