@@ -88,7 +88,8 @@ class Composition(ReferenceN):
                 raise TypeError('Can only add new items to composition')
             context.txn.insert(composite)
         with system_override():
-            await super().on_create(instance, [c.__storage__.id for c in value])
+            await super().on_create(instance,
+                                    [c.__storage__.id for c in value])
 
     async def on_change(self, instance, value, old_value):
         old_ids = frozenset(await self.fetch(instance, set_storage=False))
@@ -178,14 +179,14 @@ class EmbeddedItem:
         self._desc = descriptor
         self._inst = instance
 
-    def new(self, clazz=None) -> Composite:
+    def new(self, clazz: Type[Composite]=None) -> Composite:
         composite_type = clazz or self._desc.allowed_types[0]
         with system_override():
             composite = composite_type()
             composite.id = self._desc.key_for(self._inst)
         return composite
 
-    async def item(self):
+    async def item(self) -> Composite:
         with system_override():
             composite_id = self._desc.key_for(self._inst)
             return await db.get_item(composite_id)

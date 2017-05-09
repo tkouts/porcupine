@@ -237,7 +237,8 @@ class Transaction:
             errors = [task.exception() for task in tasks]
             if any(errors):
                 # TODO: log errors
-                print(errors)
+                # print(errors)
+                pass
 
         self.connector.active_txns -= 1
 

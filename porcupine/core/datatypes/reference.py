@@ -1,5 +1,3 @@
-import math
-
 from porcupine import db, context
 from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
     InvalidUsage, AttributeSetError
@@ -187,35 +185,27 @@ class ReferenceN(Text, Acceptable):
         if active_index > 0:
             # collection is split
             is_split = True
-            # fetch previous chunks
-            while True:
-                previous_chunk = await db.connector.get_external(
-                    self.key_for(instance, chunk=active_index - 1))
-                if previous_chunk is not None:
-                    # print(len(previous_chunk))
-                    chunks.insert(0, previous_chunk)
-                    active_index -= 1
-                else:
-                    break
+            coll_key = self.key_for(instance)
+            previous_chunks, _ = await system.fetch_collection_chunks(coll_key)
+            # add previous chunks to the beginning
+            chunks[0:0] = previous_chunks
 
         value, dirtiness = system.resolve_set(' '.join(chunks))
         # print(dirtiness)
         split_threshold = db.connector.coll_split_threshold
         compact_threshold = db.connector.coll_compact_threshold
         if current_size > split_threshold or dirtiness > compact_threshold:
-            # we need to maintain the collection
+            # collection maintenance
             key = self.key_for(instance)
             if current_size > split_threshold:
                 shd_compact = (current_size * (1 - dirtiness)) < split_threshold
                 if not is_split and shd_compact:
                     await SchemaMaintenance.compact_collection(key)
                 else:
-                    parts = math.ceil(current_size / split_threshold)
-                    await SchemaMaintenance.split_collection(key, parts)
+                    await SchemaMaintenance.rebuild_collection(key)
             elif dirtiness > compact_threshold:
                 if is_split:
-                    # full rebuild
-                    pass
+                    await SchemaMaintenance.rebuild_collection(key)
                 else:
                     await SchemaMaintenance.compact_collection(key)
         if set_storage:

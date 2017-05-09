@@ -1,3 +1,4 @@
+import asyncio
 import random
 import ujson
 
@@ -135,8 +136,11 @@ class Couchbase(AbstractConnector):
         try:
             result = await self.bucket.get(key)
         except NotFoundError:
-            raise exceptions.NotFound
-        new_value, return_value = xform(result.value)
+            raise exceptions.NotFound('Key {0} is removed'.format(key))
+        xform_result = xform(result.value)
+        if asyncio.iscoroutine(xform_result):
+            xform_result = await xform_result
+        new_value, return_value = xform_result
         if new_value is not None:
             try:
                 await self.bucket.replace(key, new_value,
@@ -145,7 +149,7 @@ class Couchbase(AbstractConnector):
             except KeyExistsError:
                 return False, None
             except NotFoundError:
-                raise exceptions.NotFound
+                raise exceptions.NotFound('Key {0} is removed'.format(key))
         return True, return_value
 
     # indexes

@@ -5,6 +5,7 @@ import functools
 import collections
 import cbor
 from typing import Optional
+from porcupine import db
 from .permissions import resolve
 
 
@@ -97,6 +98,25 @@ def get_composite_id(parent_id: str, comp_name: str, comp_id: str=None) -> str:
     if comp_id is None:
         return '{0}.{1}'.format(parent_id, comp_name)
     return '{0}.{1}.{2}'.format(parent_id, comp_name, comp_id)
+
+
+async def fetch_collection_chunks(collection_key) -> (list, int):
+    prev_chunks = []
+    item_id, collection_name, chunk_no = collection_key.split('/')
+    previous_chunk_no = int(chunk_no) - 1
+    # fetch previous chunks
+    while True:
+        previous_chunk_key = get_collection_key(item_id,
+                                                collection_name,
+                                                previous_chunk_no)
+        previous_chunk = await db.connector.get_raw(previous_chunk_key)
+        if previous_chunk is not None:
+            # print(len(previous_chunk))
+            prev_chunks.insert(0, previous_chunk)
+            previous_chunk_no -= 1
+        else:
+            break
+    return prev_chunks, previous_chunk_no + 1
 
 
 async def resolve_visibility(item, user) -> Optional[int]:
