@@ -57,6 +57,21 @@ class Composition(ReferenceN):
     """
     storage_info = '_compN_'
 
+    @staticmethod
+    def get_collection_id(composite: Composite):
+        return composite.__storage__.id.split('.')[-1]
+
+    async def fetch(self, instance, set_storage=True):
+        value = await super().fetch(instance, set_storage=False)
+        value = [
+            system.get_composite_id(instance.__storage__.id, self.name, cid)
+            for cid in value
+        ]
+        if set_storage:
+            storage = getattr(instance, self.storage)
+            setattr(storage, self.storage_key, value)
+        return value
+
     def __get__(self, instance, owner):
         if instance is None:
             return self

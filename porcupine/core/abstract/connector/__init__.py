@@ -119,9 +119,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     def insert_multi(self, insertions):
         raise NotImplementedError
 
-    def initialize_multi(self, initializations):
-        raise NotImplementedError
-
     def upsert_multi(self, upsertions):
         raise NotImplementedError
 

@@ -11,6 +11,7 @@ from porcupine import exceptions, log
 from porcupine.core.abstract.connector import AbstractConnector
 from .cursor import Cursor
 from .index import Index
+
 import couchbase.experimental
 couchbase.experimental.enable()
 from acouchbase.bucket import Bucket as aBucket
@@ -98,13 +99,6 @@ class Couchbase(AbstractConnector):
                 await self.delete_multi(inserted)
             self.raise_exists(existing_key)
 
-    async def initialize_multi(self, initializations):
-        try:
-            await self.bucket.insert_multi(initializations,
-                                           format=couchbase.FMT_AUTO)
-        except KeyExistsError:
-            pass
-
     def upsert_multi(self, upsertions):
         return self.bucket.upsert_multi(upsertions, format=couchbase.FMT_AUTO)
 
@@ -121,8 +115,21 @@ class Couchbase(AbstractConnector):
                 mutations.append(sub_doc.counter(path, value))
         return self.bucket.mutate_in(item_id, *mutations)
 
-    def append_multi(self, appends):
-        return self.bucket.append_multi(appends)
+    async def append_multi(self, appends):
+        # make sure keys are initialized
+        # tasks = [self.exists(key)
+        #          for key in appends]
+        # completed, _ = await asyncio.wait(tasks)
+        # keys_exist = [c.result() for c in completed]
+        # initializations = {key: '' for key, exists in keys_exist
+        #                    if not exists}
+        # if initializations:
+        try:
+            await self.bucket.insert_multi({key: '' for key in appends},
+                                           format=couchbase.FMT_AUTO)
+        except KeyExistsError:
+            pass
+        await self.bucket.append_multi(appends)
 
     async def swap_if_not_modified(self, key, xform):
         try:

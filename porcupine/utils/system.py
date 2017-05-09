@@ -111,6 +111,7 @@ async def resolve_visibility(item, user) -> Optional[int]:
 def resolve_set(raw_string: str) -> (list, float):
     # build set
     uniques = {}
+    dirtiness = 0.0
     dirty_count = 0
     total_count = 0
     # print('raw value is', raw_string)
@@ -130,8 +131,6 @@ def resolve_set(raw_string: str) -> (list, float):
     value = list(uniques.keys())
     if total_count:
         dirtiness = dirty_count / total_count
-    else:
-        dirtiness = 0.0
     return value, dirtiness
 
 

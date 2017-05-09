@@ -17,7 +17,7 @@ default_settings = {
         'multi_fetch_chunk_size': 500,
         'collection_compact_threshold': 0.3,
         # split threshold set to 64K
-        'collection_split_threshold': 65535,
+        'collection_split_threshold': 64 * 1024,
         # optional for running unit tests suite
         # 'tests_bucket': 'porcupine_tests'
         '__indices__': {},

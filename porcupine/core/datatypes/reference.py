@@ -130,28 +130,30 @@ class ItemCollection:
             await self._check_permissions_and_raise()
         collection_key = self._desc.key_for(self._inst)
         for item in items:
+            item_id = self._desc.get_collection_id(item)
             if not await self._desc.accepts_item(item):
                 raise ContainmentError(self._inst, self._desc.name, item)
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
                 collection = getattr(storage, self._desc.name)
-                if item.id not in collection:
-                    collection.append(item.id)
+                if item_id not in collection:
+                    collection.append(item_id)
             else:
-                context.txn.append(collection_key, ' {0}'.format(item.id))
+                context.txn.append(collection_key, ' {0}'.format(item_id))
 
     async def remove(self, *items):
         if not context.system_override:
             await self._check_permissions_and_raise()
         collection_key = self._desc.key_for(self._inst)
         for item in items:
+            item_id = self._desc.get_collection_id(item)
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
                 collection = getattr(storage, self._desc.name)
-                if item.id in collection:
-                    collection.remove(item.id)
+                if item_id in collection:
+                    collection.remove(item_id)
             else:
-                context.txn.append(collection_key, ' -{0}'.format(item.id))
+                context.txn.append(collection_key, ' -{0}'.format(item_id))
 
 
 class ReferenceN(Text, Acceptable):
@@ -165,6 +167,10 @@ class ReferenceN(Text, Acceptable):
                 self.type_error_message.format(type(self).__name__, 'required'))
         super().__init__(default, **kwargs)
         Acceptable.__init__(self, **kwargs)
+
+    @staticmethod
+    def get_collection_id(item):
+        return item.__storage__.id
 
     async def fetch(self, instance, set_storage=True):
         chunks = []
