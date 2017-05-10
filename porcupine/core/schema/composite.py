@@ -24,16 +24,22 @@ class Composite(Elastic):
             raise TypeError('Composite objects cannot be instantiated')
 
     @property
+    def item_id(self):
+        return self.id.split('.')[0]
+
+    @property
+    async def is_stale(self):
+        return not await db.connector.exists(self.item_id)
+
+    @property
     async def item(self):
-        item_id = self.id.split('.')[0]
-        return await db.connector.get(item_id)
+        return await db.connector.get(self.item_id)
 
     @property
     async def is_deleted(self):
         parent = await self.item
         if parent is None:
             # stale composite
-            # TODO: remove from DB
             return 1
         return parent.is_deleted
 

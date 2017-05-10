@@ -120,6 +120,10 @@ async def fetch_collection_chunks(collection_key) -> (list, int):
 
 
 async def resolve_visibility(item, user) -> Optional[int]:
+    is_stale = await item.is_stale
+    if is_stale:
+        # TODO: remove from DB
+        return None
     is_deleted = item.is_deleted
     if inspect.isawaitable(is_deleted):
         is_deleted = await is_deleted

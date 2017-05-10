@@ -47,6 +47,12 @@ class GenericItem(Removable, Elastic):
     name = String(required=True, unique=True)
     description = String(store_as='desc')
 
+    @property
+    async def is_stale(self):
+        if self.parent_id is not None:
+            return not await db.connector.exists(self.__storage__.pid)
+        return False
+
     async def clone(self, memo: dict=None):
         clone = await super().clone(memo)
         now = datetime.datetime.utcnow().isoformat()

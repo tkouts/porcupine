@@ -10,6 +10,7 @@ from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
 
 from porcupine import exceptions, log
 from porcupine.core.abstract.connector import AbstractConnector
+from porcupine.core.context import context_cacheable
 from .cursor import Cursor
 from .index import Index
 
@@ -61,6 +62,7 @@ class Couchbase(AbstractConnector):
         n1query.adhoc = ad_hoc
         return self.bucket.n1ql_query(n1query)
 
+    @context_cacheable(size=1000)
     async def exists(self, key):
         try:
             await self.bucket.retrieve_in(key, 'dl')

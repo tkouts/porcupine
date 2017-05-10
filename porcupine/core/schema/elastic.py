@@ -173,6 +173,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             result.update(kwargs)
         return result
 
+    @property
+    async def is_stale(self):
+        raise NotImplementedError
+
     async def clone(self, memo: dict=None) -> 'Elastic':
         """
         Creates an in-memory clone of the item.
