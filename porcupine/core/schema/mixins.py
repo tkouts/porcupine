@@ -61,7 +61,7 @@ class Cloneable:
             # runs with system override - exclude deleted
             children = [Cloneable._prepare_id_map(child, id_map)
                         for child in await item.get_children()
-                        if not child.deleted]
+                        if not child.is_deleted]
             for items in await gather(*children):
                 all_items += items
         return all_items
