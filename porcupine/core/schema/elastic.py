@@ -43,6 +43,8 @@ class ElasticMeta(type):
         cls.__record__ = storage(cls.__name__, field_spec)
         cls.__ext_record__ = storage(cls.__name__, ext_spec)
         cls.__sig__ = system.hash_series(*schema.keys())
+        # register content class
+        system.ELASTIC_MAP[cls.__name__] = cls
         super().__init__(name, bases, dct)
 
 
@@ -79,7 +81,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         item_type = dct.pop('type')
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
-            item_type = system.get_rto_by_name(item_type)
+            item_type = system.get_content_class(item_type)
         new_item = item_type()
         new_item.apply_patch(dct)
         return new_item
@@ -158,8 +160,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
         @rtype: str
         """
-        return '{0}.{1}'.format(self.__class__.__module__,
-                                self.__class__.__name__)
+        return type(self).__name__
+        # return '{0}.{1}'.format(self.__class__.__module__,
+        #                         self.__class__.__name__)
 
     def apply_patch(self, patch: dict) -> None:
         for attr, value in patch.items():

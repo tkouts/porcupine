@@ -182,7 +182,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
     def schema_updater(item_dict):
         from porcupine.datatypes import Blob, ReferenceN, RelatorN
 
-        clazz = system.get_rto_by_name(item_dict['_cc'])
+        clazz = system.get_content_class(item_dict['_cc'])
         item_schema = frozenset([key for key in item_dict.keys()
                                  if not key.startswith('_')
                                  and not key.endswith('_')])

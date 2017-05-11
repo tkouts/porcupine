@@ -21,7 +21,7 @@ class Acceptable:
     def allowed_types(self):
         if not self.accepts_resolved:
             self.accepts = tuple([
-                system.get_rto_by_name(x) if isinstance(x, str) else x
+                system.get_content_class(x) if isinstance(x, str) else x
                 for x in self.accepts
             ])
             self.accepts_resolved = True

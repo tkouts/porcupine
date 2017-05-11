@@ -4,11 +4,10 @@ import sys
 import asyncio
 
 from porcupine import __version__
-from porcupine.apps.resources import resources
-from porcupine.apps.auth import auth
-from porcupine.apps.status import status
+from porcupine import apps
 from porcupine.config import settings
 from . import log
+from .loader import install_apps
 from .server import server
 from .services.blueprint import services_blueprint, services
 from .daemon import Daemon
@@ -48,7 +47,7 @@ def start(args):
 
     # register services blueprint
     server.blueprint(services_blueprint)
-    log.porcupine_log.info('Starting Porcupine %s', __version__)
+    log.porcupine_log.info('Starting Porcupine {0}'.format(__version__))
 
     try:
         # prepare services
@@ -56,11 +55,8 @@ def start(args):
         for service in services:
             service.prepare()
 
-        # locate apps
-        apps = [resources, auth, status]
-        # register apps
-        for app in apps:
-            server.blueprint(app, url_prefix=app.name)
+        # install native apps
+        install_apps(apps.__path__, prefix='porcupine.apps.')
 
         if args.daemon or args.stop or args.graceful:
             # daemon commands

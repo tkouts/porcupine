@@ -7,7 +7,7 @@ from porcupine.utils import system
 class DefaultPersistence(object):
     @staticmethod
     def loads(value):
-        content_class = system.get_rto_by_name(value.pop('_cc'))
+        content_class = system.get_content_class(value.pop('_cc'))
         item = content_class(dict_storage=value)
         return item
 

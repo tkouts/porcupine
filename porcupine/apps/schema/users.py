@@ -43,7 +43,7 @@ class Membership(Item):
         L{Policies<org.innoscript.desktop.schema.properties.Policies>}
     """
     member_of = RelatorN(
-        accepts=('porcupine.apps.schema.groups.Group', ),
+        accepts=('Group', ),
         rel_attr='members'
     )
     policies = RelatorN(

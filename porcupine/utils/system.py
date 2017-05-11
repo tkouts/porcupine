@@ -13,8 +13,45 @@ VALID_ID_CHARS = [
     chr(x) for x in
     list(range(ord('a'), ord('z'))) +
     list(range(ord('A'), ord('Z'))) +
-    list(range(ord('0'), ord('9')))
-]
+    list(range(ord('0'), ord('9')))]
+
+
+class FrozenDict(collections.Mapping):
+    __slots__ = ('_dct', )
+
+    def __init__(self, dct):
+        self._dct = dct
+
+    def __getitem__(self, item):
+        return self._dct[item]
+
+    def __iter__(self):
+        return iter(self._dct)
+
+    def __len__(self):
+        return len(self._dct)
+
+    def to_dict(self):
+        return {**self._dct}
+
+    toDict = to_dict
+
+
+class WriteOnceDict(collections.MutableMapping, dict):
+    # dict implementations to override the MutableMapping versions
+    __getitem__ = dict.__getitem__
+    __iter__ = dict.__iter__
+
+    def __delitem__(self, key):
+        raise KeyError('Read-only dictionary')
+
+    def __setitem__(self, key, value):
+        if key in self:
+            raise KeyError('{0} has already been set'.format(key))
+        dict.__setitem__(self, key, value)
+
+
+ELASTIC_MAP = WriteOnceDict()
 
 
 def chunks(l, n):
@@ -30,6 +67,10 @@ def generate_oid(length: int=8) -> str:
     @rtype: str
     """
     return ''.join(random.sample(VALID_ID_CHARS, length))
+
+
+def get_content_class(name: str):
+    return ELASTIC_MAP[name]
 
 
 @functools.lru_cache(maxsize=None)
@@ -100,7 +141,7 @@ def get_composite_id(parent_id: str, comp_name: str, comp_id: str=None) -> str:
     return '{0}.{1}.{2}'.format(parent_id, comp_name, comp_id)
 
 
-async def fetch_collection_chunks(collection_key) -> (list, int):
+async def fetch_collection_chunks(collection_key: str) -> (list, int):
     prev_chunks = []
     item_id, collection_name, chunk_no = collection_key.split('/')
     previous_chunk_no = int(chunk_no) - 1
@@ -129,6 +170,7 @@ async def resolve_visibility(item, user) -> Optional[int]:
         is_deleted = await is_deleted
     if is_deleted:
         return None
+    # return user role
     return await resolve(item, user)
 
 
@@ -169,24 +211,3 @@ def locate_descriptor_by_storage_key(cls, key):
     for desc in cls.__schema__.values():
         if desc.storage_key == key:
             return desc
-
-
-class FrozenDict(collections.Mapping):
-    __slots__ = ('_dct', )
-
-    def __init__(self, dct):
-        self._dct = dct
-
-    def __getitem__(self, item):
-        return self._dct[item]
-
-    def __iter__(self):
-        return iter(self._dct)
-
-    def __len__(self):
-        return len(self._dct)
-
-    def to_dict(self):
-        return {**self._dct}
-
-    toDict = to_dict
