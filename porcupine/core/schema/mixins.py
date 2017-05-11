@@ -26,22 +26,35 @@ class Cloneable:
     @staticmethod
     async def _prepare_id_map(item: 'AnyItem',
                               id_map: Dict[str, str],
+                              composite_type: int=None,
                               is_root=False) -> List['AnyItem']:
         all_items = []
-        id_map[item.id] = system.generate_oid()
+
+        if composite_type is None:
+            id_map[item.id] = system.generate_oid()
+        elif composite_type == 1:
+            # composition
+            path = item.id.split('.')[:-1]
+            new_path = [id_map.get(oid, oid) for oid in path]
+            new_path.append(system.generate_oid())
+            id_map[item.id] = '.'.join(new_path)
+        elif composite_type == 2:
+            # embedded
+            path = item.id.split('.')
+            new_path = [id_map.get(oid, oid) for oid in path]
+            id_map[item.id] = '.'.join(new_path)
 
         if not is_root:
             all_items.append(item)
 
-        for attr_name, attr_def in item.__schema__.items():
-            if isinstance(attr_def, Embedded):
-                # TODO: revisit
-                embedded = await getattr(item, attr_name)
+        for attr_name, data_type in item.__schema__.items():
+            if isinstance(data_type, Embedded):
+                embedded = await getattr(item, attr_name).item()
                 if embedded is not None:
-                    await Cloneable._prepare_id_map(embedded, id_map)
-            elif isinstance(attr_def, Composition):
+                    await Cloneable._prepare_id_map(embedded, id_map, 2)
+            elif isinstance(data_type, Composition):
                 items = await getattr(item, attr_name).items()
-                await gather(*[Cloneable._prepare_id_map(i, id_map)
+                await gather(*[Cloneable._prepare_id_map(i, id_map, 1)
                                for i in items])
 
         if item.is_collection:
@@ -84,7 +97,7 @@ class Cloneable:
                     target: 'Container',
                     memo: Dict) -> 'AnyItem':
         all_children = await Cloneable._prepare_id_map(
-            self, memo['_id_map_'], True)
+            self, memo['_id_map_'], is_root=True)
         memo['_id_map_'][self.parent_id] = target.id
         clone = await Cloneable._write_clone(self, memo, target)
         for item in all_children:

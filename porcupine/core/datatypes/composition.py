@@ -79,7 +79,7 @@ class Composition(ReferenceN):
 
     async def clone(self, instance, memo):
         composites = await self.__get__(instance, None).items()
-        self.__set__(instance, [item.clone(memo) for item in composites])
+        self.__set__(instance, [await item.clone(memo) for item in composites])
 
     async def on_create(self, instance, value):
         for composite in value:
@@ -233,7 +233,7 @@ class Embedded(Reference1):
         embedded = self.__get__(instance, None)
         composite = await embedded.item()
         if composite:
-            self.__set__(instance, composite.clone(memo))
+            self.__set__(instance, await composite.clone(memo))
 
     async def on_create(self, instance, composite):
         if composite is not None:

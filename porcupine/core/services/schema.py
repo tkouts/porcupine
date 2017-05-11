@@ -194,6 +194,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
         for attr_name in for_removal:
             # detect if it is composite attribute
             attr_value = item_dict.pop(attr_name)
+            # TODO: handle composites
             if isinstance(attr_value, str):
                 if attr_value == Blob.storage_info:
                     externals[attr_name] = (attr_value, None)

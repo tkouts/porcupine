@@ -53,14 +53,15 @@ class GenericItem(Removable, Elastic):
             return not await db.connector.exists(self.__storage__.pid)
         return False
 
-    async def clone(self, memo: dict=None):
-        clone = await super().clone(memo)
+    async def clone(self, memo: dict=None) -> 'GenericItem':
+        clone: 'GenericItem' = await super().clone(memo)
         now = datetime.datetime.utcnow().isoformat()
         user = context.user
         with system_override():
             clone.owner = user.id
             clone.created = clone.modified = now
             clone.modified_by = user.name
+            clone.parent_id = None
         return clone
 
     async def append_to(self, parent) -> None:

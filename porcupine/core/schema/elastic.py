@@ -203,6 +203,5 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 await _
         with system_override():
             clone.id = new_id
-            clone.parent_id = None
         clone.__is_new__ = True
         return clone

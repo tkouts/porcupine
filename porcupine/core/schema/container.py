@@ -123,7 +123,7 @@ class Container(Item):
         return await self.get_children()
 
     @children.http_post
-    @contract.is_new_item()
+    # @contract.is_new_item()
     @db.transactional()
     async def children(self, request):
         if 'source' in request.args:

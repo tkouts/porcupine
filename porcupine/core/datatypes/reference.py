@@ -248,8 +248,9 @@ class ReferenceN(Text, Acceptable):
                     raise ContainmentError(instance, self.name, item)
             if ref_items:
                 # write external
-                super().on_create(instance,
-                                  ' '.join([i.id for i in ref_items]))
+                raw_value = ' '.join([self.get_collection_id(i)
+                                      for i in ref_items])
+                super().on_create(instance, raw_value)
         else:
             ref_items = []
         return ref_items, []
