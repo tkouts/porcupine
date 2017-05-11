@@ -29,7 +29,8 @@ class Composite(Elastic):
 
     @property
     async def is_stale(self):
-        return not await db.connector.exists(self.item_id)
+        _, exists = await db.connector.exists(self.item_id)
+        return not exists
 
     @property
     async def item(self):

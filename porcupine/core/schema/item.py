@@ -50,7 +50,8 @@ class GenericItem(Removable, Elastic):
     @property
     async def is_stale(self):
         if self.parent_id is not None:
-            return not await db.connector.exists(self.__storage__.pid)
+            _, parent_exists = await db.connector.exists(self.__storage__.pid)
+            return not parent_exists
         return False
 
     async def clone(self, memo: dict=None) -> 'GenericItem':
@@ -213,7 +214,7 @@ class Item(Cloneable, Movable, Recyclable, GenericItem):
                     context.txn.upsert(parent)
 
     # HTTP views
-    def get(self, request):
+    def get(self, _):
         return self
 
     @contract(accepts=dict)
