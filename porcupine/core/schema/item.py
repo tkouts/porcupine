@@ -108,7 +108,7 @@ class GenericItem(Removable, Elastic):
                 parent.modified = self.modified
                 context.txn.upsert(parent)
 
-    async def is_contained_in(self, item) -> bool:
+    async def is_contained_in(self, item: 'GenericItem') -> bool:
         """
         Checks if the item is contained in the specified container.
 

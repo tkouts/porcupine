@@ -22,7 +22,7 @@ class Container(Item):
     items = Items()
     containers = Containers()
 
-    async def child_exists(self, name):
+    async def child_exists(self, name: str) -> bool:
         """
         Checks if a child with the specified name is contained
         in the container.

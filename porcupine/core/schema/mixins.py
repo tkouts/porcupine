@@ -1,11 +1,17 @@
 import datetime
+from typing import TYPE_CHECKING, TypeVar, Dict, List
 
 from porcupine import db, context, exceptions, gather
 from porcupine.core.context import system_override
 from porcupine.datatypes import Embedded, Composition, DataType
 from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.utils import system, permissions
-from .elastic import Elastic
+
+if TYPE_CHECKING:
+    from .item import Item
+    from .container import Container
+    from .recycle import RecycleBin
+    AnyItem = TypeVar('AnyItem', Item, Container)
 
 
 class Cloneable:
@@ -18,7 +24,9 @@ class Cloneable:
     __slots__ = ()
 
     @staticmethod
-    async def _prepare_id_map(item, id_map, is_root=False):
+    async def _prepare_id_map(item: 'AnyItem',
+                              id_map: Dict[str, str],
+                              is_root=False) -> List['AnyItem']:
         all_items = []
         id_map[item.id] = system.generate_oid()
 
@@ -46,7 +54,9 @@ class Cloneable:
         return all_items
 
     @staticmethod
-    async def _write_clone(item, memo, target):
+    async def _write_clone(item: 'AnyItem',
+                           memo: Dict,
+                           target: 'Container'=None) -> 'AnyItem':
         id_map = memo['_id_map_']
         clone = await item.clone(memo)
 
@@ -70,16 +80,18 @@ class Cloneable:
         context.txn.insert(clone)
         return clone
 
-    async def _copy(self, target: Elastic, memo: dict):
+    async def _copy(self: 'AnyItem',
+                    target: 'Container',
+                    memo: Dict) -> 'AnyItem':
         all_children = await Cloneable._prepare_id_map(
             self, memo['_id_map_'], True)
         memo['_id_map_'][self.parent_id] = target.id
         clone = await Cloneable._write_clone(self, memo, target)
         for item in all_children:
-            await Cloneable._write_clone(item, memo, None)
+            await Cloneable._write_clone(item, memo)
         return clone
 
-    async def copy_to(self, target):
+    async def copy_to(self: 'AnyItem', target: 'Container') -> 'AnyItem':
         """
         Copies the item to the designated target.
 
@@ -116,7 +128,7 @@ class Movable:
 
     parent_id = ParentId(default=None, store_as='pid')
 
-    async def move_to(self, target) -> None:
+    async def move_to(self: 'AnyItem', target: 'Container') -> None:
         """
         Moves the item to the designated target.
 
@@ -157,10 +169,10 @@ class Movable:
             # update target and parent
             if self.is_collection:
                 await target.containers.add(self)
-                parent.containers.remove(self)
+                await parent.containers.remove(self)
             else:
                 await target.items.add(self)
-                parent.items.remove(self)
+                await parent.items.remove(self)
 
             target.modified = now
             parent.modified = now
@@ -181,7 +193,7 @@ class Removable:
     """
     __slots__ = ()
 
-    async def remove(self) -> None:
+    async def remove(self: 'AnyItem') -> None:
         """
         Deletes the item permanently.
 
@@ -215,15 +227,15 @@ class Removable:
                 if parent is not None:
                     # update parent
                     if self.is_collection:
-                        parent.containers.remove(self)
+                        await parent.containers.remove(self)
                     else:
-                        parent.items.remove(self)
+                        await parent.items.remove(self)
                     parent.modified = datetime.datetime.utcnow().isoformat()
                     context.txn.upsert(parent)
             await _delete(self)
 
     @db.transactional()
-    async def delete(self, request):
+    async def delete(self: 'AnyItem', request):
         await self.remove()
         return True
 
@@ -233,7 +245,7 @@ class Recyclable:
 
     is_deleted = Deleted(store_as='dl')
 
-    async def restore(self) -> None:
+    async def restore(self: 'AnyItem') -> None:
         def restore_unique_keys(item) -> None:
             uniques = [dt for dt in item.__schema__.values()
                        if dt.unique]
@@ -265,7 +277,7 @@ class Recyclable:
             restore_unique_keys(self)
             await restore(self)
 
-    async def recycle_to(self, recycle_bin) -> None:
+    async def recycle_to(self: 'AnyItem', recycle_bin: 'RecycleBin') -> None:
         """
         Moves the item to the specified recycle bin.
         The item then becomes inaccessible.

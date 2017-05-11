@@ -17,5 +17,6 @@ def install_apps(path, prefix=''):
             if member_name.startswith('__'):
                 continue
             if isinstance(value, App):
-                porcupine_log.info('Installing application {0}'.format(value.name))
+                porcupine_log.info(
+                    'Installing application {0}'.format(value.name))
                 server.blueprint(value, url_prefix=value.name)
