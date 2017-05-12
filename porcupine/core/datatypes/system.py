@@ -34,7 +34,7 @@ class Acl(Dictionary):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._default = None
+        self.default = None
 
     def __get__(self, instance, owner) -> [AclValue, 'Acl']:
         if instance is None:
@@ -93,7 +93,7 @@ class Children(ReferenceN):
                 # create a separate instance per owner
                 # accepting the container's containment types
                 clazz = type(self)
-                children = clazz(default=self._default,
+                children = clazz(default=self.default,
                                  accepts=owner.containment)
                 setattr(owner, clazz.name, children)
                 return children
@@ -118,8 +118,9 @@ class Children(ReferenceN):
     async def get(self, instance, request, expand=True):
         return await super().get(instance, request, True)
 
-    # disallow direct additions
+    # disallow direct additions / assignment
     post = None
+    put = None
 
 
 class Items(Children):

@@ -161,11 +161,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         @rtype: str
         """
         return type(self).__name__
-        # return '{0}.{1}'.format(self.__class__.__module__,
-        #                         self.__class__.__name__)
 
     def apply_patch(self, patch: dict) -> None:
         for attr, value in patch.items():
+            # TODO: add support for acl
             setattr(self, attr, value)
 
     def custom_view(self, *args, **kwargs) -> dict:
@@ -179,6 +178,14 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @property
     async def is_stale(self):
         raise NotImplementedError
+
+    def reset(self):
+        data_types = list(self.__schema__.values())
+        for data_type in data_types:
+            if not data_type.readonly \
+                    and data_type.name != 'acl' \
+                    and data_type.storage == '__storage__':
+                setattr(self, data_type.name, data_type.default)
 
     async def clone(self, memo: dict=None) -> 'Elastic':
         """

@@ -17,7 +17,7 @@ class DataType:
     storage = '__storage__'
 
     def __init__(self, default=None, **kwargs):
-        self._default = default
+        self.default = default
         self.name = None
         for arg in ('required', 'allow_none', 'readonly',
                     'protected', 'store_as', 'indexed',
@@ -34,9 +34,11 @@ class DataType:
         if instance is not None:
             system_override = context.system_override
             if self.readonly and not system_override:
-                raise AttributeError(
-                    'Attribute {0} of {1} is readonly'.format(
-                        self.name, instance.__class__.__name__))
+                storage = getattr(instance, self.storage)
+                if value != getattr(storage, self.storage_key):
+                    raise AttributeError(
+                        'Attribute {0} of {1} is readonly'.format(
+                            self.name, instance.__class__.__name__))
         if self.allow_none and value is None:
             return
         if not isinstance(value, self.safe_type):
@@ -60,7 +62,7 @@ class DataType:
 
     def set_default(self, instance, value=None):
         if value is None:
-            value = self._default
+            value = self.default
         storage = getattr(instance, self.storage)
         # add to snapshot in order to validate
         if not instance.__is_new__:
@@ -122,8 +124,8 @@ class DataType:
                                            value)
             context.txn.delete_external(unique_key)
 
-    def on_undelete(self, instance, value):
-        pass
+    # def on_undelete(self, instance, value):
+    #     pass
 
     # HTTP views
 

@@ -220,7 +220,7 @@ class ReferenceN(Text, Acceptable):
 
     def set_default(self, instance, value=None):
         if value is None:
-            value = self._default
+            value = self.default
         if isinstance(value, tuple):
             value = list(value)
         super().set_default(instance, value)

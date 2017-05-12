@@ -100,7 +100,6 @@ class Composition(ReferenceN):
         with system_override():
             for composite in value:
                 if composite.__is_new__:
-                    # composite.parent_id = instance.id
                     context.txn.insert(composite)
                     added.append(composite)
                 else:
@@ -159,6 +158,7 @@ class Composition(ReferenceN):
             try:
                 if composite_id:
                     composite = await collection.get_item_by_id(composite_id)
+                    composite.reset()
                     composite.apply_patch(item_dict)
                 else:
                     # item_dict.setdefault('type', self.allowed_types[0])

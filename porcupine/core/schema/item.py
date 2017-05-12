@@ -219,10 +219,21 @@ class Item(Cloneable, Movable, Recyclable, GenericItem):
 
     @contract(accepts=dict)
     @db.transactional()
-    async def patch(self, request):
-        for attr, value in request.json.items():
-            try:
-                setattr(self, attr, value)
-            except exceptions.AttributeSetError as e:
-                raise exceptions.InvalidUsage(str(e))
+    async def put(self, request):
+        self.reset()
+        try:
+            self.apply_patch(request.json)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
         await self.update()
+        return self
+
+    @contract(accepts=dict)
+    @db.transactional()
+    async def patch(self, request):
+        try:
+            self.apply_patch(request.json)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+        await self.update()
+        return self

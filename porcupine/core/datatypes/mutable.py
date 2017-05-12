@@ -39,7 +39,7 @@ class List(DataType):
 
     def set_default(self, instance, value=None):
         if value is None:
-            value = self._default
+            value = self.default
         if isinstance(value, MutableSequence):
             value = copy.deepcopy(value)
         super().set_default(instance, value)
@@ -78,7 +78,7 @@ class Dictionary(DataType):
 
     def set_default(self, instance, value=None):
         if value is None:
-            value = self._default
+            value = self.default
         if isinstance(value, MutableMapping):
             value = copy.deepcopy(value)
         super().set_default(instance, value)
