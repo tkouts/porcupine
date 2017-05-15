@@ -1,4 +1,4 @@
-from porcupine import db, context
+from porcupine import db, context, exceptions
 from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
     InvalidUsage, AttributeSetError
 from porcupine.core.services.schema import SchemaMaintenance
@@ -32,7 +32,7 @@ class Acceptable:
 
 
 class ItemReference(str):
-    async def item(self):
+    async def item(self, quiet=True):
         """
         This method returns the object that this data type
         instance references. If the current user has no read
@@ -42,7 +42,7 @@ class ItemReference(str):
         @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
         @return: The referenced object, otherwise None
         """
-        return await db.get_item(self)
+        return await db.get_item(self, quiet=quiet)
 
 
 class Reference1(String, Acceptable):
@@ -109,10 +109,13 @@ class ItemCollection:
             await self._desc.fetch(self._inst)
         return tuple(getattr(storage, name))
 
-    async def get_item_by_id(self, item_id):
+    async def get_item_by_id(self, item_id, quiet=True):
         ids = await self.get()
         if item_id in ids:
-            return await db.get_item(item_id, quiet=False)
+            return await db.get_item(item_id, quiet=quiet)
+        elif not quiet:
+            raise exceptions.NotFound(
+                'The resource {0} does not exist'.format(item_id))
 
     async def items(self):
         return await db.get_multi(await self.get())

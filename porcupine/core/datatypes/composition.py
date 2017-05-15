@@ -23,9 +23,9 @@ class EmbeddedCollection(ItemCollection):
                                                    composite.id)
         return composite
 
-    async def get_item_by_id(self, item_id):
+    async def get_item_by_id(self, item_id, quiet=True):
         with system_override():
-            return await super().get_item_by_id(item_id)
+            return await super().get_item_by_id(item_id, quiet=quiet)
 
     async def items(self):
         with system_override():

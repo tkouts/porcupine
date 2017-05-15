@@ -92,7 +92,7 @@ class DataType:
         """
         if self.required and not value:
             raise ValueError('Attribute {0} is mandatory. '
-                             'Got {1}.'.format(self.name, value))
+                             'Got {1!r}.'.format(self.name, value))
 
     def clone(self, instance, memo):
         pass

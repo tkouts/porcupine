@@ -53,8 +53,8 @@ class RelatorItem(ItemReference):
         s._desc = descriptor
         return s
 
-    async def item(self):
-        item = await super().item()
+    async def item(self, quiet=True):
+        item = await super().item(quiet=quiet)
         if not item or self._desc.rel_attr not in item.__schema__:
             return None
         return item
