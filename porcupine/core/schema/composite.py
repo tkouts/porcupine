@@ -21,7 +21,7 @@ class Composite(Elastic):
 
     @see: L{porcupine.datatypes.Composition}
     """
-    path = String(required=True, readonly=True, protected=True)
+    path = String(required=True, readonly=True, protected=True)  # type: str
 
     def __init__(self, dict_storage=None):
         super().__init__(dict_storage)
@@ -67,6 +67,20 @@ class Composite(Elastic):
         item = await self.item
         await item.update()
 
+    async def remove(self):
+        exploded_path = self.path.split('.')
+        comp_name = exploded_path[-1]
+        parent_id = exploded_path[-2]
+        parent = await db.get_item(parent_id)
+        comp = getattr(parent, comp_name)
+        if hasattr(comp, 'remove'):
+            # composition
+            await comp.remove(self)
+        else:
+            # embedded
+            setattr(parent, comp_name, None)
+            context.txn.upsert(parent)
+
     # HTTP views
     def get(self, _):
         return self
@@ -91,3 +105,7 @@ class Composite(Elastic):
             raise exceptions.InvalidUsage(str(e))
         await self.update()
         return self
+
+    @db.transactional()
+    async def delete(self, _):
+        await self.remove()

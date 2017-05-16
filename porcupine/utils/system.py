@@ -135,10 +135,8 @@ def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
     return '{0}>{1}>{2}'.format(parent_id, attr_name, hash_series(attr_value))
 
 
-def get_composite_id(parent_id: str, comp_name: str, comp_id: str=None) -> str:
-    if comp_id is None:
-        return '{0}.{1}'.format(parent_id, comp_name)
-    return '{0}.{1}.{2}'.format(parent_id, comp_name, comp_id)
+def get_composite_path(parent_path: str, comp_name: str) -> str:
+    return '{0}.{1}'.format(parent_path, comp_name)
 
 
 async def fetch_collection_chunks(collection_key: str) -> (list, int):

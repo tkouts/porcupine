@@ -132,14 +132,14 @@ class ItemCollection:
         collection_key = self._desc.key_for(self._inst)
         for item in items:
             item_id = item.id
-            if not await self._desc.accepts_item(item):
-                raise ContainmentError(self._inst, self._desc.name, item)
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
                 collection = getattr(storage, self._desc.name)
                 if item_id not in collection:
                     collection.append(item_id)
             else:
+                if not await self._desc.accepts_item(item):
+                    raise ContainmentError(self._inst, self._desc.name, item)
                 context.txn.append(collection_key, ' {0}'.format(item_id))
 
     async def remove(self, *items):
@@ -289,12 +289,24 @@ class ReferenceN(Text, Acceptable):
                 context.txn.delete_external(external_key)
                 active_chunk -= 1
 
+    def get_member_id(self, instance, request_path):
+        chunks = request_path.split('{0}/{1}'.format(instance.id, self.name))
+        member_id = chunks[-1]
+        if member_id.startswith('/'):
+            member_id = member_id[1:]
+        return member_id
+
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
+        member_id = self.get_member_id(instance, request.path)
         collection = getattr(instance, self.name)
-        if expand:
-            return await collection.items()
-        return await collection.get()
+        if member_id:
+            member = await collection.get_item_by_id(member_id, quiet=False)
+            return member
+        else:
+            if expand:
+                return await collection.items()
+            return await collection.get()
 
     @contract(accepts=str)
     @db.transactional()
@@ -305,6 +317,8 @@ class ReferenceN(Text, Acceptable):
         :param request: 
         :return: 
         """
+        if self.get_member_id(instance, request.path):
+            raise exceptions.MethodNotAllowed('Method not allowed')
         item = await db.get_item(request.json, quiet=False)
         collection = getattr(instance, self.name)
         try:
@@ -312,3 +326,12 @@ class ReferenceN(Text, Acceptable):
         except AttributeSetError as e:
             raise InvalidUsage(str(e))
         return True
+
+    @db.transactional()
+    async def delete(self, instance, request):
+        member_id = self.get_member_id(instance, request.path)
+        collection = getattr(instance, self.name)
+        if not member_id:
+            raise exceptions.MethodNotAllowed('Method not allowed')
+        member = await collection.get_item_by_id(member_id, quiet=False)
+        await collection.remove(member)

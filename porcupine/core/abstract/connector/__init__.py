@@ -102,9 +102,15 @@ class AbstractConnector(metaclass=abc.ABCMeta):
         return await self.get_raw(ext_id)
 
     async def exists(self, key):
-        raise NotImplementedError
+        if context.txn is not None and key in context.txn:
+            return key, True
+        key_exists = await self.key_exists(key)
+        return key, key_exists
 
     # item operations
+    async def key_exists(self, key):
+        raise NotImplementedError
+
     # @abc.abstractmethod
     async def get_raw(self, key, quiet=True):
         raise NotImplementedError

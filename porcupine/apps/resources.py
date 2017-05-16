@@ -6,7 +6,7 @@ from porcupine import App
 from porcupine import db, exceptions
 from porcupine.core.schema.elastic import Elastic
 from porcupine.core.schema.composite import Composite
-from porcupine.datatypes import ReferenceN, Reference1
+from porcupine.datatypes import Composition, Embedded, ReferenceN
 
 
 class Resources(App):
@@ -35,7 +35,7 @@ async def resource_handler(request, item_id):
 
 
 @resources.route('/<item_id>/<path:path>',
-                 methods=frozenset({'GET', 'PUT', 'POST', 'PATCH'}))
+                 methods=frozenset({'GET', 'PUT', 'POST', 'PATCH', 'DELETE'}))
 async def member_handler(request, item_id, path):
 
     async def resolve_path(root, full_path: str):
@@ -50,10 +50,10 @@ async def member_handler(request, item_id, path):
                 if resolved is None:
                     raise exceptions.NotFound(
                         'The resource {0} does not exist'.format(request_path))
-                elif isinstance(resolved, Reference1):
+                elif isinstance(resolved, Embedded):
                     reference = getattr(inst, resolved.name)
-                    resolved = await reference.item(quiet=False)
-            elif isinstance(resolved, ReferenceN):
+                    resolved = await reference.item() or resolved
+            elif isinstance(resolved, Composition):
                 collection = getattr(inst, resolved.name)
                 try:
                     resolved = await collection.get_item_by_id(attr_name,
@@ -61,6 +61,8 @@ async def member_handler(request, item_id, path):
                 except exceptions.NotFound:
                     raise exceptions.NotFound(
                         'The resource {0} does not exist'.format(request_path))
+            elif isinstance(resolved, ReferenceN) and not path_tokens:
+                break
             else:
                 raise exceptions.NotFound(
                     'The resource {0} does not exist'.format(request_path))

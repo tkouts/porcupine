@@ -63,14 +63,14 @@ class Couchbase(AbstractConnector):
         return self.bucket.n1ql_query(n1query)
 
     @context_cacheable(size=1000)
-    async def exists(self, key):
+    async def key_exists(self, key) -> bool:
         try:
             await self.bucket.retrieve_in(key, 'dl')
         except NotFoundError:
-            return key, False
+            return False
         except (DocumentNotJsonError, SubdocPathNotFoundError):
             pass
-        return key, True
+        return True
 
     async def get_raw(self, key, quiet=True):
         try:

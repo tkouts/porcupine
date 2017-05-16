@@ -174,20 +174,6 @@ class Transaction:
         # external upsertions
         upsertions = self._upsertions
 
-        # if self._appends:
-        #     # make sure externals with appends are initialized
-        #     append_keys = list(self._appends.keys())
-        #     # tasks = [connector.exists(key)
-        #     #          for key in append_keys
-        #     #          if key not in insertions]
-        #     # completed, _ = await asyncio.wait(tasks)
-        #     # keys_exist = [c.result() for c in completed]
-        #     # initializations = {key: '' for key, exists in keys_exist
-        #     #                    if not exists}
-        #     initializations = {key: '' for key in append_keys}
-        # else:
-        #     initializations = {}
-
         # update deletions with externals
         deletions.extend(self._deletions.keys())
         return insertions, upsertions, deletions

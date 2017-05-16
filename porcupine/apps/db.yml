@@ -34,12 +34,15 @@
             - id: everyone
               name: Everyone Group
               type: EveryoneGroup
+              is_system: Yes
             - id: authusers
               name: Authenticated Users
               type: AuthUsersGroup
+              is_system: Yes
             - id: administrators
               name: Administrators
               type: Group
+              is_system: Yes
               members:
                 - admin
 

@@ -19,8 +19,8 @@ class EmbeddedCollection(ItemCollection):
         with system_override():
             composite = composite_type()
             parent_path = getattr(self._inst, 'path', self._inst.id)
-            composite.path = system.get_composite_id(parent_path,
-                                                     self._desc.name)
+            composite.path = system.get_composite_path(parent_path,
+                                                       self._desc.name)
         return composite
 
     async def get_item_by_id(self, item_id, quiet=True):
@@ -170,14 +170,14 @@ class EmbeddedItem:
             composite = composite_type()
             composite.id = self._desc.key_for(self._inst)
             parent_path = getattr(self._inst, 'path', self._inst.id)
-            composite.path = system.get_composite_id(parent_path,
-                                                     self._desc.name)
+            composite.path = system.get_composite_path(parent_path,
+                                                       self._desc.name)
         return composite
 
-    async def item(self) -> Composite:
+    async def item(self, quiet=True) -> Composite:
         with system_override():
             composite_id = self._desc.key_for(self._inst)
-            return await db.get_item(composite_id)
+            return await db.get_item(composite_id, quiet=quiet)
 
 
 class Embedded(Reference1):
@@ -210,7 +210,7 @@ class Embedded(Reference1):
         setattr(instance.__storage__, self.name, self.storage_info)
 
     def key_for(self, instance):
-        return system.get_composite_id(instance.id, self.name)
+        return system.get_composite_path(instance.id, self.name)
 
     def snapshot(self, instance, composite, previous_value):
         storage_key = self.storage_key
@@ -245,15 +245,16 @@ class Embedded(Reference1):
             context.txn.delete(composite)
 
     # HTTP views
-    async def get(self, instance, request, expand=True):
-        embedded = await self.__get__(instance, None).item()
-        return embedded
+    # These are called when there is no embedded item
 
-    @contract(accepts=dict, optional=True)
+    async def get(self, instance, request, expand=True):
+        return None
+
+    @contract(accepts=dict)
     @db.transactional()
     async def put(self, instance, request):
         """
-        Resets the collection
+        Creates a new composite and sets the data type
         :param instance: 
         :param request: 
         :return: 
@@ -261,20 +262,13 @@ class Embedded(Reference1):
         value = self.__get__(instance, None)
         item_dict = request.json
         try:
-            if item_dict is None:
-                setattr(instance, self.name, None)
-                await instance.update()
-                return None
-            else:
-                embedded = await value.item()
-                if embedded:
-                    embedded.apply_patch(item_dict)
-                    await embedded.update()
-                else:
-                    embedded = value.new()
-                    embedded.apply_patch(item_dict)
-                    setattr(instance, self.name, embedded)
-                    await instance.update()
+            embedded = value.new()
+            embedded.apply_patch(item_dict)
+            setattr(instance, self.name, embedded)
+            await instance.update()
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         return embedded
+
+    async def delete(self, instance, request):
+        pass
