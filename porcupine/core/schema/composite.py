@@ -1,4 +1,7 @@
-from porcupine import db, context
+from porcupine import db, context, exceptions
+from porcupine.contract import contract
+from porcupine.datatypes import String
+from porcupine.core.context import system_override
 from .elastic import Elastic
 
 
@@ -18,6 +21,8 @@ class Composite(Elastic):
 
     @see: L{porcupine.datatypes.Composition}
     """
+    path = String(required=True, readonly=True, protected=True)
+
     def __init__(self, dict_storage=None):
         super().__init__(dict_storage)
         if self.__is_new__ and not context.system_override:
@@ -25,7 +30,7 @@ class Composite(Elastic):
 
     @property
     def item_id(self):
-        return self.id.split('.')[0]
+        return self.path.split('.')[0]
 
     @property
     async def is_stale(self):
@@ -49,7 +54,40 @@ class Composite(Elastic):
         parent = await self.item
         return parent.acl
 
+    async def clone(self, memo: dict=None) -> 'Composite':
+        clone: 'Composite' = await super().clone(memo)
+        with system_override():
+            id_map = memo['_id_map_']
+            clone.path = '.'.join([id_map.get(oid, oid)
+                                   for oid in self.path.split('.')])
+        return clone
+
     async def update(self):
         context.txn.upsert(self)
         item = await self.item
         await item.update()
+
+    # HTTP views
+    def get(self, _):
+        return self
+
+    @contract(accepts=dict)
+    @db.transactional()
+    async def put(self, request):
+        self.reset()
+        try:
+            self.apply_patch(request.json)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+        await self.update()
+        return self
+
+    @contract(accepts=dict)
+    @db.transactional()
+    async def patch(self, request):
+        try:
+            self.apply_patch(request.json)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+        await self.update()
+        return self

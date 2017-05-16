@@ -172,21 +172,6 @@ class GenericItem(Removable, Elastic):
         path = '/'.join([p.name for p in parents])
         return '/%s' % path if not path.startswith('/') else path
 
-
-class Item(Cloneable, Movable, Recyclable, GenericItem):
-    """
-    Simple item with update capability.
-
-    Normally, this is the base class of your custom Porcupine Objects.
-    Subclass the L{porcupine.schema.Container} class if you want
-    to create custom containers.
-    """
-    shortcuts = RelatorN(
-        accepts=('porcupine.schema.Shortcut', ),
-        rel_attr='target',
-        cascade_delete=True,
-    )
-
     async def update(self) -> None:
         """
         Updates the item.
@@ -237,3 +222,18 @@ class Item(Cloneable, Movable, Recyclable, GenericItem):
             raise exceptions.InvalidUsage(str(e))
         await self.update()
         return self
+
+
+class Item(Cloneable, Movable, Recyclable, GenericItem):
+    """
+    Simple item with shortcuts.
+
+    Normally, this is the base class of your custom Porcupine Objects.
+    Subclass the L{porcupine.schema.Container} class if you want
+    to create custom containers.
+    """
+    shortcuts = RelatorN(
+        accepts=('porcupine.schema.Shortcut', ),
+        rel_attr='target',
+        cascade_delete=True,
+    )

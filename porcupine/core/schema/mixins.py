@@ -26,23 +26,10 @@ class Cloneable:
     @staticmethod
     async def _prepare_id_map(item: 'AnyItem',
                               id_map: Dict[str, str],
-                              composite_type: int=None,
                               is_root=False) -> List['AnyItem']:
         all_items = []
 
-        if composite_type is None:
-            id_map[item.id] = system.generate_oid()
-        elif composite_type == 1:
-            # composition
-            path = item.id.split('.')[:-1]
-            new_path = [id_map.get(oid, oid) for oid in path]
-            new_path.append(system.generate_oid())
-            id_map[item.id] = '.'.join(new_path)
-        elif composite_type == 2:
-            # embedded
-            path = item.id.split('.')
-            new_path = [id_map.get(oid, oid) for oid in path]
-            id_map[item.id] = '.'.join(new_path)
+        id_map[item.id] = system.generate_oid()
 
         if not is_root:
             all_items.append(item)
@@ -51,10 +38,10 @@ class Cloneable:
             if isinstance(data_type, Embedded):
                 embedded = await getattr(item, attr_name).item()
                 if embedded is not None:
-                    await Cloneable._prepare_id_map(embedded, id_map, 2)
+                    await Cloneable._prepare_id_map(embedded, id_map)
             elif isinstance(data_type, Composition):
                 items = await getattr(item, attr_name).items()
-                await gather(*[Cloneable._prepare_id_map(i, id_map, 1)
+                await gather(*[Cloneable._prepare_id_map(i, id_map)
                                for i in items])
 
         if item.is_collection:

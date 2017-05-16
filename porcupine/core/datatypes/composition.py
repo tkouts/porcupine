@@ -18,9 +18,9 @@ class EmbeddedCollection(ItemCollection):
         composite_type = clazz or self._desc.allowed_types[0]
         with system_override():
             composite = composite_type()
-            composite.id = system.get_composite_id(self._inst.id,
-                                                   self._desc.name,
-                                                   composite.id)
+            parent_path = getattr(self._inst, 'path', self._inst.id)
+            composite.path = system.get_composite_id(parent_path,
+                                                     self._desc.name)
         return composite
 
     async def get_item_by_id(self, item_id, quiet=True):
@@ -56,21 +56,6 @@ class Composition(ReferenceN):
     @see: L{porcupine.schema.Composite}
     """
     storage_info = '_compN_'
-
-    @staticmethod
-    def get_collection_id(composite: Composite):
-        return composite.__storage__.id.split('.')[-1]
-
-    async def fetch(self, instance, set_storage=True):
-        value = await super().fetch(instance, set_storage=False)
-        value = [
-            system.get_composite_id(instance.__storage__.id, self.name, cid)
-            for cid in value
-        ]
-        if set_storage:
-            storage = getattr(instance, self.storage)
-            setattr(storage, self.storage_key, value)
-        return value
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -184,6 +169,9 @@ class EmbeddedItem:
         with system_override():
             composite = composite_type()
             composite.id = self._desc.key_for(self._inst)
+            parent_path = getattr(self._inst, 'path', self._inst.id)
+            composite.path = system.get_composite_id(parent_path,
+                                                     self._desc.name)
         return composite
 
     async def item(self) -> Composite:

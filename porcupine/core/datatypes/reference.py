@@ -131,7 +131,7 @@ class ItemCollection:
             await self._check_permissions_and_raise()
         collection_key = self._desc.key_for(self._inst)
         for item in items:
-            item_id = self._desc.get_collection_id(item)
+            item_id = item.id
             if not await self._desc.accepts_item(item):
                 raise ContainmentError(self._inst, self._desc.name, item)
             if self._inst.__is_new__:
@@ -147,7 +147,7 @@ class ItemCollection:
             await self._check_permissions_and_raise()
         collection_key = self._desc.key_for(self._inst)
         for item in items:
-            item_id = self._desc.get_collection_id(item)
+            item_id = item.id
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
                 collection = getattr(storage, self._desc.name)
@@ -168,10 +168,6 @@ class ReferenceN(Text, Acceptable):
                 self.type_error_message.format(type(self).__name__, 'required'))
         super().__init__(default, **kwargs)
         Acceptable.__init__(self, **kwargs)
-
-    @staticmethod
-    def get_collection_id(item):
-        return item.__storage__.id
 
     async def fetch(self, instance, set_storage=True):
         chunks = []
@@ -251,8 +247,7 @@ class ReferenceN(Text, Acceptable):
                     raise ContainmentError(instance, self.name, item)
             if ref_items:
                 # write external
-                raw_value = ' '.join([self.get_collection_id(i)
-                                      for i in ref_items])
+                raw_value = ' '.join([i.id for i in ref_items])
                 super().on_create(instance, raw_value)
         else:
             ref_items = []

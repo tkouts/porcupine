@@ -4,8 +4,9 @@ from sanic.response import json, HTTPResponse
 
 from porcupine import App
 from porcupine import db, exceptions
-from porcupine.schema import Item, Composite
-from porcupine.datatypes import DataType, ReferenceN, Reference1
+from porcupine.core.schema.elastic import Elastic
+from porcupine.core.schema.composite import Composite
+from porcupine.datatypes import ReferenceN, Reference1
 
 
 class Resources(App):
@@ -20,6 +21,10 @@ resources = Resources()
                  methods=frozenset({'GET', 'PUT', 'PATCH', 'DELETE'}))
 async def resource_handler(request, item_id):
     item = await db.get_item(item_id, quiet=False)
+    if isinstance(item, Composite):
+        # disallow direct composite access
+        raise exceptions.NotFound(
+            'The resource {0} does not exist'.format(item_id))
     handler = getattr(item, request.method.lower(), None)
     if handler is None:
         raise exceptions.MethodNotAllowed('Method not allowed')
@@ -30,7 +35,7 @@ async def resource_handler(request, item_id):
 
 
 @resources.route('/<item_id>/<path:path>',
-                 methods=frozenset({'GET', 'PUT', 'POST'}))
+                 methods=frozenset({'GET', 'PUT', 'POST', 'PATCH'}))
 async def member_handler(request, item_id, path):
 
     async def resolve_path(root, full_path: str):
@@ -39,7 +44,7 @@ async def member_handler(request, item_id, path):
         resolved = inst = root
         while path_tokens:
             attr_name = path_tokens.pop(0)
-            if isinstance(resolved, (Item, Composite)):
+            if isinstance(resolved, Elastic):
                 inst = resolved
                 resolved = getattr(type(inst), attr_name, None)
                 if resolved is None:
@@ -56,7 +61,7 @@ async def member_handler(request, item_id, path):
                 except exceptions.NotFound:
                     raise exceptions.NotFound(
                         'The resource {0} does not exist'.format(request_path))
-            elif isinstance(resolved, DataType):
+            else:
                 raise exceptions.NotFound(
                     'The resource {0} does not exist'.format(request_path))
         return inst, resolved
@@ -67,10 +72,10 @@ async def member_handler(request, item_id, path):
     handler = getattr(member, request.method.lower(), None)
     if handler is None:
         raise exceptions.MethodNotAllowed('Method not allowed')
-    if isinstance(member, DataType):
-        result = handler(instance, request)
-    else:
+    if isinstance(member, Elastic):
         result = handler(request)
+    else:
+        result = handler(instance, request)
     if asyncio.iscoroutine(result):
         result = await result
     return result if isinstance(result, HTTPResponse) else json(result)
