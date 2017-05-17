@@ -1,3 +1,0 @@
-"""
-Porcupine utilities package
-"""
