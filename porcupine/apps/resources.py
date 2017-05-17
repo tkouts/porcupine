@@ -62,6 +62,7 @@ async def member_handler(request, item_id, path):
                     raise exceptions.NotFound(
                         'The resource {0} does not exist'.format(request_path))
             elif isinstance(resolved, ReferenceN) and not path_tokens:
+                # let data type handler resolve membership
                 break
             else:
                 raise exceptions.NotFound(

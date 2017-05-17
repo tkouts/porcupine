@@ -2,7 +2,7 @@
 Porcupine composition data types
 ================================
 """
-from typing import Type
+from typing import Type, Union
 from porcupine import db, exceptions, context
 from porcupine.utils import system
 from porcupine.contract import contract
@@ -11,10 +11,11 @@ from porcupine.core.schema.composite import Composite
 from .reference import ReferenceN, ItemCollection, Reference1
 
 
-class EmbeddedCollection(ItemCollection):
+class CompositeFactory:
     __slots__ = ()
 
-    def new(self, clazz: Type[Composite]=None) -> Composite:
+    def factory(self: Union['EmbeddedCollection', 'EmbeddedItem'],
+                clazz: Type[Composite]=None) -> Composite:
         composite_type = clazz or self._desc.allowed_types[0]
         with system_override():
             composite = composite_type()
@@ -22,6 +23,10 @@ class EmbeddedCollection(ItemCollection):
             composite.path = system.get_composite_path(parent_path,
                                                        self._desc.name)
         return composite
+
+
+class EmbeddedCollection(ItemCollection, CompositeFactory):
+    __slots__ = ()
 
     async def get_item_by_id(self, item_id, quiet=True):
         with system_override():
@@ -118,9 +123,8 @@ class Composition(ReferenceN):
         """
         collection = getattr(instance, self.name)
         item_dict = request.json
-        # item_dict.setdefault('type', self.allowed_types[0])
         try:
-            composite = collection.new()  # Composite.new_from_dict(item_dict)
+            composite = collection.factory()
             composite.apply_patch(item_dict)
             await collection.add(composite)
         except exceptions.AttributeSetError as e:
@@ -146,8 +150,7 @@ class Composition(ReferenceN):
                     composite.reset()
                     composite.apply_patch(item_dict)
                 else:
-                    # item_dict.setdefault('type', self.allowed_types[0])
-                    composite = collection.new()
+                    composite = collection.factory()
                     composite.apply_patch(item_dict)
                 composites.append(composite)
             except exceptions.AttributeSetError as e:
@@ -157,7 +160,7 @@ class Composition(ReferenceN):
         return composites
 
 
-class EmbeddedItem:
+class EmbeddedItem(CompositeFactory):
     __slots__ = ('_desc', '_inst')
 
     def __init__(self, descriptor: 'Embedded', instance):
@@ -165,13 +168,9 @@ class EmbeddedItem:
         self._inst = instance
 
     def new(self, clazz: Type[Composite]=None) -> Composite:
-        composite_type = clazz or self._desc.allowed_types[0]
+        composite = super().factory(clazz)
         with system_override():
-            composite = composite_type()
             composite.id = self._desc.key_for(self._inst)
-            parent_path = getattr(self._inst, 'path', self._inst.id)
-            composite.path = system.get_composite_path(parent_path,
-                                                       self._desc.name)
         return composite
 
     async def item(self, quiet=True) -> Composite:
@@ -262,7 +261,7 @@ class Embedded(Reference1):
         value = self.__get__(instance, None)
         item_dict = request.json
         try:
-            embedded = value.new()
+            embedded = value.factory()
             embedded.apply_patch(item_dict)
             setattr(instance, self.name, embedded)
             await instance.update()

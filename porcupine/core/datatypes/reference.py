@@ -289,6 +289,8 @@ class ReferenceN(Text, Acceptable):
                 context.txn.delete_external(external_key)
                 active_chunk -= 1
 
+    # HTTP views
+
     def get_member_id(self, instance, request_path):
         chunks = request_path.split('{0}/{1}'.format(instance.id, self.name))
         member_id = chunks[-1]
