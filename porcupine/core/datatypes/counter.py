@@ -12,7 +12,9 @@ class Counter(Integer):
         super().__init__(default, **kwargs)
 
     async def on_change(self, instance, value, old_value):
-        context.txn.mutate(instance,
-                           self.storage_key,
-                           db.connector.SUB_DOC_COUNTER,
-                           value - old_value)
+        delta = value - old_value
+        if delta:
+            context.txn.mutate(instance,
+                               self.storage_key,
+                               db.connector.SUB_DOC_COUNTER,
+                               delta)
