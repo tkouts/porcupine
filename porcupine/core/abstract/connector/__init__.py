@@ -2,10 +2,10 @@ import abc
 
 from porcupine import context
 from porcupine.config import settings
-from porcupine.exceptions import DBAlreadyExists
 from porcupine.core.abstract.connector.join import Join
 from porcupine.core.abstract.connector.persist import DefaultPersistence
-from porcupine.utils import system
+from porcupine.core.utils import system
+from porcupine.exceptions import DBAlreadyExists
 from .transaction import Transaction
 
 

@@ -1,9 +1,10 @@
 import asyncio
 from inspect import isawaitable
+
 from collections import defaultdict
 
 from porcupine import exceptions
-from porcupine.utils import system
+from porcupine.core.utils import system
 
 
 class Transaction:

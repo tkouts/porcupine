@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING, TypeVar, Dict, List
 
 from porcupine import db, context, exceptions, gather
 from porcupine.core.context import system_override
-from porcupine.datatypes import Embedded, Composition, DataType
 from porcupine.core.datatypes.system import Deleted, ParentId
-from porcupine.utils import system, permissions
+from porcupine.core.utils import system, permissions
+from porcupine.datatypes import Embedded, Composition, DataType
 
 if TYPE_CHECKING:
     from .item import Item

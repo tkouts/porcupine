@@ -1,7 +1,7 @@
 """
 Default database object persistence layer
 """
-from porcupine.utils import system
+from porcupine.core.utils import system
 
 
 class DefaultPersistence(object):

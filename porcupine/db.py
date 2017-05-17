@@ -1,12 +1,12 @@
 import asyncio
+
 import copy
 from functools import wraps
-
+from sanic import Blueprint
 from sanic.request import Request
-from sanic.blueprints import Blueprint
 
 from porcupine import context, exceptions
-from porcupine.utils import system
+from porcupine.core.utils import system
 
 connector = None
 

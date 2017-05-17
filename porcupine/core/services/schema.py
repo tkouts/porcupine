@@ -1,11 +1,12 @@
 """
 Schema maintenance service
 """
-import math
 import asyncio
+import math
 from inspect import isawaitable
+
 from porcupine import log, db, exceptions
-from porcupine.utils import system
+from porcupine.core.utils import system
 from .service import AbstractService
 
 

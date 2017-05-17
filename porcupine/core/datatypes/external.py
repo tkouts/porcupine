@@ -2,12 +2,13 @@
 Porcupine external data types
 =============================
 """
-import os.path
-import shutil
 import asyncio
 
+import os.path
+import shutil
+
 from porcupine import db, context
-from porcupine.utils import system
+from porcupine.core.utils import system
 from .common import String
 from .datatype import DataType
 

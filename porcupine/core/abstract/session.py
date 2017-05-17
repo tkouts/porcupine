@@ -1,7 +1,8 @@
 import abc
+
 from porcupine.config import settings
-from porcupine.utils import system
-from porcupine.utils.observables import ObservableDict
+from porcupine.core.utils import system
+from porcupine.core.utils.observables import ObservableDict
 
 
 class Session(ObservableDict):

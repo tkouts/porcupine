@@ -1,6 +1,7 @@
 import copy
 from collections import MutableSequence, MutableMapping
-from porcupine.utils.observables import ObservableList, ObservableDict
+
+from porcupine.core.utils.observables import ObservableList, ObservableDict
 from .datatype import DataType
 
 

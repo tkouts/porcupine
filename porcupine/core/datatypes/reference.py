@@ -1,12 +1,10 @@
 from porcupine import db, context, exceptions
-from porcupine.exceptions import ContainmentError, NotFound, Forbidden, \
-    InvalidUsage, AttributeSetError
-from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.core.context import system_override
 from porcupine.contract import contract
-from porcupine.utils import system, permissions
-from .external import Text
+from porcupine.core.context import system_override
+from porcupine.core.services.schema import SchemaMaintenance
+from porcupine.core.utils import system, permissions
 from .common import String
+from .external import Text
 
 
 class Acceptable:
@@ -72,11 +70,11 @@ class Reference1(String, Acceptable):
         if value:
             try:
                 ref_item = await db.get_item(value, quiet=False)
-            except (NotFound, Forbidden):
+            except (exceptions.NotFound, exceptions.Forbidden):
                 # TODO: change wording
-                raise InvalidUsage('Invalid item {0}'.format(value))
+                raise exceptions.InvalidUsage('Invalid item {0}'.format(value))
             if not await self.accepts_item(ref_item):
-                raise ContainmentError(instance, self.name, ref_item)
+                raise exceptions.ContainmentError(instance, self.name, ref_item)
             return ref_item
 
     async def on_change(self, instance, value, old_value):
@@ -124,7 +122,7 @@ class ItemCollection:
         user = context.user
         user_role = await permissions.resolve(self._inst, user)
         if user_role < permissions.AUTHOR:
-            raise Forbidden('Forbidden')
+            raise exceptions.Forbidden('Forbidden')
 
     async def add(self, *items):
         if not context.system_override:
@@ -139,7 +137,8 @@ class ItemCollection:
                     collection.append(item_id)
             else:
                 if not await self._desc.accepts_item(item):
-                    raise ContainmentError(self._inst, self._desc.name, item)
+                    raise exceptions.ContainmentError(self._inst,
+                                                      self._desc.name, item)
                 context.txn.append(collection_key, ' {0}'.format(item_id))
 
     async def remove(self, *items):
@@ -244,7 +243,8 @@ class ReferenceN(Text, Acceptable):
             # check containment
             for item in ref_items:
                 if not await self.accepts_item(item):
-                    raise ContainmentError(instance, self.name, item)
+                    raise exceptions.ContainmentError(instance,
+                                                      self.name, item)
             if ref_items:
                 # write external
                 raw_value = ' '.join([i.id for i in ref_items])
@@ -325,8 +325,8 @@ class ReferenceN(Text, Acceptable):
         collection = getattr(instance, self.name)
         try:
             await collection.add(item)
-        except AttributeSetError as e:
-            raise InvalidUsage(str(e))
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
         return True
 
     @db.transactional()

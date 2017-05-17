@@ -1,5 +1,5 @@
 from porcupine import context, db, exceptions
-from porcupine.utils.system import get_key_of_unique
+from porcupine.core.utils.system import get_key_of_unique
 
 
 class DataType:

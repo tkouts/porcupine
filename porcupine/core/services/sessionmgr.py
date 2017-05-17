@@ -2,10 +2,12 @@
 Session Manager Service
 """
 import asyncio
+
 from sanic import Blueprint
+
 from porcupine import log
-from porcupine.utils import system
 from porcupine.config import settings
+from porcupine.core.utils import system
 from .service import AbstractService
 
 session_manager = None

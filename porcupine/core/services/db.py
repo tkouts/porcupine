@@ -2,8 +2,8 @@
 Database service
 """
 from porcupine import log, db
-from porcupine.utils import system
 from porcupine.config import settings
+from porcupine.core.utils import system
 from .service import AbstractService
 
 
