@@ -35,7 +35,8 @@ class EmbeddedCollection(ItemCollection, CompositeFactory):
 
     async def items(self):
         with system_override():
-            return await super().items()
+            async for item in super().items():
+                yield item
 
     async def add(self, *composites):
         with system_override():
@@ -69,7 +70,7 @@ class Composition(ReferenceN):
         return EmbeddedCollection(self, instance)
 
     async def clone(self, instance, memo):
-        composites = await self.__get__(instance, None).items()
+        composites = [c async for c in self.__get__(instance, None).items()]
         self.__set__(instance, [await item.clone(memo) for item in composites])
 
     async def on_create(self, instance, value):
@@ -83,8 +84,8 @@ class Composition(ReferenceN):
                                     [c.__storage__.id for c in value])
 
     async def on_change(self, instance, value, old_value):
-        old_ids = frozenset(await self.fetch(instance, set_storage=False))
-        collection = self.__get__(instance, None)
+        collection = getattr(instance, self.name)
+        old_ids = frozenset([cid async for cid in collection])
         new_ids = frozenset([c.__storage__.id for c in value])
         removed_ids = old_ids.difference(new_ids)
         added = []
@@ -97,14 +98,14 @@ class Composition(ReferenceN):
                     context.txn.upsert(composite)
             await super(EmbeddedCollection, collection).add(*added)
             if removed_ids:
-                removed = await db.get_multi(removed_ids)
+                removed = [i async for i in db.get_multi(removed_ids)]
                 for item in removed:
                     context.txn.delete(item)
                 await super(EmbeddedCollection, collection).remove(*removed)
 
     async def on_delete(self, instance, value):
-        composite_ids = await self.fetch(instance, set_storage=False)
-        async for composite in db.connector.get_multi(composite_ids):
+        collection = self.__get__(instance, None)
+        async for composite in collection.items():
             context.txn.delete(composite)
         # remove collection documents
         await super().on_delete(instance, value)

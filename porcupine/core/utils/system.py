@@ -7,7 +7,7 @@ import hashlib
 import random
 
 from porcupine import db
-from porcupine.core.utils.customcollections import WriteOnceDict
+from porcupine.core.utils.collections import WriteOnceDict
 from .permissions import resolve
 
 VALID_ID_CHARS = [

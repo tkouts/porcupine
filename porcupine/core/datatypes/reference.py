@@ -1,8 +1,8 @@
 from porcupine import db, context, exceptions
 from porcupine.contract import contract
 from porcupine.core.context import system_override
-from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.core.utils import system, permissions
+from porcupine.core.utils import system
+from .collection import ItemCollection
 from .common import String
 from .external import Text
 
@@ -93,69 +93,6 @@ class Reference1(String, Acceptable):
         return value
 
 
-class ItemCollection:
-    __slots__ = ('_desc', '_inst')
-
-    def __init__(self, descriptor, instance):
-        self._desc = descriptor
-        self._inst = instance
-
-    async def get(self):
-        storage = getattr(self._inst, self._desc.storage)
-        name = self._desc.name
-        if getattr(storage, name) is None:
-            await self._desc.fetch(self._inst)
-        return tuple(getattr(storage, name))
-
-    async def get_item_by_id(self, item_id, quiet=True):
-        ids = await self.get()
-        if item_id in ids:
-            return await db.get_item(item_id, quiet=quiet)
-        elif not quiet:
-            raise exceptions.NotFound(
-                'The resource {0} does not exist'.format(item_id))
-
-    async def items(self):
-        return await db.get_multi(await self.get())
-
-    async def _check_permissions_and_raise(self):
-        user = context.user
-        user_role = await permissions.resolve(self._inst, user)
-        if user_role < permissions.AUTHOR:
-            raise exceptions.Forbidden('Forbidden')
-
-    async def add(self, *items):
-        if not context.system_override:
-            await self._check_permissions_and_raise()
-        collection_key = self._desc.key_for(self._inst)
-        for item in items:
-            item_id = item.id
-            if self._inst.__is_new__:
-                storage = getattr(self._inst, self._desc.storage)
-                collection = getattr(storage, self._desc.name)
-                if item_id not in collection:
-                    collection.append(item_id)
-            else:
-                if not await self._desc.accepts_item(item):
-                    raise exceptions.ContainmentError(self._inst,
-                                                      self._desc.name, item)
-                context.txn.append(collection_key, ' {0}'.format(item_id))
-
-    async def remove(self, *items):
-        if not context.system_override:
-            await self._check_permissions_and_raise()
-        collection_key = self._desc.key_for(self._inst)
-        for item in items:
-            item_id = item.id
-            if self._inst.__is_new__:
-                storage = getattr(self._inst, self._desc.storage)
-                collection = getattr(storage, self._desc.name)
-                if item_id in collection:
-                    collection.remove(item_id)
-            else:
-                context.txn.append(collection_key, ' -{0}'.format(item_id))
-
-
 class ReferenceN(Text, Acceptable):
     storage_info = '_refN_'
     safe_type = (list, tuple)
@@ -167,49 +104,6 @@ class ReferenceN(Text, Acceptable):
                 self.type_error_message.format(type(self).__name__, 'required'))
         super().__init__(default, **kwargs)
         Acceptable.__init__(self, **kwargs)
-
-    async def fetch(self, instance, set_storage=True):
-        chunks = []
-        current_size = 0
-        is_split = False
-        value = await super().fetch(instance, set_storage=False)
-        # print('raw value is', value)
-        if value:
-            current_size = len(value)
-            chunks.append(value)
-
-        active_chunk_key = system.get_active_chunk_key(self.name)
-        active_index = getattr(instance.__storage__, active_chunk_key)
-        if active_index > 0:
-            # collection is split
-            is_split = True
-            coll_key = self.key_for(instance)
-            previous_chunks, _ = await system.fetch_collection_chunks(coll_key)
-            # add previous chunks to the beginning
-            chunks[0:0] = previous_chunks
-
-        value, dirtiness = system.resolve_set(' '.join(chunks))
-        # print(dirtiness)
-        split_threshold = db.connector.coll_split_threshold
-        compact_threshold = db.connector.coll_compact_threshold
-        if current_size > split_threshold or dirtiness > compact_threshold:
-            # collection maintenance
-            key = self.key_for(instance)
-            if current_size > split_threshold:
-                shd_compact = (current_size * (1 - dirtiness)) < split_threshold
-                if not is_split and shd_compact:
-                    await SchemaMaintenance.compact_collection(key)
-                else:
-                    await SchemaMaintenance.rebuild_collection(key)
-            elif dirtiness > compact_threshold:
-                if is_split:
-                    await SchemaMaintenance.rebuild_collection(key)
-                else:
-                    await SchemaMaintenance.compact_collection(key)
-        if set_storage:
-            storage = getattr(instance, self.storage)
-            setattr(storage, self.storage_key, value)
-        return value
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -234,12 +128,13 @@ class ReferenceN(Text, Acceptable):
         return system.get_collection_key(instance.id, self.name, chunk)
 
     async def clone(self, instance, memo):
-        ids = await getattr(instance, self.name).get()
-        self.__set__(instance, [memo['_id_map_'].get(oid, oid) for oid in ids])
+        collection = getattr(instance, self.name)
+        self.__set__(instance, [memo['_id_map_'].get(oid, oid)
+                                async for oid in collection])
 
     async def on_create(self, instance, value):
         if value:
-            ref_items = await db.get_multi(value)
+            ref_items = [i async for i in db.get_multi(value)]
             # check containment
             for item in ref_items:
                 if not await self.accepts_item(item):
@@ -256,22 +151,22 @@ class ReferenceN(Text, Acceptable):
     async def on_change(self, instance, value, old_value):
         # old_value is always None
         # need to compute deltas
-        old_ids = await self.fetch(instance, set_storage=False)
+        collection = getattr(instance, self.name)
+        old_ids = [oid async for oid in collection]
         new_value = frozenset(value)
         if new_value == frozenset(old_ids):
             # nothing changed
             return [], []
         # compute old value leaving out non-accessible items
-        ref_items = await db.get_multi(old_ids)
+        ref_items = [i async for i in db.get_multi(old_ids)]
         old_value = frozenset([i.id for i in ref_items])
         added_ids = new_value.difference(old_value)
         removed_ids = old_value.difference(new_value)
-        added = await db.get_multi(added_ids)
-        removed = await db.get_multi(removed_ids)
-        item_collection = self.__get__(instance, None)
+        added = [i async for i in db.get_multi(added_ids)]
+        removed = [i async for i in db.get_multi(removed_ids)]
         with system_override():
-            await item_collection.add(*added)
-            await item_collection.remove(*removed)
+            await collection.add(*added)
+            await collection.remove(*removed)
         return added, removed
 
     async def on_delete(self, instance, value):
@@ -307,8 +202,8 @@ class ReferenceN(Text, Acceptable):
             return member
         else:
             if expand:
-                return await collection.items()
-            return await collection.get()
+                return [item async for item in collection.items()]
+            return [oid async for oid in collection]
 
     @contract(accepts=str)
     @db.transactional()

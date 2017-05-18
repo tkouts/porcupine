@@ -4,8 +4,8 @@ Porcupine reference data types
 """
 from porcupine import db, context
 from porcupine.core.context import system_override
-from .reference import Reference1, ReferenceN, ItemCollection, \
-    ItemReference, Acceptable
+from .reference import Reference1, ReferenceN, ItemReference, Acceptable
+from .collection import ItemCollection
 
 
 class RelatorBase(Acceptable):
@@ -41,7 +41,8 @@ class RelatorBase(Acceptable):
                 rel_attr_value = getattr(item, self.rel_attr)
                 if isinstance(rel_attr_value, RelatorCollection):
                     # call super remove to avoid recursion
-                    await super(RelatorCollection, rel_attr_value).remove(instance)
+                    await super(RelatorCollection,
+                                rel_attr_value).remove(instance)
                 elif isinstance(rel_attr_value, RelatorItem):
                     setattr(item, self.rel_attr, None)
                     context.txn.upsert(item)
@@ -118,9 +119,9 @@ class Relator1(Reference1, RelatorBase):
 
 class RelatorCollection(ItemCollection):
     async def items(self):
-        items = await super().items()
-        return [item for item in items
-                if self._desc.rel_attr in item.__schema__]
+        async for item in super().items():
+            if self._desc.rel_attr in item.__schema__:
+                yield item
 
     async def add(self, *items):
         await super().add(*items)
@@ -177,12 +178,13 @@ class RelatorN(ReferenceN, RelatorBase):
         await self.remove_reference(instance, *removed)
 
     async def on_delete(self, instance, value):
-        ref_ids = await self.fetch(instance, set_storage=False)
-        async for ref_item in db.connector.get_multi(ref_ids):
-            if self.cascade_delete:
-                with system_override():
-                    await ref_item.remove()
-            else:
-                await self.remove_reference(instance, ref_item)
+        collection = self.__get__(instance, None)
+        with system_override():
+            async for ref_item in collection.items():
+                if self.cascade_delete:
+                    with system_override():
+                        await ref_item.remove()
+                else:
+                    await self.remove_reference(instance, ref_item)
         # remove collection documents
         await super().on_delete(instance, value)

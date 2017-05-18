@@ -1,7 +1,8 @@
 import asyncio
-
 import copy
 from functools import wraps
+from typing import AsyncIterator
+
 from sanic import Blueprint
 from sanic.request import Request
 
@@ -41,19 +42,20 @@ async def get_item(item_id, quiet=True):
                 'The resource {0} does not exist'.format(item_id))
 
 
-async def get_multi(ids):
-    items = []
+async def get_multi(ids, return_none=False) -> AsyncIterator:
     user = context.user
     is_override = context.system_override
     if ids:
         async for item in connector.get_multi(ids):
-            if is_override:
-                items.append(item)
-                continue
-            visibility = await system.resolve_visibility(item, user)
-            if visibility:
-                items.append(item)
-    return items
+            if item is not None:
+                if is_override:
+                    yield item
+                    continue
+                visibility = await system.resolve_visibility(item, user)
+                if visibility:
+                    yield item
+            elif return_none:
+                yield None
 
 
 def transactional(auto_commit=True):

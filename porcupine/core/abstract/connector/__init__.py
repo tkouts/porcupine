@@ -93,7 +93,9 @@ class AbstractConnector(metaclass=abc.ABCMeta):
             for chunk in system.chunks(object_ids, self.multi_fetch_chunk_size):
                 batch = await self.get_multi_raw(chunk)
                 for raw_item in batch:
-                    if raw_item is not None:
+                    if raw_item is None:
+                        yield None
+                    else:
                         yield loads(raw_item)
 
     async def get_external(self, ext_id):

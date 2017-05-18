@@ -78,7 +78,7 @@ class Container(Item):
 
         @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
         """
-        return await self.items.items()
+        return [i async for i in self.items.items()]
 
     async def get_containers(self, resolve_shortcuts=False):
         """
@@ -86,7 +86,7 @@ class Container(Item):
 
         @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
         """
-        return await self.containers.items()
+        return [i async for i in self.containers.items()]
 
     # def has_items(self):
     #     """

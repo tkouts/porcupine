@@ -1,0 +1,3 @@
+"""
+Porcupine core data types
+"""

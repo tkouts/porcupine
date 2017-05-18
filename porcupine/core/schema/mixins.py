@@ -40,9 +40,9 @@ class Cloneable:
                 if embedded is not None:
                     await Cloneable._prepare_id_map(embedded, id_map)
             elif isinstance(data_type, Composition):
-                items = await getattr(item, attr_name).items()
-                await gather(*[Cloneable._prepare_id_map(i, id_map)
-                               for i in items])
+                composites = getattr(item, attr_name).items()
+                await gather(*[Cloneable._prepare_id_map(c, id_map)
+                               async for c in composites])
 
         if item.is_collection:
             # runs with system override - exclude deleted

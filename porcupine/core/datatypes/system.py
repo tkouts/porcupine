@@ -1,9 +1,8 @@
-import porcupine.core.utils.customcollections
 from porcupine import context, exceptions, db, gather
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.core.utils import system, permissions
+from porcupine.core.utils import permissions, collections
 from .common import String
 from .counter import Counter
 from .mutable import Dictionary
@@ -12,7 +11,7 @@ from .reference import ReferenceN
 Shortcut = None
 
 
-class AclValue(porcupine.core.utils.customcollections.FrozenDict):
+class AclValue(collections.FrozenDict):
     __slots__ = ('_desc', '_inst')
 
     def __init__(self, descriptor: Dictionary, instance, acl):
