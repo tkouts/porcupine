@@ -136,7 +136,7 @@ class Container(Item):
         else:
             # new item
             try:
-                new_item = Container.new_from_dict(request.json)
+                new_item = await Container.new_from_dict(request.json)
                 await new_item.append_to(self)
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))

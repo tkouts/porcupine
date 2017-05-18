@@ -56,7 +56,6 @@ class DataType:
     def __set__(self, instance, value):
         self.validate_value(value, instance)
         storage = getattr(instance, self.storage)
-        # if not instance.__is_new__:
         self.snapshot(instance, value, getattr(storage, self.storage_key))
         setattr(storage, self.storage_key, value)
 
@@ -77,7 +76,7 @@ class DataType:
         elif instance.__snapshot__[storage_key] == new_value:
             del instance.__snapshot__[storage_key]
 
-    def validate(self, value):
+    def validate(self, value) -> None:
         """
         Data type validation method.
 
@@ -85,7 +84,7 @@ class DataType:
         instance attribute of an object, whenever this object
         is appended or updated.
 
-        @raise ValidationError:
+        @raise ValueError:
             if the data type is mandatory and value is empty.
 
         @return: None
@@ -124,9 +123,6 @@ class DataType:
                                            value)
             context.txn.delete_external(unique_key)
 
-    # def on_undelete(self, instance, value):
-    #     pass
-
     # HTTP views
 
     def get(self, instance, request):
@@ -135,7 +131,7 @@ class DataType:
     @db.transactional()
     async def put(self, instance, request):
         try:
-            setattr(instance, self.name, request.json)
+            await instance.apply_patch({self.name: request.json})
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         await instance.update()

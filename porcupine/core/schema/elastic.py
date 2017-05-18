@@ -8,6 +8,7 @@ from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.core.utils import system
 from porcupine.datatypes import DataType, String, ReferenceN
+from porcupine.core.datatypes.asyncsetter import AsyncSetter
 from .storage import storage
 
 
@@ -78,13 +79,13 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     sig = SchemaSignature()
 
     @staticmethod
-    def new_from_dict(dct: dict) -> 'Elastic':
+    async def new_from_dict(dct: dict) -> 'Elastic':
         item_type = dct.pop('type')
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
             item_type = system.get_content_class(item_type)
         new_item = item_type()
-        new_item.apply_patch(dct)
+        await new_item.apply_patch(dct)
         return new_item
 
     def __init__(self, dict_storage=None):
@@ -163,10 +164,12 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         """
         return type(self).__name__
 
-    def apply_patch(self, patch: dict) -> None:
+    async def apply_patch(self, patch: dict) -> None:
         for attr, value in patch.items():
-            # TODO: add support for acl
-            setattr(self, attr, value)
+            if isinstance(self.__schema__.get(attr, None), AsyncSetter):
+                await getattr(self, attr).reset(value)
+            else:
+                setattr(self, attr, value)
 
     def custom_view(self, *args, **kwargs) -> dict:
         result = {

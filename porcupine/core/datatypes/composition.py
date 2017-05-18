@@ -10,6 +10,7 @@ from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
 from porcupine.core.utils import system
 from .reference import ReferenceN, ItemCollection, Reference1
+from .external import Text
 
 
 class CompositeFactory:
@@ -70,8 +71,10 @@ class Composition(ReferenceN):
         return EmbeddedCollection(self, instance)
 
     async def clone(self, instance, memo):
-        composites = [c async for c in self.__get__(instance, None).items()]
-        self.__set__(instance, [await item.clone(memo) for item in composites])
+        composites = self.__get__(instance, None).items()
+        super(Text, self).__set__(
+            instance, [await item.clone(memo)
+                       async for item in composites])
 
     async def on_create(self, instance, value):
         for composite in value:
@@ -127,7 +130,7 @@ class Composition(ReferenceN):
         item_dict = request.json
         try:
             composite = collection.factory()
-            composite.apply_patch(item_dict)
+            await composite.apply_patch(item_dict)
             await collection.add(composite)
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
@@ -150,10 +153,9 @@ class Composition(ReferenceN):
                 if composite_id:
                     composite = await collection.get_item_by_id(composite_id)
                     composite.reset()
-                    composite.apply_patch(item_dict)
                 else:
                     composite = collection.factory()
-                    composite.apply_patch(item_dict)
+                await composite.apply_patch(item_dict)
                 composites.append(composite)
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
@@ -264,7 +266,7 @@ class Embedded(Reference1):
         item_dict = request.json
         try:
             embedded = value.factory()
-            embedded.apply_patch(item_dict)
+            await embedded.apply_patch(item_dict)
             setattr(instance, self.name, embedded)
             await instance.update()
         except exceptions.AttributeSetError as e:

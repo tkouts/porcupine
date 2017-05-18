@@ -3,8 +3,10 @@ from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.utils import system
 from .collection import ItemCollection
+from .datatype import DataType
 from .common import String
 from .external import Text
+from .asyncsetter import AsyncSetter
 
 
 class Acceptable:
@@ -93,7 +95,7 @@ class Reference1(String, Acceptable):
         return value
 
 
-class ReferenceN(Text, Acceptable):
+class ReferenceN(AsyncSetter, Text, Acceptable):
     storage_info = '_refN_'
     safe_type = (list, tuple)
     allow_none = False
@@ -105,9 +107,7 @@ class ReferenceN(Text, Acceptable):
         super().__init__(default, **kwargs)
         Acceptable.__init__(self, **kwargs)
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
+    def getter(self, instance, value=None):
         return ItemCollection(self, instance)
 
     def set_default(self, instance, value=None):
@@ -129,8 +129,11 @@ class ReferenceN(Text, Acceptable):
 
     async def clone(self, instance, memo):
         collection = getattr(instance, self.name)
-        self.__set__(instance, [memo['_id_map_'].get(oid, oid)
-                                async for oid in collection])
+        super(Text, self).__set__(instance, [memo['_id_map_'].get(oid, oid)
+                                             async for oid in collection])
+
+    # allow regular snapshots
+    snapshot = DataType.snapshot
 
     async def on_create(self, instance, value):
         if value:
@@ -142,24 +145,19 @@ class ReferenceN(Text, Acceptable):
                                                       self.name, item)
             if ref_items:
                 # write external
-                raw_value = ' '.join([i.id for i in ref_items])
+                raw_value = ' '.join([i.__storage__.id for i in ref_items])
                 super().on_create(instance, raw_value)
         else:
             ref_items = []
         return ref_items, []
 
     async def on_change(self, instance, value, old_value):
-        # old_value is always None
         # need to compute deltas
         collection = getattr(instance, self.name)
-        old_ids = [oid async for oid in collection]
         new_value = frozenset(value)
-        if new_value == frozenset(old_ids):
-            # nothing changed
-            return [], []
         # compute old value leaving out non-accessible items
-        ref_items = [i async for i in db.get_multi(old_ids)]
-        old_value = frozenset([i.id for i in ref_items])
+        ref_items = [i async for i in db.get_multi(old_value)]
+        old_value = frozenset([i.__storage__.id for i in ref_items])
         added_ids = new_value.difference(old_value)
         removed_ids = old_value.difference(new_value)
         added = [i async for i in db.get_multi(added_ids)]

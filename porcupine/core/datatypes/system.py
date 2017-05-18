@@ -7,11 +7,12 @@ from .common import String
 from .counter import Counter
 from .mutable import Dictionary
 from .reference import ReferenceN
+from .asyncsetter import AsyncSetter, AsyncSetterValue
 
 Shortcut = None
 
 
-class AclValue(collections.FrozenDict):
+class AclValue(AsyncSetterValue, collections.FrozenDict):
     __slots__ = ('_desc', '_inst')
 
     def __init__(self, descriptor: Dictionary, instance, acl):
@@ -26,25 +27,19 @@ class AclValue(collections.FrozenDict):
             raise exceptions.Forbidden(
                 'The user does not have permissions '
                 'to modify the access control list.')
-        super(type(self._desc), self._desc).__set__(self._inst, acl)
+        # set acl
+        super(Dictionary, self._desc).__set__(self._inst, acl)
 
 
-class Acl(Dictionary):
+class Acl(AsyncSetter, Dictionary):
     protected = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.default = None
 
-    def __get__(self, instance, owner) -> [AclValue, 'Acl']:
-        if instance is None:
-            return self
-        dct = super().__get__(instance, owner) or {}
-        return AclValue(self, instance, dct)
-
-    def __set__(self, instance, value):
-        raise AttributeError('Cannot directly set the ACL. '
-                             'Use the reset method instead.')
+    def getter(self, instance, value=None):
+        return AclValue(self, instance, value or {})
 
     async def apply_acl(self, container, acl, old_acl):
         tasks = []
@@ -54,7 +49,6 @@ class Acl(Dictionary):
                 super().on_change(child, acl, old_acl)
                 if child.is_collection:
                     tasks.append(self.apply_acl(child, acl, old_acl))
-                    # await self.apply_acl(child, acl, old_acl)
         if tasks:
             await gather(*tasks)
 
@@ -63,14 +57,6 @@ class Acl(Dictionary):
         if instance.is_collection:
             with system_override():
                 await self.apply_acl(instance, value, old_value)
-
-    @contract(accepts=dict)
-    @db.transactional()
-    async def put(self, instance, request):
-        acl = request.json
-        await self.__get__(instance, None).reset(acl)
-        await instance.update()
-        return True
 
 
 class SchemaSignature(String):

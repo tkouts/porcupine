@@ -4,14 +4,21 @@ from typing import AsyncIterator
 from porcupine import db, exceptions, context
 from porcupine.core.utils import system, permissions
 from porcupine.core.services.schema import SchemaMaintenance
+from .asyncsetter import AsyncSetterValue
+from .external import Text
 
 
-class ItemCollection(collections.AsyncIterable):
+class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
     __slots__ = ('_desc', '_inst')
 
     def __init__(self, descriptor, instance):
         self._desc = descriptor
         self._inst = instance
+
+    @property
+    def is_fetched(self):
+        storage = getattr(self._inst, self._desc.storage)
+        return getattr(storage, self._desc.storage_key) is not None
 
     async def __aiter__(self):
         instance = self._inst
@@ -21,8 +28,10 @@ class ItemCollection(collections.AsyncIterable):
         current_size = 0
         is_split = False
         removed = {}
+        # TODO: OrderedDict
         resolved = {}
         dirtiness = 0.0
+        storage = getattr(instance, descriptor.storage)
 
         def resolve_chunk(c: str):
             nonlocal total_count, dirty_count, removed, resolved
@@ -43,6 +52,11 @@ class ItemCollection(collections.AsyncIterable):
                     else:
                         resolved[oid] = None
                         yield oid
+
+        if self.is_fetched:
+            for item_id in getattr(storage, descriptor.storage_key):
+                yield item_id
+            return
 
         chunk = await self._desc.fetch(instance, set_storage=False)
         if chunk:
@@ -65,6 +79,9 @@ class ItemCollection(collections.AsyncIterable):
                         yield item_id
                 else:
                     break
+
+        # set storage
+        setattr(storage, descriptor.storage_key, list(resolved.keys()))
 
         # compute dirtiness factor
         if total_count:
@@ -155,3 +172,11 @@ class ItemCollection(collections.AsyncIterable):
                 if not context.system_override:
                     await self._check_permissions_and_raise()
                 context.txn.append(collection_key, ' -{0}'.format(item_id))
+
+    async def reset(self, value):
+        if not self.is_fetched:
+            # fetch collection
+            async for _ in self:
+                pass
+        # set collection
+        super(Text, self._desc).__set__(self._inst, value)

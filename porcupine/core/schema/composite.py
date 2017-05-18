@@ -90,7 +90,7 @@ class Composite(Elastic):
     async def put(self, request):
         self.reset()
         try:
-            self.apply_patch(request.json)
+            await self.apply_patch(request.json)
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         await self.update()
@@ -100,7 +100,7 @@ class Composite(Elastic):
     @db.transactional()
     async def patch(self, request):
         try:
-            self.apply_patch(request.json)
+            await self.apply_patch(request.json)
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         await self.update()
