@@ -8,12 +8,13 @@ from sanic.request import Request
 
 from porcupine import context, exceptions
 from porcupine.core.utils import system
-from porcupine.hinting import ANY_ITEM_CO, ID_LIST
+from porcupine.hinting import TYPING
 
 connector = None
 
 
-async def get_item(item_id: str, quiet: bool=True) -> Optional[ANY_ITEM_CO]:
+async def get_item(item_id: str, quiet: bool=True) -> Optional[
+        TYPING.ANY_ITEM_CO]:
     """
     Fetches an object from the database.
     If the user has no read permissions on the object
@@ -43,8 +44,8 @@ async def get_item(item_id: str, quiet: bool=True) -> Optional[ANY_ITEM_CO]:
                 'The resource {0} does not exist'.format(item_id))
 
 
-async def get_multi(ids: ID_LIST, return_none: bool=False) -> AsyncIterator[
-        Optional[ANY_ITEM_CO]]:
+async def get_multi(ids: TYPING.ID_LIST, return_none=False) -> AsyncIterator[
+        Optional[TYPING.ANY_ITEM_CO]]:
     user = context.user
     is_override = context.system_override
     if ids:

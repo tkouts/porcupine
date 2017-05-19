@@ -3,7 +3,7 @@ import copy
 from typing import List, ClassVar
 
 from porcupine import config
-from porcupine.hinting import SCHEMA, STORAGE
+from porcupine.hinting import TYPING
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.core.utils import system
@@ -66,10 +66,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     :cvar is_collection: A boolean indicating if the object is a container.
     :type is_collection: bool
     """
-    __schema__: SCHEMA = {}
+    __schema__: TYPING.SCHEMA = {}
     __sig__: ClassVar[str] = ''
-    __record__: STORAGE = None
-    __ext_record__: STORAGE = None
+    __record__: TYPING.STORAGE = None
+    __ext_record__: TYPING.STORAGE = None
 
     is_collection: ClassVar[bool] = False
     is_deleted: ClassVar[bool] = False

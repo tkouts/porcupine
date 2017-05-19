@@ -2,7 +2,7 @@ import collections
 from typing import AsyncIterator
 
 from porcupine import db, exceptions, context
-from porcupine.hinting import ANY_ITEM_CO, ITEM_ID, ID_LIST
+from porcupine.hinting import TYPING
 from porcupine.core.utils import system, permissions
 from porcupine.core.services.schema import SchemaMaintenance
 from .asyncsetter import AsyncSetterValue
@@ -21,7 +21,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
         storage = getattr(self._inst, self._desc.storage)
         return getattr(storage, self._desc.storage_key) is not None
 
-    async def __aiter__(self) -> ITEM_ID:
+    async def __aiter__(self) -> TYPING.ITEM_ID:
         instance = self._inst
         descriptor = self._desc
         dirty_count = 0
@@ -106,7 +106,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
                 else:
                     await SchemaMaintenance.compact_collection(collection_key)
 
-    async def items(self) -> AsyncIterator[ANY_ITEM_CO]:
+    async def items(self) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
         chunk_size = 20  # db.connector.multi_fetch_chunk_size
         chunk = []
 
@@ -129,7 +129,9 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
                 else:
                     yield i
 
-    async def get_item_by_id(self, item_id: ITEM_ID, quiet=True) -> ANY_ITEM_CO:
+    async def get_item_by_id(self,
+                             item_id: TYPING.ITEM_ID,
+                             quiet=True) -> TYPING.ANY_ITEM_CO:
         async for oid in self:
             if oid == item_id:
                 return await db.get_item(item_id, quiet=quiet)
@@ -143,7 +145,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
         if user_role < permissions.AUTHOR:
             raise exceptions.Forbidden('Forbidden')
 
-    async def add(self, *items: ANY_ITEM_CO) -> None:
+    async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         collection_key = self._desc.key_for(self._inst)
         for item in items:
             item_id = item.id
@@ -160,7 +162,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
                                                       self._desc.name, item)
                 context.txn.append(collection_key, ' {0}'.format(item_id))
 
-    async def remove(self, *items: ANY_ITEM_CO):
+    async def remove(self, *items: TYPING.ANY_ITEM_CO):
         collection_key = self._desc.key_for(self._inst)
         for item in items:
             item_id = item.id
@@ -174,7 +176,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
                     await self._check_permissions_and_raise()
                 context.txn.append(collection_key, ' -{0}'.format(item_id))
 
-    async def reset(self, value: ID_LIST) -> None:
+    async def reset(self, value: TYPING.ID_LIST) -> None:
         if not self.is_fetched:
             # fetch collection
             async for _ in self:

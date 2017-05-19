@@ -2,14 +2,14 @@ import datetime
 from typing import Dict, List
 
 from porcupine import db, context, exceptions, gather
-from porcupine.hinting import CONTAINER_CO, RECYCLE_BIN_CO, ITEM_TYPE
+from porcupine.hinting import TYPING
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.core.utils import system, permissions
 from porcupine.datatypes import Embedded, Composition, DataType
 
 
-class Cloneable(ITEM_TYPE):
+class Cloneable(TYPING.ITEM_TYPE):
     """
     Adds cloning capabilities to Porcupine Objects.
 
@@ -51,7 +51,7 @@ class Cloneable(ITEM_TYPE):
     @staticmethod
     async def _write_clone(item: 'Cloneable',
                            memo: Dict,
-                           target: CONTAINER_CO=None) -> 'Cloneable':
+                           target: TYPING.CONTAINER_CO=None) -> 'Cloneable':
         id_map = memo['_id_map_']
         clone = await item.clone(memo)
 
@@ -76,7 +76,7 @@ class Cloneable(ITEM_TYPE):
         return clone
 
     async def _copy(self,
-                    target: CONTAINER_CO,
+                    target: TYPING.CONTAINER_CO,
                     memo: Dict) -> 'Cloneable':
         all_children = await Cloneable._prepare_id_map(
             self, memo['_id_map_'], is_root=True)
@@ -86,7 +86,7 @@ class Cloneable(ITEM_TYPE):
             await Cloneable._write_clone(item, memo)
         return clone
 
-    async def copy_to(self, target: CONTAINER_CO) -> 'Cloneable':
+    async def copy_to(self, target: TYPING.CONTAINER_CO) -> 'Cloneable':
         """
         Copies the item to the designated target.
 
@@ -112,7 +112,7 @@ class Cloneable(ITEM_TYPE):
                                      '_id_map_': {}})
 
 
-class Movable(ITEM_TYPE):
+class Movable(TYPING.ITEM_TYPE):
     """
     Adds moving capabilities to Porcupine Objects.
 
@@ -123,7 +123,7 @@ class Movable(ITEM_TYPE):
 
     parent_id = ParentId(default=None, store_as='pid')
 
-    async def move_to(self, target: CONTAINER_CO) -> None:
+    async def move_to(self, target: TYPING.CONTAINER_CO) -> None:
         """
         Moves the item to the designated target.
 
@@ -176,7 +176,7 @@ class Movable(ITEM_TYPE):
             context.txn.upsert(target)
 
 
-class Removable(ITEM_TYPE):
+class Removable(TYPING.ITEM_TYPE):
     """
     Makes Porcupine objects removable.
 
@@ -235,7 +235,7 @@ class Removable(ITEM_TYPE):
         return True
 
 
-class Recyclable(ITEM_TYPE):
+class Recyclable(TYPING.ITEM_TYPE):
     __slots__ = ()
 
     is_deleted = Deleted(store_as='dl')
@@ -272,7 +272,7 @@ class Recyclable(ITEM_TYPE):
             restore_unique_keys(self)
             await restore(self)
 
-    async def recycle_to(self, recycle_bin: RECYCLE_BIN_CO) -> None:
+    async def recycle_to(self, recycle_bin: TYPING.RECYCLE_BIN_CO) -> None:
         """
         Moves the item to the specified recycle bin.
         The item then becomes inaccessible.
