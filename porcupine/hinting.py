@@ -1,10 +1,13 @@
 from typing import TYPE_CHECKING, TypeVar, Dict, List, Any, ClassVar, Type
 
 
-class Hinter:
+class _Hinter:
     def __init__(self):
         if TYPE_CHECKING:
-            # Data types
+            ##############
+            # Data types #
+            ##############
+
             from porcupine.datatypes import DataType, Composition, Embedded
 
             self.DT_CO = TypeVar('DT', DataType, covariant=True)
@@ -13,15 +16,22 @@ class Hinter:
                                              covariant=True)
             self.DT_COMPOSITION_TYPE = Type[self.DT_COMPOSITION_CO]
 
-            # Data type values
+            ####################
+            # Data type values #
+            ####################
+
             from porcupine.core.datatypes.composition import EmbeddedItem, \
                 EmbeddedCollection
+
             self.COMPOSITION_CO = TypeVar('COMPOSITION_CO',
                                           EmbeddedItem, EmbeddedCollection,
                                           covariant=True)
             self.COMPOSITION_TYPE = Type[self.COMPOSITION_CO]
 
-            # Items
+            #########
+            # Items #
+            #########
+
             from porcupine.schema import Item, Composite, Container
             from porcupine.core.schema.recycle import RecycleBin
 
@@ -36,7 +46,10 @@ class Hinter:
                                           covariant=True)
             self.ITEM_TYPE = Type[self.ITEM_CO]
 
-            # Other
+            #########
+            # Other #
+            #########
+
             from porcupine.core.schema.storage import storage
 
             self.ITEM_ID = TypeVar('ITEM_ID', str)
@@ -49,4 +62,4 @@ class Hinter:
             return object
         return Any
 
-TYPING = Hinter()
+TYPING = _Hinter()

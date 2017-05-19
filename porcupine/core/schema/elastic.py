@@ -2,8 +2,8 @@ import asyncio
 import copy
 from typing import List, ClassVar
 
-from porcupine import config
 from porcupine.hinting import TYPING
+from porcupine import config
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.core.utils import system

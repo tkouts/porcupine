@@ -1,8 +1,8 @@
 import collections
 from typing import AsyncIterator
 
-from porcupine import db, exceptions, context
 from porcupine.hinting import TYPING
+from porcupine import db, exceptions, context
 from porcupine.core.utils import system, permissions
 from porcupine.core.services.schema import SchemaMaintenance
 from .asyncsetter import AsyncSetterValue

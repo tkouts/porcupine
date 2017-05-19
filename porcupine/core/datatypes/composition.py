@@ -2,11 +2,11 @@
 Porcupine composition data types
 ================================
 """
-from typing import Type
+from typing import Type, AsyncIterator
 
+from porcupine.hinting import TYPING
 from porcupine import db, exceptions, context
 from porcupine.contract import contract
-from porcupine.hinting import TYPING
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
 from porcupine.core.utils import system
@@ -31,16 +31,16 @@ class CompositeFactory(TYPING.COMPOSITION_TYPE):
 class EmbeddedCollection(ItemCollection, CompositeFactory):
     __slots__ = ()
 
-    async def get_item_by_id(self, item_id, quiet=True):
+    async def get_item_by_id(self, item_id: TYPING.ITEM_ID, quiet=True):
         with system_override():
             return await super().get_item_by_id(item_id, quiet=quiet)
 
-    async def items(self):
+    async def items(self) -> AsyncIterator[TYPING.COMPOSITE_CO]:
         with system_override():
             async for item in super().items():
                 yield item
 
-    async def add(self, *composites):
+    async def add(self, *composites: TYPING.COMPOSITE_CO):
         with system_override():
             await super().add(*composites)
             for composite in composites:
@@ -49,7 +49,7 @@ class EmbeddedCollection(ItemCollection, CompositeFactory):
                 context.txn.insert(composite)
         await self._inst.update()
 
-    async def remove(self, *composites):
+    async def remove(self, *composites: TYPING.COMPOSITE_CO):
         with system_override():
             await super().remove(*composites)
             for composite in composites:

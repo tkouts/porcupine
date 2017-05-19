@@ -6,9 +6,9 @@ from typing import AsyncIterator, Optional
 from sanic import Blueprint
 from sanic.request import Request
 
+from porcupine.hinting import TYPING
 from porcupine import context, exceptions
 from porcupine.core.utils import system
-from porcupine.hinting import TYPING
 
 connector = None
 
