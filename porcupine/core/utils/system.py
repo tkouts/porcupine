@@ -137,30 +137,19 @@ async def resolve_visibility(item, user) -> Optional[int]:
     return await resolve(item, user)
 
 
-def resolve_set(raw_string: str) -> (list, float):
+def resolve_set(raw_string: str) -> list:
     # build set
     uniques = OrderedDict()
-    dirtiness = 0.0
-    dirty_count = 0
-    total_count = 0
-    # print('raw value is', raw_string)
     for oid in raw_string.split(' '):
         if oid:
-            total_count += 1
             if oid.startswith('-'):
                 key = oid[1:]
-                dirty_count += 1
                 if key in uniques:
-                    dirty_count += 1
                     del uniques[key]
             else:
-                if oid in uniques:
-                    dirty_count += 1
                 uniques[oid] = None
     value = list(uniques.keys())
-    if total_count:
-        dirtiness = dirty_count / total_count
-    return value, dirtiness
+    return value
 
 
 def get_descriptor_by_storage_key(cls, key):

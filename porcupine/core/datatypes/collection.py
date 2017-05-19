@@ -62,6 +62,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
         chunk = await self._desc.fetch(instance, set_storage=False)
         if chunk:
             current_size = len(chunk)
+            # print(chunk)
             for item_id in resolve_chunk(chunk):
                 yield item_id
 
@@ -78,6 +79,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 if previous_chunk is not None:
                     for item_id in resolve_chunk(previous_chunk):
                         yield item_id
+                    previous_chunk_no -= 1
                 else:
                     break
 
@@ -107,7 +109,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                     await SchemaMaintenance.compact_collection(collection_key)
 
     async def items(self) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
-        chunk_size = 40  # db.connector.multi_fetch_chunk_size
+        chunk_size = 40
         chunk = []
 
         async for item_id in self:

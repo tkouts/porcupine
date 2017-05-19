@@ -200,7 +200,8 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
             return member
         else:
             if expand:
-                return [item async for item in collection.items()]
+                items = [item async for item in collection.items()]
+                return items
             return [oid async for oid in collection]
 
     @contract(accepts=str)

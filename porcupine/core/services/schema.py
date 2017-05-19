@@ -67,7 +67,7 @@ class SchemaMaintenanceTask:
 class CollectionCompacter(SchemaMaintenanceTask):
     @staticmethod
     def compact_set(raw_string):
-        compacted, _ = system.resolve_set(raw_string)
+        compacted = system.resolve_set(raw_string)
         return ' '.join(compacted), True
 
     async def execute(self):
@@ -99,7 +99,7 @@ class CollectionReBuilder(SchemaMaintenanceTask):
             previous_chunks, min_chunk = \
                 await system.fetch_collection_chunks(self.key)
             raw_chunks[0:0] = previous_chunks
-        collection, _ = system.resolve_set(' '.join(raw_chunks))
+        collection = system.resolve_set(' '.join(raw_chunks))
         parts = math.ceil(len(' '.join(collection)) /
                           db.connector.coll_split_threshold)
         avg = len(collection) / parts
