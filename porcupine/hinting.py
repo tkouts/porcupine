@@ -8,12 +8,16 @@ class _Hinter:
             # Data types #
             ##############
 
-            from porcupine.datatypes import DataType, Composition, Embedded
+            from porcupine.datatypes import DataType, Composition, Embedded, \
+                ReferenceN
 
             self.DT_CO = TypeVar('DT', DataType, covariant=True)
             self.DT_COMPOSITION_CO = TypeVar('DT_COMPOSITION_CO',
                                              Composition, Embedded,
                                              covariant=True)
+            self.DT_MULTI_REFERENCE_CO = TypeVar('DT_MULTI_REFERENCE_CO',
+                                                 ReferenceN,
+                                                 covariant=True)
             self.DT_COMPOSITION_TYPE = Type[self.DT_COMPOSITION_CO]
 
             ####################

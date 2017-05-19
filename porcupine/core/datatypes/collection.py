@@ -1,4 +1,4 @@
-import collections
+from collections import AsyncIterable, OrderedDict
 from typing import AsyncIterator
 
 from porcupine.hinting import TYPING
@@ -9,15 +9,16 @@ from .asyncsetter import AsyncSetterValue
 from .external import Text
 
 
-class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
+class ItemCollection(AsyncSetterValue, AsyncIterable):
     __slots__ = ('_desc', '_inst')
 
-    def __init__(self, descriptor, instance):
+    def __init__(self, descriptor: TYPING.DT_MULTI_REFERENCE_CO,
+                 instance: TYPING.ANY_ITEM_CO):
         self._desc = descriptor
         self._inst = instance
 
     @property
-    def is_fetched(self):
+    def is_fetched(self) -> bool:
         storage = getattr(self._inst, self._desc.storage)
         return getattr(storage, self._desc.storage_key) is not None
 
@@ -29,8 +30,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
         current_size = 0
         is_split = False
         removed = {}
-        # TODO: OrderedDict
-        resolved = {}
+        resolved = OrderedDict()
         dirtiness = 0.0
         storage = getattr(instance, descriptor.storage)
 
@@ -107,7 +107,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
                     await SchemaMaintenance.compact_collection(collection_key)
 
     async def items(self) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
-        chunk_size = 20  # db.connector.multi_fetch_chunk_size
+        chunk_size = 40  # db.connector.multi_fetch_chunk_size
         chunk = []
 
         async for item_id in self:
@@ -139,7 +139,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
             raise exceptions.NotFound(
                 'The resource {0} does not exist'.format(item_id))
 
-    async def _check_permissions_and_raise(self):
+    async def _check_permissions_and_raise(self) -> None:
         user = context.user
         user_role = await permissions.resolve(self._inst, user)
         if user_role < permissions.AUTHOR:
@@ -162,7 +162,7 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
                                                       self._desc.name, item)
                 context.txn.append(collection_key, ' {0}'.format(item_id))
 
-    async def remove(self, *items: TYPING.ANY_ITEM_CO):
+    async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         collection_key = self._desc.key_for(self._inst)
         for item in items:
             item_id = item.id
@@ -178,8 +178,9 @@ class ItemCollection(AsyncSetterValue, collections.AsyncIterable):
 
     async def reset(self, value: TYPING.ID_LIST) -> None:
         if not self.is_fetched:
-            # fetch collection
+            # fetch collection for snapshot to work
             async for _ in self:
                 pass
+        # TODO: reset txn appends
         # set collection
         super(Text, self._desc).__set__(self._inst, value)

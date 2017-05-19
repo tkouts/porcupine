@@ -1,10 +1,10 @@
 import inspect
-from typing import Optional
-
 import cbor
 import functools
 import hashlib
 import random
+from collections import OrderedDict
+from typing import Optional
 
 from porcupine import db
 from porcupine.core.utils.collections import WriteOnceDict
@@ -139,7 +139,7 @@ async def resolve_visibility(item, user) -> Optional[int]:
 
 def resolve_set(raw_string: str) -> (list, float):
     # build set
-    uniques = {}
+    uniques = OrderedDict()
     dirtiness = 0.0
     dirty_count = 0
     total_count = 0

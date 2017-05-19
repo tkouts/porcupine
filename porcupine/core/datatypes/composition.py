@@ -256,6 +256,7 @@ class Embedded(Reference1):
     # These are called when there is no embedded item
 
     async def get(self, instance, request, expand=True):
+        # TODO:  maybe raise NotFound?
         return None
 
     @contract(accepts=dict)
