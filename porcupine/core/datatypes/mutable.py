@@ -6,17 +6,17 @@ from .datatype import DataType
 
 
 class OList(ObservableList):
-    def __init__(self, descriptor, instance, seq=()):
-        self._descriptor = descriptor
-        self._instance = instance
+    def __init__(self, descriptor: 'List', instance, seq=()):
+        self._desc = descriptor
+        self._inst = instance
         self._prev = None
         super().__init__(seq)
 
     def on_before_mutate(self):
-        self._prev = copy.deepcopy(self[:])
+        self._prev = copy.deepcopy(self)
 
     def on_after_mutate(self):
-        self._descriptor.snapshot(self._instance, self, self._prev)
+        self._desc.snapshot(self._inst, self, self._prev)
 
 
 class List(DataType):
@@ -47,9 +47,9 @@ class List(DataType):
 
 
 class ODict(ObservableDict):
-    def __init__(self, descriptor, instance, seq=(), **kwargs):
-        self._descriptor = descriptor
-        self._instance = instance
+    def __init__(self, descriptor: 'Dictionary', instance, seq=(), **kwargs):
+        self._desc = descriptor
+        self._inst = instance
         self._prev = None
         super().__init__(seq, **kwargs)
 
@@ -57,7 +57,7 @@ class ODict(ObservableDict):
         self._prev = copy.deepcopy(dict(self.items()))
 
     def on_after_mutate(self):
-        self._descriptor.snapshot(self._instance, self, self._prev)
+        self._desc.snapshot(self._inst, self, self._prev)
 
 
 class Dictionary(DataType):

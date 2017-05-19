@@ -2,7 +2,7 @@
 Porcupine composition data types
 ================================
 """
-from typing import Type, AsyncIterator
+from typing import Type, AsyncIterator, List
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions, context
@@ -87,9 +87,12 @@ class Composition(ReferenceN):
             await super().on_create(instance,
                                     [c.__storage__.id for c in value])
 
-    async def on_change(self, instance, value, old_value):
+    async def on_change(self,
+                        instance: TYPING.ANY_ITEM_CO,
+                        value: List[TYPING.COMPOSITE_CO],
+                        old_value: TYPING.ID_LIST):
         collection = getattr(instance, self.name)
-        old_ids = frozenset([cid async for cid in collection])
+        old_ids = frozenset(old_value)
         new_ids = frozenset([c.__storage__.id for c in value])
         removed_ids = old_ids.difference(new_ids)
         added = []
@@ -160,7 +163,7 @@ class Composition(ReferenceN):
                 composites.append(composite)
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
-        setattr(instance, self.name, composites)
+        await collection.reset(composites)
         await instance.update()
         return composites
 
@@ -172,7 +175,8 @@ class EmbeddedItem(CompositeFactory):
         self._desc = descriptor
         self._inst = instance
 
-    def new(self, clazz: Type[TYPING.COMPOSITE_CO]=None) -> TYPING.COMPOSITE_CO:
+    def factory(self,
+                clazz: Type[TYPING.COMPOSITE_CO]=None) -> TYPING.COMPOSITE_CO:
         composite = super().factory(clazz)
         with system_override():
             composite.id = self._desc.key_for(self._inst)
