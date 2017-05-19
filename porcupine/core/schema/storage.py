@@ -12,6 +12,6 @@ class Storage(namedlist('Storage', '')):
         return self._asdict()
 
 
-def storage(typename, field_names, rename=False):
+def storage(typename, field_names, rename=False) -> namedlist:
     nl = namedlist(typename, field_names, default=None, rename=rename)
     return type(typename, (nl, Storage, ), {})

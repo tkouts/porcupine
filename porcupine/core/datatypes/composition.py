@@ -6,6 +6,7 @@ from typing import Type, Union
 
 from porcupine import db, exceptions, context
 from porcupine.contract import contract
+from porcupine.hinting import COMPOSITE_CO
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
 from porcupine.core.utils import system
@@ -17,7 +18,7 @@ class CompositeFactory:
     __slots__ = ()
 
     def factory(self: Union['EmbeddedCollection', 'EmbeddedItem'],
-                clazz: Type[Composite]=None) -> Composite:
+                clazz: Type[COMPOSITE_CO]=None) -> COMPOSITE_CO:
         composite_type = clazz or self._desc.allowed_types[0]
         with system_override():
             composite = composite_type()
@@ -171,13 +172,13 @@ class EmbeddedItem(CompositeFactory):
         self._desc = descriptor
         self._inst = instance
 
-    def new(self, clazz: Type[Composite]=None) -> Composite:
+    def new(self, clazz: Type[COMPOSITE_CO]=None) -> COMPOSITE_CO:
         composite = super().factory(clazz)
         with system_override():
             composite.id = self._desc.key_for(self._inst)
         return composite
 
-    async def item(self, quiet=True) -> Composite:
+    async def item(self, quiet=True) -> COMPOSITE_CO:
         with system_override():
             composite_id = self._desc.key_for(self._inst)
             return await db.get_item(composite_id, quiet=quiet)

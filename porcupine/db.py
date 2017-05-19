@@ -1,18 +1,19 @@
 import asyncio
 import copy
 from functools import wraps
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 from sanic import Blueprint
 from sanic.request import Request
 
 from porcupine import context, exceptions
 from porcupine.core.utils import system
+from porcupine.hinting import ANY_ITEM_CO, ID_LIST
 
 connector = None
 
 
-async def get_item(item_id, quiet=True):
+async def get_item(item_id: str, quiet: bool=True) -> Optional[ANY_ITEM_CO]:
     """
     Fetches an object from the database.
     If the user has no read permissions on the object
@@ -42,7 +43,8 @@ async def get_item(item_id, quiet=True):
                 'The resource {0} does not exist'.format(item_id))
 
 
-async def get_multi(ids, return_none=False) -> AsyncIterator:
+async def get_multi(ids: ID_LIST, return_none: bool=False) -> AsyncIterator[
+        Optional[ANY_ITEM_CO]]:
     user = context.user
     is_override = context.system_override
     if ids:

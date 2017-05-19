@@ -1,20 +1,15 @@
 import datetime
-from typing import TYPE_CHECKING, TypeVar, Dict, List
+from typing import Dict, List
 
 from porcupine import db, context, exceptions, gather
+from porcupine.hinting import CONTAINER_CO, RECYCLE_BIN_CO, ITEM_TYPE
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.core.utils import system, permissions
 from porcupine.datatypes import Embedded, Composition, DataType
 
-if TYPE_CHECKING:
-    from .item import Item
-    from .container import Container
-    from .recycle import RecycleBin
-    AnyItem = TypeVar('AnyItem', Item, Container)
 
-
-class Cloneable:
+class Cloneable(ITEM_TYPE):
     """
     Adds cloning capabilities to Porcupine Objects.
 
@@ -24,9 +19,9 @@ class Cloneable:
     __slots__ = ()
 
     @staticmethod
-    async def _prepare_id_map(item: 'AnyItem',
+    async def _prepare_id_map(item: 'Cloneable',
                               id_map: Dict[str, str],
-                              is_root=False) -> List['AnyItem']:
+                              is_root: bool=False) -> List['Cloneable']:
         all_items = []
 
         id_map[item.id] = system.generate_oid()
@@ -54,9 +49,9 @@ class Cloneable:
         return all_items
 
     @staticmethod
-    async def _write_clone(item: 'AnyItem',
+    async def _write_clone(item: 'Cloneable',
                            memo: Dict,
-                           target: 'Container'=None) -> 'AnyItem':
+                           target: CONTAINER_CO=None) -> 'Cloneable':
         id_map = memo['_id_map_']
         clone = await item.clone(memo)
 
@@ -80,9 +75,9 @@ class Cloneable:
         context.txn.insert(clone)
         return clone
 
-    async def _copy(self: 'AnyItem',
-                    target: 'Container',
-                    memo: Dict) -> 'AnyItem':
+    async def _copy(self,
+                    target: CONTAINER_CO,
+                    memo: Dict) -> 'Cloneable':
         all_children = await Cloneable._prepare_id_map(
             self, memo['_id_map_'], is_root=True)
         memo['_id_map_'][self.parent_id] = target.id
@@ -91,7 +86,7 @@ class Cloneable:
             await Cloneable._write_clone(item, memo)
         return clone
 
-    async def copy_to(self: 'AnyItem', target: 'Container') -> 'AnyItem':
+    async def copy_to(self, target: CONTAINER_CO) -> 'Cloneable':
         """
         Copies the item to the designated target.
 
@@ -117,7 +112,7 @@ class Cloneable:
                                      '_id_map_': {}})
 
 
-class Movable:
+class Movable(ITEM_TYPE):
     """
     Adds moving capabilities to Porcupine Objects.
 
@@ -128,7 +123,7 @@ class Movable:
 
     parent_id = ParentId(default=None, store_as='pid')
 
-    async def move_to(self: 'AnyItem', target: 'Container') -> None:
+    async def move_to(self, target: CONTAINER_CO) -> None:
         """
         Moves the item to the designated target.
 
@@ -181,7 +176,7 @@ class Movable:
             context.txn.upsert(target)
 
 
-class Removable:
+class Removable(ITEM_TYPE):
     """
     Makes Porcupine objects removable.
 
@@ -193,13 +188,13 @@ class Removable:
     """
     __slots__ = ()
 
-    async def remove(self: 'AnyItem') -> None:
+    async def remove(self) -> None:
         """
         Deletes the item permanently.
 
         @return: None
         """
-        async def _delete(item):
+        async def _delete(item: 'Removable'):
             if item.is_system:
                 raise exceptions.Forbidden(
                     'The object {0} is systemic and can not be removed'
@@ -235,18 +230,18 @@ class Removable:
             await _delete(self)
 
     @db.transactional()
-    async def delete(self: 'AnyItem', request):
+    async def delete(self, request):
         await self.remove()
         return True
 
 
-class Recyclable:
+class Recyclable(ITEM_TYPE):
     __slots__ = ()
 
     is_deleted = Deleted(store_as='dl')
 
-    async def restore(self: 'AnyItem') -> None:
-        def restore_unique_keys(item) -> None:
+    async def restore(self) -> None:
+        def restore_unique_keys(item: 'Recyclable') -> None:
             uniques = [dt for dt in item.__schema__.values()
                        if dt.unique]
             for data_type in uniques:
@@ -254,7 +249,7 @@ class Recyclable:
                 value = getattr(storage, data_type.storage_key)
                 DataType.on_create(data_type, item, value)
 
-        async def restore(item) -> None:
+        async def restore(item: 'Recyclable') -> None:
             # mark as deleted
             self.is_deleted -= 1
             context.txn.upsert(item)
@@ -277,7 +272,7 @@ class Recyclable:
             restore_unique_keys(self)
             await restore(self)
 
-    async def recycle_to(self: 'AnyItem', recycle_bin: 'RecycleBin') -> None:
+    async def recycle_to(self, recycle_bin: RECYCLE_BIN_CO) -> None:
         """
         Moves the item to the specified recycle bin.
         The item then becomes inaccessible.
@@ -287,7 +282,7 @@ class Recyclable:
         @type recycle_bin: RecycleBin
         @return: None
         """
-        def remove_unique_keys(item) -> None:
+        def remove_unique_keys(item: 'Recyclable') -> None:
             uniques = [dt for dt in item.__schema__.values()
                        if dt.unique]
             for data_type in uniques:
@@ -295,7 +290,7 @@ class Recyclable:
                 value = getattr(storage, data_type.storage_key)
                 DataType.on_delete(data_type, item, value)
 
-        async def recycle(item) -> None:
+        async def recycle(item: 'Recyclable') -> None:
             if item.is_system:
                 raise exceptions.Forbidden(
                     'The object {0} is systemic and can not be recycled'

@@ -1,8 +1,7 @@
 import abc
-from .datatype import DataType
 from typing import Type
 
-DT = Type[DataType]
+from porcupine.hinting import DT_CO
 
 
 class AsyncSetterValue(metaclass=abc.ABCMeta):
@@ -13,7 +12,7 @@ class AsyncSetterValue(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
 
-class AsyncSetter(DT, metaclass=abc.ABCMeta):
+class AsyncSetter(Type[DT_CO], metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def getter(self, instance, value=None):
         return NotImplementedError
