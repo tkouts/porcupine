@@ -150,7 +150,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         collection_key = self._desc.key_for(self._inst)
         for item in items:
-            item_id = item.id
+            item_id = item.__storage__.id
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
                 collection = getattr(storage, self._desc.name)
@@ -167,13 +167,14 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         collection_key = self._desc.key_for(self._inst)
         for item in items:
-            item_id = item.id
+            item_id = item.__storage__.id
             if self._inst.__is_new__:
                 storage = getattr(self._inst, self._desc.storage)
                 collection = getattr(storage, self._desc.name)
                 if item_id in collection:
                     collection.remove(item_id)
             else:
+                print('removing ', collection_key, item_id)
                 if not context.system_override:
                     await self._check_permissions_and_raise()
                 context.txn.append(collection_key, ' -{0}'.format(item_id))

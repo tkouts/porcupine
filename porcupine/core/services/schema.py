@@ -28,6 +28,9 @@ class SchemaMaintenance(AbstractService):
                 break
             try:
                 await task.execute()
+            except Exception as e:
+                log.error('Task {0} threw error {1}'.format(
+                    type(task).__name__, str(e)))
             finally:
                 cls.queue.task_done()
 
@@ -100,29 +103,37 @@ class CollectionReBuilder(SchemaMaintenanceTask):
                 await system.fetch_collection_chunks(self.key)
             raw_chunks[0:0] = previous_chunks
         collection = system.resolve_set(' '.join(raw_chunks))
-        parts = math.ceil(len(' '.join(collection)) /
-                          db.connector.coll_split_threshold)
-        avg = len(collection) / parts
-        chunks = []
-        last = 0.0
-        while last < len(collection):
-            chunks.append(collection[int(last):int(last + avg)])
-            last += avg
-        raw_chunks = [' '.join(chunk) for chunk in chunks]
-        insertions = {
-            system.get_collection_key(self.item_id,
-                                      self.collection_name,
-                                      self.chunk_no - i - 1): chunk
-            for i, chunk in enumerate(reversed(raw_chunks[:-1]))
-        }
-        deletions = []
-        unused_chunk = self.chunk_no - len(raw_chunks)
-        while unused_chunk >= min_chunk:
-            key = system.get_collection_key(self.item_id,
-                                            self.collection_name,
-                                            unused_chunk)
-            deletions.append(key)
-            unused_chunk -= 1
+        if collection:
+            parts = math.ceil(len(' '.join(collection)) /
+                              db.connector.coll_split_threshold)
+            avg = len(collection) / parts
+            chunks = []
+            last = 0.0
+            while last < len(collection):
+                chunks.append(collection[int(last):int(last + avg)])
+                last += avg
+            raw_chunks = [' '.join(chunk) for chunk in chunks]
+            insertions = {
+                system.get_collection_key(self.item_id,
+                                          self.collection_name,
+                                          self.chunk_no - i - 1): chunk
+                for i, chunk in enumerate(reversed(raw_chunks[:-1]))
+            }
+            deletions = []
+            unused_chunk = self.chunk_no - len(raw_chunks)
+            while unused_chunk >= min_chunk:
+                key = system.get_collection_key(self.item_id,
+                                                self.collection_name,
+                                                unused_chunk)
+                deletions.append(key)
+                unused_chunk -= 1
+        else:
+            # empty collection
+            insertions = []
+            deletions = [system.get_collection_key(self.item_id,
+                                                   self.collection_name,
+                                                   i)
+                         for i in range(min_chunk, self.chunk_no + 1)]
         return raw_chunks[-1], (insertions, deletions)
 
     async def bump_up_active_chunk(self):
