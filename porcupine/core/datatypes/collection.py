@@ -174,7 +174,6 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 if item_id in collection:
                     collection.remove(item_id)
             else:
-                print('removing ', collection_key, item_id)
                 if not context.system_override:
                     await self._check_permissions_and_raise()
                 context.txn.append(collection_key, ' -{0}'.format(item_id))
