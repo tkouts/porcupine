@@ -111,24 +111,17 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def items(self) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
         chunk_size = 40
         chunk = []
+        get_multi = system.multi_with_stale_resolution
 
         async for item_id in self:
             chunk.append(item_id)
             if len(chunk) > chunk_size:
-                async for i in db.get_multi(chunk, return_none=True):
-                    if i is None:
-                        # TODO: remove stale id
-                        pass
-                    else:
+                async for i in get_multi(chunk):
                         yield i
                 chunk = []
 
         if chunk:
-            async for i in db.get_multi(chunk, return_none=True):
-                if i is None:
-                    # TODO: remove stale id
-                    pass
-                else:
+            async for i in get_multi(chunk):
                     yield i
 
     async def get_item_by_id(self,

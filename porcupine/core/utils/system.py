@@ -4,8 +4,9 @@ import functools
 import hashlib
 import random
 from collections import OrderedDict
-from typing import Optional
+from typing import Optional, AsyncIterator
 
+from porcupine.hinting import TYPING
 from porcupine import db
 from porcupine.core.utils.collections import WriteOnceDict
 from .permissions import resolve
@@ -123,7 +124,7 @@ async def fetch_collection_chunks(collection_key: str) -> (list, int):
     return prev_chunks, previous_chunk_no + 1
 
 
-async def resolve_visibility(item, user) -> Optional[int]:
+async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
     is_stale = await item.is_stale
     if is_stale:
         # TODO: remove from DB
@@ -135,6 +136,16 @@ async def resolve_visibility(item, user) -> Optional[int]:
         return None
     # return user role
     return await resolve(item, user)
+
+
+async def multi_with_stale_resolution(
+        ids: TYPING.ID_LIST) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
+    async for i in db.get_multi(ids, return_none=True):
+        if i is None:
+            # TODO: remove stale id
+            pass
+        else:
+            yield i
 
 
 def resolve_set(raw_string: str) -> list:
@@ -152,7 +163,7 @@ def resolve_set(raw_string: str) -> list:
     return value
 
 
-def get_descriptor_by_storage_key(cls, key):
+def get_descriptor_by_storage_key(cls, key: str):
     if key in cls.__schema__:
         return cls.__schema__[key]
     return locate_descriptor_by_storage_key(cls, key)

@@ -105,9 +105,11 @@ class Composition(ReferenceN):
                     context.txn.upsert(composite)
             await super(EmbeddedCollection, collection).add(*added)
             if removed_ids:
-                removed = [i async for i in db.get_multi(removed_ids)]
-                for item in removed:
-                    context.txn.delete(item)
+                removed = []
+                get_multi = system.multi_with_stale_resolution
+                async for composite in get_multi(removed_ids):
+                    removed.append(composite)
+                    context.txn.delete(composite)
                 await super(EmbeddedCollection, collection).remove(*removed)
 
     async def on_delete(self, instance, value):
@@ -118,12 +120,12 @@ class Composition(ReferenceN):
         await super().on_delete(instance, value)
 
     # HTTP views
-    async def get(self, instance, request, expand=False):
-        return await super().get(instance, request, expand=True)
+    async def get(self, instance: TYPING.ANY_ITEM_CO, request, expand=True):
+        return await super().get(instance, request, expand=expand)
 
     @contract(accepts=dict)
     @db.transactional()
-    async def post(self, instance, request):
+    async def post(self, instance: TYPING.ANY_ITEM_CO, request):
         """
         Adds a new composite to the collection
         :param instance: 
@@ -142,7 +144,7 @@ class Composition(ReferenceN):
 
     @contract(accepts=list)
     @db.transactional()
-    async def put(self, instance, request):
+    async def put(self, instance: TYPING.ANY_ITEM_CO, request):
         """
         Resets the collection
         :param instance: 
@@ -280,4 +282,5 @@ class Embedded(Reference1):
         return embedded
 
     async def delete(self, instance, request):
+        # TODO:  maybe raise NotFound?
         pass

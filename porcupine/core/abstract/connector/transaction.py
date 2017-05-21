@@ -3,7 +3,7 @@ from inspect import isawaitable
 
 from collections import defaultdict
 
-from porcupine import exceptions
+from porcupine import exceptions, gather
 from porcupine.core.utils import system
 
 
@@ -130,6 +130,7 @@ class Transaction:
 
             # print(snapshots, removed_items)
             if inserted_items or snapshots or removed_items:
+                async_handlers = []
                 for item in inserted_items:
                     # execute on_create handlers
                     for data_type in item.__schema__.values():
@@ -139,7 +140,7 @@ class Transaction:
                                 item,
                                 getattr(storage, data_type.storage_key))
                             if asyncio.iscoroutine(_):
-                                await _
+                                async_handlers.append(_)
                         except exceptions.AttributeSetError as e:
                             raise exceptions.InvalidUsage(str(e))
 
@@ -156,7 +157,7 @@ class Transaction:
                                 getattr(storage, attr),
                                 old_value)
                             if asyncio.iscoroutine(_):
-                                await _
+                                async_handlers.append(_)
                         except exceptions.AttributeSetError as e:
                             raise exceptions.InvalidUsage(str(e))
 
@@ -167,7 +168,11 @@ class Transaction:
                         value = getattr(storage, dt.storage_key)
                         _ = dt.on_delete(item, value)
                         if asyncio.iscoroutine(_):
-                            await _
+                            async_handlers.append(_)
+
+                if async_handlers:
+                    # execute async handlers
+                    await gather(*async_handlers)
             else:
                 break
         # update insertions with externals
@@ -198,30 +203,30 @@ class Transaction:
         if upsertions:
             task = connector.upsert_multi(upsertions)
             if isawaitable(task):
-                tasks.append(asyncio.ensure_future(task))
+                tasks.append(task)
 
         # sub document mutations
         for item_id, mutations in self._sd.items():
             task = connector.mutate_in(item_id, mutations)
             if isawaitable(task):
-                tasks.append(asyncio.ensure_future(task))
+                tasks.append(task)
 
         # appends
         if self._appends:
             appends = {k: ''.join(v) for k, v in self._appends.items()}
             task = connector.append_multi(appends)
             if isawaitable(task):
-                tasks.append(asyncio.ensure_future(task))
+                tasks.append(task)
 
         # deletions
         if deletions:
             task = connector.delete_multi(deletions)
             if isawaitable(task):
-                tasks.append(asyncio.ensure_future(task))
+                tasks.append(task)
 
         if tasks:
             completed, _ = await asyncio.wait(tasks)
-            errors = [task.exception() for task in tasks]
+            errors = [task.exception() for task in completed]
             if any(errors):
                 # TODO: log errors
                 # print(errors)
