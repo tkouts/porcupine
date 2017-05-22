@@ -9,7 +9,7 @@ from porcupine import db, exceptions, context
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
-from porcupine.core.utils import system
+from porcupine.core import utils
 from .reference import ReferenceN, ItemCollection, Reference1
 from .external import Text
 
@@ -23,8 +23,8 @@ class CompositeFactory(TYPING.COMPOSITION_TYPE):
         with system_override():
             composite = composite_type()
             parent_path = getattr(self._inst, 'path', self._inst.id)
-            composite.path = system.get_composite_path(parent_path,
-                                                       self._desc.name)
+            composite.path = utils.get_composite_path(parent_path,
+                                                      self._desc.name)
         return composite
 
 
@@ -104,7 +104,7 @@ class Composition(ReferenceN):
             await super(EmbeddedCollection, collection).add(*added)
             if removed_ids:
                 removed = []
-                get_multi = system.multi_with_stale_resolution
+                get_multi = utils.multi_with_stale_resolution
                 async for composite in get_multi(removed_ids):
                     removed.append(composite)
                     context.txn.delete(composite)
@@ -218,7 +218,7 @@ class Embedded(Reference1):
         setattr(instance.__storage__, self.name, self.storage_info)
 
     def key_for(self, instance):
-        return system.get_composite_path(instance.id, self.name)
+        return utils.get_composite_path(instance.id, self.name)
 
     def snapshot(self, instance, composite, previous_value):
         storage_key = self.storage_key

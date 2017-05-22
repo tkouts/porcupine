@@ -1,13 +1,13 @@
 """
 Default database object persistence layer
 """
-from porcupine.core.utils import system
+from porcupine.core import utils
 
 
 class DefaultPersistence(object):
     @staticmethod
     def loads(value):
-        content_class = system.get_content_class(value.pop('_cc'))
+        content_class = utils.get_content_class(value.pop('_cc'))
         item = content_class(dict_storage=value)
         return item
 

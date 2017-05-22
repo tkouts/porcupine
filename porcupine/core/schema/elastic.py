@@ -6,7 +6,7 @@ from porcupine.hinting import TYPING
 from porcupine import config
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import SchemaSignature
-from porcupine.core.utils import system
+from porcupine.core import utils
 from porcupine.datatypes import DataType, String, ReferenceN
 from porcupine.core.datatypes.asyncsetter import AsyncSetter
 from .storage import storage
@@ -36,7 +36,7 @@ class ElasticMeta(type):
                             field_spec.append(attr.storage_key)
                         if isinstance(attr, ReferenceN):
                             field_spec.append(
-                                system.get_active_chunk_key(attr.storage_key))
+                                utils.get_active_chunk_key(attr.storage_key))
                     if attr.indexed:
                         config.add_index(attr)
             except AttributeError:
@@ -44,9 +44,9 @@ class ElasticMeta(type):
         cls.__schema__ = schema
         cls.__record__ = storage(cls.__name__, field_spec)
         cls.__ext_record__ = storage(cls.__name__, ext_spec)
-        cls.__sig__ = system.hash_series(*schema.keys())
+        cls.__sig__ = utils.hash_series(*schema.keys())
         # register content class
-        system.ELASTIC_MAP[cls.__name__] = cls
+        utils.ELASTIC_MAP[cls.__name__] = cls
         super().__init__(name, bases, dct)
 
 
@@ -83,7 +83,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         item_type = dct.pop('type')
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
-            item_type = system.get_content_class(item_type)
+            item_type = utils.get_content_class(item_type)
         new_item = item_type()
         await new_item.apply_patch(dct)
         return new_item
@@ -100,7 +100,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             self.__storage__ = self.__record__(**dict_storage)
             # initialize storage with default values
             self.__add_defaults(list(self.__schema__.values()))
-            self.__storage__.id = system.generate_oid()
+            self.__storage__.id = utils.generate_oid()
             self.__storage__.sig = type(self).__sig__
         elif dict_storage['sig'] == type(self).__sig__:
             self.__storage__ = self.__record__(**dict_storage)
@@ -205,7 +205,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 '_dup_ext_': True,
                 '_id_map_': {}
             }
-        new_id = memo['_id_map_'].setdefault(self.id, system.generate_oid())
+        new_id = memo['_id_map_'].setdefault(self.id, utils.generate_oid())
         clone = copy.deepcopy(self)
         # call data types clone method
         for dt in self.__schema__.values():

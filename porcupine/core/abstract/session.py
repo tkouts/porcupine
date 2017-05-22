@@ -1,7 +1,7 @@
 import abc
 
 from porcupine.config import settings
-from porcupine.core.utils import system
+from porcupine.core import utils
 from porcupine.core.utils.observables import ObservableDict
 
 
@@ -48,7 +48,7 @@ class AbstractSessionManager(metaclass=abc.ABCMeta):
         pass
 
     def new_session(self):
-        session = self.SessionType(id=system.generate_oid(12))
+        session = self.SessionType(id=utils.generate_oid(12))
         session['uid'] = self.guest_user_id
         return session
 

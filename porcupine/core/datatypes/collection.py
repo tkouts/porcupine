@@ -3,7 +3,7 @@ from typing import AsyncIterator
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions, context
-from porcupine.core.utils import system
+from porcupine.core import utils
 from porcupine.core.services.schema import SchemaMaintenance
 from .asyncsetter import AsyncSetterValue
 from .external import Text
@@ -66,7 +66,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             for item_id in resolve_chunk(chunk):
                 yield item_id
 
-        active_chunk_key = system.get_active_chunk_key(descriptor.name)
+        active_chunk_key = utils.get_active_chunk_key(descriptor.name)
         active_index = getattr(instance.__storage__, active_chunk_key)
         if active_index > 0:
             # collection is split - fetch previous chunks
@@ -111,7 +111,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def items(self) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
         chunk_size = 40
         chunk = []
-        get_multi = system.multi_with_stale_resolution
+        get_multi = utils.multi_with_stale_resolution
 
         async for item_id in self:
             chunk.append(item_id)

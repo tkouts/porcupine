@@ -3,14 +3,14 @@ Database service
 """
 from porcupine import log, db
 from porcupine.config import settings
-from porcupine.core.utils import system
+from porcupine.core import utils
 from .service import AbstractService
 
 
 class Db(AbstractService):
     @staticmethod
     def get_connector():
-        connector_type = system.get_rto_by_name(settings['db']['type'])
+        connector_type = utils.get_rto_by_name(settings['db']['type'])
         return connector_type()
 
     @classmethod

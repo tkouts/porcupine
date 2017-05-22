@@ -8,7 +8,7 @@ import os.path
 import shutil
 
 from porcupine import db, context
-from porcupine.core.utils import system
+from porcupine.core import utils
 from .common import String
 from .datatype import DataType
 
@@ -56,7 +56,7 @@ class Blob(DataType):
         setattr(instance.__storage__, self.name, self.storage_info)
 
     def key_for(self, instance):
-        return system.get_blob_key(instance.id, self.name)
+        return utils.get_blob_key(instance.id, self.name)
 
     def snapshot(self, instance, new_value, old_value):
         if self.name not in instance.__snapshot__:

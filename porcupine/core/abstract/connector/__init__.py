@@ -4,7 +4,7 @@ from porcupine import context
 from porcupine.config import settings
 from porcupine.core.abstract.connector.join import Join
 from porcupine.core.abstract.connector.persist import DefaultPersistence
-from porcupine.core.utils import system
+from porcupine.core import utils
 from porcupine.exceptions import DBAlreadyExists
 from .transaction import Transaction
 
@@ -90,7 +90,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
             object_ids = [object_id for object_id in object_ids
                           if object_id not in txn]
         if object_ids:
-            for chunk in system.chunks(object_ids, self.multi_fetch_chunk_size):
+            for chunk in utils.chunks(object_ids, self.multi_fetch_chunk_size):
                 batch = await self.get_multi_raw(chunk)
                 for raw_item in batch:
                     if raw_item is None:

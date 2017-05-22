@@ -5,7 +5,8 @@ from porcupine.hinting import TYPING
 from porcupine import db, context, exceptions, gather
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Deleted, ParentId
-from porcupine.core.utils import system, permissions
+from porcupine.core import utils
+from porcupine.core.utils import permissions
 from porcupine.datatypes import Embedded, Composition, DataType
 
 
@@ -24,7 +25,7 @@ class Cloneable(TYPING.ITEM_TYPE):
                               is_root: bool=False) -> List['Cloneable']:
         all_items = []
 
-        id_map[item.id] = system.generate_oid()
+        id_map[item.id] = utils.generate_oid()
 
         if not is_root:
             all_items.append(item)

@@ -1,7 +1,7 @@
 from porcupine import db, context, exceptions
 from porcupine.contract import contract
 from porcupine.core.context import system_override
-from porcupine.core.utils import system
+from porcupine.core import utils
 from .collection import ItemCollection
 from .datatype import DataType
 from .common import String
@@ -21,7 +21,7 @@ class Acceptable:
     def allowed_types(self):
         if not self.accepts_resolved:
             self.accepts = tuple([
-                system.get_content_class(x) if isinstance(x, str) else x
+                utils.get_content_class(x) if isinstance(x, str) else x
                 for x in self.accepts
             ])
             self.accepts_resolved = True
@@ -117,15 +117,15 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
             value = list(value)
         super().set_default(instance, value)
         # add active key index
-        active_chunk_key = system.get_active_chunk_key(self.name)
+        active_chunk_key = utils.get_active_chunk_key(self.name)
         setattr(instance.__storage__, active_chunk_key, 0)
 
     def key_for(self, instance, chunk=None):
         if chunk is None:
             # return active chunk
-            active_chunk_key = system.get_active_chunk_key(self.name)
+            active_chunk_key = utils.get_active_chunk_key(self.name)
             chunk = getattr(instance.__storage__, active_chunk_key)
-        return system.get_collection_key(instance.id, self.name, chunk)
+        return utils.get_collection_key(instance.id, self.name, chunk)
 
     async def clone(self, instance, memo):
         collection = getattr(instance, self.name)
@@ -172,13 +172,13 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
 
     async def on_delete(self, instance, value):
         super().on_delete(instance, value)
-        active_chunk_key = system.get_active_chunk_key(self.name)
+        active_chunk_key = utils.get_active_chunk_key(self.name)
         active_chunk = getattr(instance.__storage__, active_chunk_key) - 1
         if active_chunk > -1:
             while True:
-                external_key = system.get_collection_key(instance.id,
-                                                         self.name,
-                                                         active_chunk)
+                external_key = utils.get_collection_key(instance.id,
+                                                        self.name,
+                                                        active_chunk)
                 _, key_exists = await db.connector.exists(external_key)
                 if not key_exists:
                     break

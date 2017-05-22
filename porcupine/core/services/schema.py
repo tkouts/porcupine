@@ -6,7 +6,7 @@ import math
 from inspect import isawaitable
 
 from porcupine import log, db, exceptions
-from porcupine.core.utils import system
+from porcupine.core import utils
 from .service import AbstractService
 
 
@@ -70,7 +70,7 @@ class SchemaMaintenanceTask:
 class CollectionCompacter(SchemaMaintenanceTask):
     @staticmethod
     def compact_set(raw_string):
-        compacted = system.resolve_set(raw_string)
+        compacted = utils.resolve_set(raw_string)
         return ' '.join(compacted), True
 
     async def execute(self):
@@ -100,9 +100,9 @@ class CollectionReBuilder(SchemaMaintenanceTask):
         raw_chunks = [raw_string]
         if self.chunk_no > 0:
             previous_chunks, min_chunk = \
-                await system.fetch_collection_chunks(self.key)
+                await utils.fetch_collection_chunks(self.key)
             raw_chunks[0:0] = previous_chunks
-        collection = system.resolve_set(' '.join(raw_chunks))
+        collection = utils.resolve_set(' '.join(raw_chunks))
         if collection:
             parts = math.ceil(len(' '.join(collection)) /
                               db.connector.coll_split_threshold)
@@ -114,35 +114,35 @@ class CollectionReBuilder(SchemaMaintenanceTask):
                 last += avg
             raw_chunks = [' '.join(chunk) for chunk in chunks]
             insertions = {
-                system.get_collection_key(self.item_id,
-                                          self.collection_name,
-                                          self.chunk_no - i - 1): chunk
+                utils.get_collection_key(self.item_id,
+                                         self.collection_name,
+                                         self.chunk_no - i - 1): chunk
                 for i, chunk in enumerate(reversed(raw_chunks[:-1]))
             }
             deletions = []
             unused_chunk = self.chunk_no - len(raw_chunks)
             while unused_chunk >= min_chunk:
-                key = system.get_collection_key(self.item_id,
-                                                self.collection_name,
-                                                unused_chunk)
+                key = utils.get_collection_key(self.item_id,
+                                               self.collection_name,
+                                               unused_chunk)
                 deletions.append(key)
                 unused_chunk -= 1
         else:
             # empty collection
             insertions = []
-            deletions = [system.get_collection_key(self.item_id,
-                                                   self.collection_name,
-                                                   i)
+            deletions = [utils.get_collection_key(self.item_id,
+                                                  self.collection_name,
+                                                  i)
                          for i in range(min_chunk, self.chunk_no + 1)]
         return raw_chunks[-1], (insertions, deletions)
 
     async def bump_up_active_chunk(self):
         connector = db.connector
-        counter_path = system.get_active_chunk_key(self.collection_name)
+        counter_path = utils.get_active_chunk_key(self.collection_name)
         try:
             await connector.insert_multi({
-                system.get_collection_key(self.item_id, self.collection_name,
-                                          self.chunk_no + 1): ''
+                utils.get_collection_key(self.item_id, self.collection_name,
+                                         self.chunk_no + 1): ''
             })
         except exceptions.DBAlreadyExists:
             pass
@@ -194,7 +194,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
     def schema_updater(item_dict):
         from porcupine.datatypes import Blob, ReferenceN, RelatorN
 
-        clazz = system.get_content_class(item_dict['_cc'])
+        clazz = utils.get_content_class(item_dict['_cc'])
         item_schema = frozenset([key for key in item_dict.keys()
                                  if not key.startswith('_')
                                  and not key.endswith('_')])
@@ -214,7 +214,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
                         or attr_value.startswith(RelatorN.storage_info_prefix):
                     try:
                         active_chunk_key = \
-                            system.get_active_chunk_key(attr_name)
+                            utils.get_active_chunk_key(attr_name)
                         active_chunk = item_dict.pop(active_chunk_key)
                     except KeyError:
                         continue
@@ -242,17 +242,17 @@ class SchemaCleaner(SchemaMaintenanceTask):
         for ext_name, ext_info in externals.items():
             ext_type, active_chunk = ext_info
             if ext_type == Blob.storage_info:
-                external_key = system.get_blob_key(self.key, ext_name)
+                external_key = utils.get_blob_key(self.key, ext_name)
                 if db.connector.exists(external_key):
                     external_keys.append(external_key)
             elif ext_type == ReferenceN.storage_info \
                     or ext_type.startswith(RelatorN.storage_info_prefix):
-                external_key = system.get_collection_key(self.key, ext_name,
-                                                         active_chunk)
+                external_key = utils.get_collection_key(self.key, ext_name,
+                                                        active_chunk)
                 while (await db.connector.exists(external_key))[1]:
                     external_keys.append(external_key)
                     active_chunk -= 1
-                    external_key = system.get_collection_key(
+                    external_key = utils.get_collection_key(
                         self.key, ext_name, active_chunk)
 
         if external_keys:

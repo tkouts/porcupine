@@ -15,10 +15,10 @@ class _Hinter:
             self.DT_COMPOSITION_CO = TypeVar('DT_COMPOSITION_CO',
                                              Composition, Embedded,
                                              covariant=True)
+            self.DT_COMPOSITION_TYPE = Type[self.DT_COMPOSITION_CO]
             self.DT_MULTI_REFERENCE_CO = TypeVar('DT_MULTI_REFERENCE_CO',
                                                  ReferenceN,
                                                  covariant=True)
-            self.DT_COMPOSITION_TYPE = Type[self.DT_COMPOSITION_CO]
 
             ####################
             # Data type values #

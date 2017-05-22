@@ -8,7 +8,7 @@ from sanic.request import Request
 
 from porcupine.hinting import TYPING
 from porcupine import context, exceptions
-from porcupine.core.utils import system
+from porcupine.core import utils
 
 connector = None
 
@@ -33,7 +33,7 @@ async def get_item(item_id: str, quiet: bool=True) -> Optional[
     if item is not None:
         if context.system_override:
             return item
-        visibility = await system.resolve_visibility(item, context.user)
+        visibility = await utils.resolve_visibility(item, context.user)
         if visibility is not None:
             if visibility:
                 return item
@@ -54,7 +54,7 @@ async def get_multi(ids: TYPING.ID_LIST, return_none=False) -> AsyncIterator[
                 if is_override:
                     yield item
                     continue
-                visibility = await system.resolve_visibility(item, user)
+                visibility = await utils.resolve_visibility(item, user)
                 if visibility:
                     yield item
             elif return_none:

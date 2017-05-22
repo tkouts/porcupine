@@ -4,7 +4,7 @@ from sanic.response import json
 
 from porcupine import db, view, gather, exceptions, server
 from porcupine.core.datatypes.system import Items, Containers
-from porcupine.core.utils import system
+from porcupine.core import utils
 from .item import Item
 from .shortcut import Shortcut
 
@@ -34,7 +34,7 @@ class Container(Item):
 
         @rtype: bool
         """
-        unique_name_key = system.get_key_of_unique(self.id, 'name', name)
+        unique_name_key = utils.get_key_of_unique(self.id, 'name', name)
         _, exists = await db.connector.exists(unique_name_key)
         return exists
 
@@ -49,7 +49,7 @@ class Container(Item):
         @rtype: L{GenericItem}
         """
         child_id = await db.connector.get_raw(
-                system.get_key_of_unique(self.id, 'name', name))
+                utils.get_key_of_unique(self.id, 'name', name))
         if child_id:
             item = await db.get_item(child_id)
             if resolve_shortcuts and isinstance(item, Shortcut):

@@ -4,7 +4,7 @@ from inspect import isawaitable
 from collections import defaultdict
 
 from porcupine import exceptions, gather
-from porcupine.core.utils import system
+from porcupine.core import utils
 
 
 class Transaction:
@@ -148,7 +148,7 @@ class Transaction:
                     # execute on change handlers
                     item = self._items[item_id]
                     for attr, old_value in snapshot.items():
-                        data_type = system.get_descriptor_by_storage_key(
+                        data_type = utils.get_descriptor_by_storage_key(
                             item.__class__, attr)
                         try:
                             storage = getattr(item, data_type.storage)

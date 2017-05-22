@@ -6,7 +6,7 @@ from sanic import Blueprint
 
 from porcupine import db
 from porcupine.apps.schema.users import SystemUser
-from porcupine.core.utils import system
+from porcupine.core import utils
 from porcupine.db import transactional
 from .context import with_context, system_override
 
@@ -56,7 +56,7 @@ class App(Blueprint):
         else:
             item = None
         if item is None:
-            item = system.get_content_class(item_type)()
+            item = utils.get_content_class(item_type)()
             if item_id:
                 # restore id in dict so it is set
                 item_dict['id'] = item_id
