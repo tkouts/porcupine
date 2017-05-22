@@ -7,7 +7,6 @@ import cbor
 import functools
 import hashlib
 import random
-from collections import OrderedDict
 from typing import Optional, AsyncIterator
 
 from porcupine.hinting import TYPING
@@ -109,25 +108,6 @@ def get_composite_path(parent_path: str, comp_name: str) -> str:
     return '{0}.{1}'.format(parent_path, comp_name)
 
 
-async def fetch_collection_chunks(collection_key: str) -> (list, int):
-    prev_chunks = []
-    item_id, collection_name, chunk_no = collection_key.split('/')
-    previous_chunk_no = int(chunk_no) - 1
-    # fetch previous chunks
-    while True:
-        previous_chunk_key = get_collection_key(item_id,
-                                                collection_name,
-                                                previous_chunk_no)
-        previous_chunk = await db.connector.get_raw(previous_chunk_key)
-        if previous_chunk is not None:
-            # print(len(previous_chunk))
-            prev_chunks.insert(0, previous_chunk)
-            previous_chunk_no -= 1
-        else:
-            break
-    return prev_chunks, previous_chunk_no + 1
-
-
 async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
     is_stale = await item.is_stale
     if is_stale:
@@ -150,21 +130,6 @@ async def multi_with_stale_resolution(
             pass
         else:
             yield i
-
-
-def resolve_set(raw_string: str) -> list:
-    # build set
-    uniques = OrderedDict()
-    for oid in raw_string.split(' '):
-        if oid:
-            if oid.startswith('-'):
-                key = oid[1:]
-                if key in uniques:
-                    del uniques[key]
-            else:
-                uniques[oid] = None
-    value = list(uniques.keys())
-    return value
 
 
 def get_descriptor_by_storage_key(cls, key: str):

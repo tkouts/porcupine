@@ -3,6 +3,7 @@ Schema maintenance service
 """
 import asyncio
 import math
+from collections import OrderedDict
 from inspect import isawaitable
 
 from porcupine import log, db, exceptions
@@ -69,8 +70,22 @@ class SchemaMaintenanceTask:
 
 class CollectionCompacter(SchemaMaintenanceTask):
     @staticmethod
-    def compact_set(raw_string):
-        compacted = utils.resolve_set(raw_string)
+    def resolve_set(raw_string: str) -> list:
+        # build set
+        uniques = OrderedDict()
+        for oid in raw_string.split(' '):
+            if oid:
+                if oid.startswith('-'):
+                    key = oid[1:]
+                    if key in uniques:
+                        del uniques[key]
+                else:
+                    uniques[oid] = None
+        value = list(uniques.keys())
+        return value
+
+    def compact_set(self, raw_string):
+        compacted = self.resolve_set(raw_string)
         return ' '.join(compacted), True
 
     async def execute(self):
@@ -86,11 +101,28 @@ class CollectionCompacter(SchemaMaintenanceTask):
             pass
 
 
-class CollectionReBuilder(SchemaMaintenanceTask):
+class CollectionReBuilder(CollectionCompacter):
     def __init__(self, key):
         super().__init__(key)
         self.item_id, self.collection_name, chunk_no = self.key.split('/')
         self.chunk_no = int(chunk_no)
+
+    async def fetch_collection_chunks(self) -> (list, int):
+        prev_chunks = []
+        previous_chunk_no = self.chunk_no - 1
+        # fetch previous chunks
+        while True:
+            previous_chunk_key = utils.get_collection_key(self.item_id,
+                                                          self.collection_name,
+                                                          previous_chunk_no)
+            previous_chunk = await db.connector.get_raw(previous_chunk_key)
+            if previous_chunk is not None:
+                # print(len(previous_chunk))
+                prev_chunks.insert(0, previous_chunk)
+                previous_chunk_no -= 1
+            else:
+                break
+        return prev_chunks, previous_chunk_no + 1
 
     async def rebuild_set(self, raw_string):
         # if len(raw_string) < db.connector.coll_split_threshold:
@@ -99,10 +131,9 @@ class CollectionReBuilder(SchemaMaintenanceTask):
         min_chunk = self.chunk_no
         raw_chunks = [raw_string]
         if self.chunk_no > 0:
-            previous_chunks, min_chunk = \
-                await utils.fetch_collection_chunks(self.key)
+            previous_chunks, min_chunk = await self.fetch_collection_chunks()
             raw_chunks[0:0] = previous_chunks
-        collection = utils.resolve_set(' '.join(raw_chunks))
+        collection = self.resolve_set(' '.join(raw_chunks))
         if collection:
             parts = math.ceil(len(' '.join(collection)) /
                               db.connector.coll_split_threshold)
