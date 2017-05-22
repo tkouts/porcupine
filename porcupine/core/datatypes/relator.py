@@ -24,9 +24,6 @@ class RelatorBase(Acceptable):
     async def add_reference(self, instance, *items):
         with system_override():
             for item in items:
-                # if not await self.accepts_item(item):
-                #     raise exceptions.ContainmentError(instance,
-                #                                       self.name, item)
                 rel_attr_value = getattr(item, self.rel_attr)
                 if isinstance(rel_attr_value, RelatorCollection):
                     # call super add to avoid recursion

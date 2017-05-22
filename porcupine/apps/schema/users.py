@@ -53,7 +53,7 @@ class Membership(Item):
         rel_attr='granted_to'
     )
 
-    async def is_member_of(self, group):
+    async def is_member_of(self, group) -> bool:
         """
         Checks if the user is member of the given group.
 
@@ -62,15 +62,17 @@ class Membership(Item):
 
         @rtype: bool
         """
-        return group.id in await self.member_of.get()
+        group_ids = [group_id async for group_id in self.member_of]
+        return group.id in group_ids
 
-    async def is_admin(self):
+    async def is_admin(self) -> bool:
         """
         Checks if the user is direct member of the administrators group.
 
         @rtype: bool
         """
-        return 'administrators' in await self.member_of.get()
+        group_ids = [group_id async for group_id in self.member_of]
+        return 'administrators' in group_ids
 
 
 class User(Membership):
