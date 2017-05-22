@@ -1,5 +1,7 @@
 import datetime
+from typing import List, Optional
 
+from porcupine.hinting import TYPING
 from porcupine import context, exceptions, db
 from porcupine.contract import contract
 from porcupine.core.context import system_override
@@ -79,36 +81,22 @@ class GenericItem(Removable, Elastic):
                 'or "move_to" methods instead.')
 
         user = context.user
-        if not context.system_override:
-            if parent is not None:
-                security = parent.__storage__.acl
-            else:
-                # add as root
-                security = {}
-            user_role = await permissions.resolve_acl(security, user)
-            if user_role == permissions.READER:
-                raise exceptions.Forbidden(
-                    'The user does not have write permissions '
-                    'on the parent container.')
-
         with system_override():
             self.owner = user.id
             self.created = self.modified = \
                 datetime.datetime.utcnow().isoformat()
             self.modified_by = user.name
             if parent is not None:
-                self.parent_id = parent.id
+                self.parent_id = parent.__storage__.id
             if self.__storage__.acl is None:
                 self.__storage__.acl = parent.__storage__.acl
 
-            context.txn.insert(self)
-            if parent is not None:
-                if self.is_collection:
-                    await parent.containers.add(self)
-                else:
-                    await parent.items.add(self)
-                parent.modified = self.modified
-                context.txn.upsert(parent)
+        context.txn.insert(self)
+        if parent is not None:
+            if self.is_collection:
+                await parent.containers.add(self)
+            else:
+                await parent.items.add(self)
 
     async def is_contained_in(self, item: 'GenericItem') -> bool:
         """
@@ -125,7 +113,7 @@ class GenericItem(Removable, Elastic):
             parent = await parent.get_parent()
         return False
 
-    async def get_parent(self) -> Elastic:
+    async def get_parent(self) -> Optional[TYPING.CONTAINER_CO]:
         """
         Returns the parent container
 
@@ -135,7 +123,7 @@ class GenericItem(Removable, Elastic):
         if self.parent_id is not None:
             return await db.get_item(self.parent_id)
 
-    def get_ancestor(self, n_levels=1):
+    async def get_ancestor(self, n_levels=1) -> Optional[TYPING.CONTAINER_CO]:
         """
         Returns the element that is situated n_levels above the base object
         in the hierarchy.
@@ -144,10 +132,14 @@ class GenericItem(Removable, Elastic):
         @return: the requested object
         @rtype: type
         """
-        # TODO: implement
-        return db.get_item(self._pids[-n_levels])
+        ancestor = self
+        for i in range(n_levels):
+            ancestor = await ancestor.get_parent()
+            if ancestor is None:
+                break
+        return ancestor
 
-    async def get_all_parents(self):
+    async def get_all_parents(self) -> List[TYPING.CONTAINER_CO]:
         """
         Returns all the parents of the item traversing the
         hierarchy up to the root folder.
@@ -165,7 +157,7 @@ class GenericItem(Removable, Elastic):
                 break
         return parents
 
-    async def full_path(self, include_self=True):
+    async def full_path(self, include_self=True) -> str:
         parents = await self.get_all_parents()
         if include_self and self.parent_id is not None:
             parents.append(self)
@@ -178,17 +170,17 @@ class GenericItem(Removable, Elastic):
 
         @return: None
         """
-        if self.__snapshot__:
+        if self.__snapshot__ or context.system_override:
             if self.parent_id is not None:
                 parent = await db.connector.get(self.parent_id)
             else:
                 parent = None
 
             user = context.user
-            user_role = await permissions.resolve(self, user)
-
-            if user_role < permissions.AUTHOR:
-                raise exceptions.Forbidden('Forbidden')
+            if not context.system_override:
+                user_role = await permissions.resolve(self, user)
+                if user_role < permissions.AUTHOR:
+                    raise exceptions.Forbidden('Forbidden')
 
             with system_override():
                 self.modified_by = user.name

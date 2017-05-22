@@ -120,7 +120,7 @@ class Container(Item):
     #     return self._nc
 
     @view
-    async def children(self, request):
+    async def children(self, _):
         # TODO: add support for resolve_shortcuts
         return await self.get_children()
 

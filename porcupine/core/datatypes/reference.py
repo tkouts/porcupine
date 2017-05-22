@@ -163,7 +163,10 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
         added = [i async for i in db.get_multi(added_ids)]
         removed = [i async for i in db.get_multi(removed_ids)]
         with system_override():
-            await collection.add(*added)
+            try:
+                await collection.add(*added)
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
             await collection.remove(*removed)
         return added, removed
 

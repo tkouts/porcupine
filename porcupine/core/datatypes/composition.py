@@ -47,14 +47,12 @@ class EmbeddedCollection(ItemCollection, CompositeFactory):
                 if not composite.__is_new__:
                     raise TypeError('Can only add new items to composition')
                 context.txn.insert(composite)
-        await self._inst.update()
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
         with system_override():
             await super().remove(*composites)
             for composite in composites:
                 context.txn.delete(composite)
-        await self._inst.update()
 
 
 class Composition(ReferenceN):

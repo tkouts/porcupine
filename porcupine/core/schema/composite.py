@@ -63,7 +63,8 @@ class Composite(Elastic):
         return clone
 
     async def update(self):
-        context.txn.upsert(self)
+        if self.__snapshot__:
+            context.txn.upsert(self)
         item = await self.item
         await item.update()
 

@@ -3,7 +3,7 @@ from typing import AsyncIterator
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions, context
-from porcupine.core.utils import system, permissions
+from porcupine.core.utils import system
 from porcupine.core.services.schema import SchemaMaintenance
 from .asyncsetter import AsyncSetterValue
 from .external import Text
@@ -134,42 +134,40 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             raise exceptions.NotFound(
                 'The resource {0} does not exist'.format(item_id))
 
-    async def _check_permissions_and_raise(self) -> None:
-        user = context.user
-        user_role = await permissions.resolve(self._inst, user)
-        if user_role < permissions.AUTHOR:
-            raise exceptions.Forbidden('Forbidden')
-
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
-        collection_key = self._desc.key_for(self._inst)
-        for item in items:
-            item_id = item.__storage__.id
-            if self._inst.__is_new__:
-                storage = getattr(self._inst, self._desc.storage)
-                collection = getattr(storage, self._desc.name)
-                if item_id not in collection:
-                    collection.append(item_id)
-            else:
-                if not context.system_override:
-                    await self._check_permissions_and_raise()
-                if not await self._desc.accepts_item(item):
-                    raise exceptions.ContainmentError(self._inst,
-                                                      self._desc.name, item)
-                context.txn.append(collection_key, ' {0}'.format(item_id))
+        if items:
+            descriptor, instance = self._desc, self._inst
+            collection_key = descriptor.key_for(instance)
+            for item in items:
+                item_id = item.__storage__.id
+                if instance.__is_new__:
+                    storage = getattr(instance, descriptor.storage)
+                    collection = getattr(storage, descriptor.name)
+                    if item_id not in collection:
+                        collection.append(item_id)
+                else:
+                    if not await descriptor.accepts_item(item):
+                        raise exceptions.ContainmentError(instance,
+                                                          descriptor.name, item)
+                    context.txn.append(collection_key, ' {0}'.format(item_id))
+            if not instance.__is_new__:
+                await instance.update()
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
-        collection_key = self._desc.key_for(self._inst)
-        for item in items:
-            item_id = item.__storage__.id
-            if self._inst.__is_new__:
-                storage = getattr(self._inst, self._desc.storage)
-                collection = getattr(storage, self._desc.name)
-                if item_id in collection:
-                    collection.remove(item_id)
-            else:
-                if not context.system_override:
-                    await self._check_permissions_and_raise()
-                context.txn.append(collection_key, ' -{0}'.format(item_id))
+        if items:
+            descriptor, instance = self._desc, self._inst
+            collection_key = descriptor.key_for(instance)
+            for item in items:
+                item_id = item.__storage__.id
+                if instance.__is_new__:
+                    storage = getattr(instance, descriptor.storage)
+                    collection = getattr(storage, descriptor.name)
+                    if item_id in collection:
+                        collection.remove(item_id)
+                else:
+                    context.txn.append(collection_key, ' -{0}'.format(item_id))
+            if not instance.__is_new__:
+                await instance.update()
 
     async def reset(self, value: TYPING.ID_LIST) -> None:
         if not self.is_fetched:

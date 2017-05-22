@@ -79,7 +79,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     sig = SchemaSignature()
 
     @staticmethod
-    async def new_from_dict(dct: dict) -> 'Elastic':
+    async def new_from_dict(dct: dict) -> TYPING.ANY_ITEM_CO:
         item_type = dct.pop('type')
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
