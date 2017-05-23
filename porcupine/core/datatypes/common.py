@@ -3,6 +3,7 @@ Porcupine data types
 ====================
 """
 import hashlib
+
 from .datatype import DataType
 
 
@@ -36,18 +37,6 @@ class Boolean(DataType):
 
     def __init__(self, default=False, **kwargs):
         super().__init__(default, **kwargs)
-
-
-class Date(String):
-    """Date data type"""
-    allow_none = True
-
-    def __init__(self, default=None, **kwargs):
-        super().__init__(default, **kwargs)
-
-
-class DateTime(Date):
-    """Datetime data type"""
 
 
 class Password(String):

@@ -34,6 +34,7 @@ setup(
         'lru-dict>=1.1.6',
         'namedlist>=1.7',
         'cbor>=1.0.0',
+        'arrow>=0.10.0',
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

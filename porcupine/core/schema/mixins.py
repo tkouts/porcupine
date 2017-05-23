@@ -1,4 +1,3 @@
-import datetime
 from typing import Dict, List
 
 from porcupine.hinting import TYPING
@@ -6,7 +5,7 @@ from porcupine import db, context, exceptions, gather
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.core import utils
-from porcupine.core.utils import permissions
+from porcupine.core.utils import permissions, date
 from porcupine.datatypes import Embedded, Composition, DataType
 
 
@@ -152,7 +151,7 @@ class Movable(TYPING.ITEM_TYPE):
                 'The user has insufficient permissions.')
 
         with system_override():
-            now = datetime.datetime.utcnow().isoformat()
+            now = date.utcnow()
             parent_id = self.parent_id
             self.parent_id = target.id
             self.modified = now

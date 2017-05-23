@@ -1,4 +1,3 @@
-import datetime
 from typing import List, Optional
 
 from porcupine.hinting import TYPING
@@ -6,8 +5,8 @@ from porcupine import context, exceptions, db
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Acl
-from porcupine.core.utils import permissions
-from porcupine.datatypes import String, DateTime, Boolean, RelatorN
+from porcupine.core.utils import permissions, date
+from porcupine.datatypes import String, Boolean, RelatorN, DateTime
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
 
@@ -58,7 +57,7 @@ class GenericItem(Removable, Elastic):
 
     async def clone(self, memo: dict=None) -> 'GenericItem':
         clone: 'GenericItem' = await super().clone(memo)
-        now = datetime.datetime.utcnow().isoformat()
+        now = date.utcnow()
         user = context.user
         with system_override():
             clone.owner = user.id
@@ -83,8 +82,7 @@ class GenericItem(Removable, Elastic):
         user = context.user
         with system_override():
             self.owner = user.id
-            self.created = self.modified = \
-                datetime.datetime.utcnow().isoformat()
+            self.created = self.modified = date.utcnow()
             self.modified_by = user.name
             if parent is not None:
                 self.parent_id = parent.__storage__.id
@@ -184,7 +182,7 @@ class GenericItem(Removable, Elastic):
 
             with system_override():
                 self.modified_by = user.name
-                self.modified = datetime.datetime.utcnow().isoformat()
+                self.modified = date.utcnow()
                 context.txn.upsert(self)
                 if parent is not None:
                     parent.modified = self.modified

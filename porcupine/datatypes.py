@@ -4,8 +4,8 @@ Porcupine data types
 """
 
 from .core.datatypes.datatype import DataType
-from .core.datatypes.common import String, Integer, Float, DateTime, Date, \
-    Password, Boolean
+from .core.datatypes.common import String, Integer, Float, Password, Boolean
+from .core.datatypes.datetime import Date, DateTime
 from .core.datatypes.mutable import List, Dictionary
 from .core.datatypes.counter import Counter
 from .core.datatypes.external import Blob, Text, File, ExternalFile
@@ -15,7 +15,8 @@ from .core.datatypes.composition import Composition, Embedded
 
 __all__ = [
     'DataType',
-    'String', 'Integer', 'Float', 'DateTime', 'Date', 'Password', 'Boolean',
+    'String', 'Integer', 'Float', 'Password', 'Boolean',
+    'Date', 'DateTime',
     'List', 'Dictionary',
     'Counter',
     'Blob', 'Text', 'File', 'ExternalFile',

@@ -22,13 +22,14 @@ class AclValue(AsyncSetterValue, collections.FrozenDict):
 
     async def reset(self, acl):
         # check user permissions
-        user_role = await permissions.resolve(self._inst, context.user)
+        instance = self._inst
+        user_role = await permissions.resolve(instance, context.user)
         if user_role < permissions.COORDINATOR:
             raise exceptions.Forbidden(
                 'The user does not have permissions '
                 'to modify the access control list.')
         # set acl
-        super(Dictionary, self._desc).__set__(self._inst, acl)
+        super(Dictionary, self._desc).__set__(instance, acl)
 
 
 class Acl(AsyncSetter, Dictionary):
