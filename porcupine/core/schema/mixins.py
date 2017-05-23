@@ -63,14 +63,10 @@ class Cloneable(TYPING.ITEM_TYPE):
             while await target.child_exists(clone.name):
                 copy_num += 1
                 clone.name = '{0} ({1})'.format(original_name, copy_num)
-            # update target
-            now = datetime.datetime.utcnow().isoformat()
             if clone.is_collection:
                 await target.containers.add(clone)
             else:
                 await target.items.add(clone)
-            target.modified = now
-            context.txn.upsert(target)
 
         clone.parent_id = id_map[item.parent_id]
         context.txn.insert(clone)
@@ -162,7 +158,6 @@ class Movable(TYPING.ITEM_TYPE):
             self.modified = now
             parent = await db.connector.get(parent_id)
 
-            # update target and parent
             if self.is_collection:
                 await target.containers.add(self)
                 await parent.containers.remove(self)
@@ -170,11 +165,7 @@ class Movable(TYPING.ITEM_TYPE):
                 await target.items.add(self)
                 await parent.items.remove(self)
 
-            target.modified = now
-            parent.modified = now
             context.txn.upsert(self)
-            context.txn.upsert(parent)
-            context.txn.upsert(target)
 
 
 class Removable(TYPING.ITEM_TYPE):
@@ -226,8 +217,6 @@ class Removable(TYPING.ITEM_TYPE):
                         await parent.containers.remove(self)
                     else:
                         await parent.items.remove(self)
-                    parent.modified = datetime.datetime.utcnow().isoformat()
-                    context.txn.upsert(parent)
             await _delete(self)
 
     @db.transactional()
