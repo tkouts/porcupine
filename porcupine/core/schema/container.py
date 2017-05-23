@@ -88,36 +88,25 @@ class Container(Item):
         """
         return [i async for i in self.containers.items()]
 
-    # def has_items(self):
-    #     """
-    #     Checks if the container has at least one non-container child.
-    #
-    #     @rtype: bool
-    #     """
-    #     return self._ni > 0
-    #
-    # def has_containers(self):
-    #     """
-    #     Checks if the container has at least one child container.
-    #
-    #     @rtype: bool
-    #     """
-    #     return self._nc > 0
-    #
-    # @property
-    # def children_count(self):
-    #     """The total number of the container's children"""
-    #     return self._ni + self._nc
-    #
-    # @property
-    # def items_count(self):
-    #     """The number of the items contained"""
-    #     return self._ni
-    #
-    # @property
-    # def containers_count(self):
-    #     """The number of containers contained"""
-    #     return self._nc
+    async def has_items(self) -> bool:
+        """
+        Checks if the container has at least one non-container child.
+
+        @rtype: bool
+        """
+        async for _ in self.items.items():
+            return True
+        return False
+
+    async def has_containers(self) -> bool:
+        """
+        Checks if the container has at least one child container.
+
+        @rtype: bool
+        """
+        async for _ in self.containers.items():
+            return True
+        return False
 
     @view
     async def children(self, _):
