@@ -24,18 +24,20 @@ class DataType:
                     'unique'):
             if arg in kwargs:
                 setattr(self, arg, kwargs[arg])
-        self.validate_value(default, None)
+        self.validate_value(None, default)
 
     @property
     def storage_key(self):
         return self.store_as or self.name
 
-    def validate_value(self, value, instance):
+    def get_value(self, instance):
+        storage = getattr(instance, self.storage)
+        return getattr(storage, self.storage_key)
+
+    def validate_value(self, instance, value):
         if instance is not None:
-            system_override = context.system_override
-            if self.readonly and not system_override:
-                storage = getattr(instance, self.storage)
-                if value != getattr(storage, self.storage_key):
+            if self.readonly and not context.system_override:
+                if value != self.get_value(instance):
                     raise AttributeError(
                         'Attribute {0} of {1} is readonly'.format(
                             self.name, instance.__class__.__name__))
@@ -50,11 +52,10 @@ class DataType:
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        storage = getattr(instance, self.storage)
-        return getattr(storage, self.storage_key)
+        return self.get_value(instance)
 
     def __set__(self, instance, value):
-        self.validate_value(value, instance)
+        self.validate_value(instance, value)
         storage = getattr(instance, self.storage)
         self.snapshot(instance, value, getattr(storage, self.storage_key))
         setattr(storage, self.storage_key, value)

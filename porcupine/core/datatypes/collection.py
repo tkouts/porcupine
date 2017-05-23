@@ -19,8 +19,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
 
     @property
     def is_fetched(self) -> bool:
-        storage = getattr(self._inst, self._desc.storage)
-        return getattr(storage, self._desc.storage_key) is not None
+        return self._desc.get_value(self._inst) is not None
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
         instance = self._inst

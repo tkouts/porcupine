@@ -135,10 +135,8 @@ class Transaction:
                     # execute on_create handlers
                     for data_type in item.__schema__.values():
                         try:
-                            storage = getattr(item, data_type.storage)
-                            _ = data_type.on_create(
-                                item,
-                                getattr(storage, data_type.storage_key))
+                            _ = data_type.on_create(item,
+                                                    data_type.get_value(item))
                             if asyncio.iscoroutine(_):
                                 async_handlers.append(_)
                         except exceptions.AttributeSetError as e:
@@ -151,11 +149,9 @@ class Transaction:
                         data_type = utils.get_descriptor_by_storage_key(
                             item.__class__, attr)
                         try:
-                            storage = getattr(item, data_type.storage)
-                            _ = data_type.on_change(
-                                item,
-                                getattr(storage, attr),
-                                old_value)
+                            _ = data_type.on_change(item,
+                                                    data_type.get_value(item),
+                                                    old_value)
                             if asyncio.iscoroutine(_):
                                 async_handlers.append(_)
                         except exceptions.AttributeSetError as e:
@@ -164,9 +160,7 @@ class Transaction:
                 for item in removed_items:
                     # execute on delete handlers
                     for dt in list(item.__schema__.values()):
-                        storage = getattr(item, dt.storage)
-                        value = getattr(storage, dt.storage_key)
-                        _ = dt.on_delete(item, value)
+                        _ = dt.on_delete(item, dt.get_value(item))
                         if asyncio.iscoroutine(_):
                             async_handlers.append(_)
 

@@ -6,10 +6,9 @@ from porcupine.core import utils
 
 class DefaultPersistence(object):
     @staticmethod
-    def loads(value):
-        content_class = utils.get_content_class(value.pop('_cc'))
-        item = content_class(dict_storage=value)
-        return item
+    def loads(storage):
+        content_class = utils.get_content_class(storage.pop('_cc'))
+        return content_class(dict_storage=storage)
 
     @staticmethod
     def dumps(obj):

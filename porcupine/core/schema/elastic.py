@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import functools
 from typing import List, ClassVar
 
 from porcupine.hinting import TYPING
@@ -88,6 +89,14 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         await new_item.apply_patch(dct)
         return new_item
 
+    @classmethod
+    @functools.lru_cache(maxsize=None)
+    def view_data_types(cls):
+        schema = cls.__schema__.values()
+        return [data_type for data_type in schema
+                if not data_type.protected
+                and data_type.storage == '__storage__']
+
     def __init__(self, dict_storage=None):
         if dict_storage is None:
             dict_storage = {}
@@ -147,10 +156,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             getattr(self.__storage__, attr_name))
 
     def to_json(self) -> dict:
-        schema = list(self.__schema__.values())
-        return self.custom_view(*[data_type.name for data_type in schema
-                                  if not data_type.protected
-                                  and data_type.storage == '__storage__'])
+        return {
+            data_type.name: getattr(self.__storage__, data_type.storage_key)
+            for data_type in self.view_data_types()
+        }
 
     # ujson hook
     toDict = to_json

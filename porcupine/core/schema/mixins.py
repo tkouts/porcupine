@@ -246,9 +246,7 @@ class Recyclable(TYPING.ITEM_TYPE):
             uniques = [dt for dt in item.__schema__.values()
                        if dt.unique]
             for data_type in uniques:
-                storage = getattr(item, data_type.storage)
-                value = getattr(storage, data_type.storage_key)
-                DataType.on_create(data_type, item, value)
+                DataType.on_create(data_type, item, data_type.get_value(item))
 
         async def restore(item: 'Recyclable') -> None:
             # mark as deleted
@@ -287,9 +285,7 @@ class Recyclable(TYPING.ITEM_TYPE):
             uniques = [dt for dt in item.__schema__.values()
                        if dt.unique]
             for data_type in uniques:
-                storage = getattr(item, data_type.storage)
-                value = getattr(storage, data_type.storage_key)
-                DataType.on_delete(data_type, item, value)
+                DataType.on_delete(data_type, item, data_type.get_value(item))
 
         async def recycle(item: 'Recyclable') -> None:
             if item.is_system:
