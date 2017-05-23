@@ -33,13 +33,21 @@ class Composite(Elastic):
         return self.path.split('.')[0]
 
     @property
+    def parent_id(self):
+        return self.path.split('.')[-2]
+
+    @property
     async def is_stale(self):
-        _, exists = await db.connector.exists(self.item_id)
+        _, exists = await db.connector.exists(self.parent_id)
         return not exists
 
     @property
     async def item(self):
         return await db.connector.get(self.item_id)
+
+    @property
+    async def parent(self):
+        return await db.connector.get(self.parent_id)
 
     @property
     async def is_deleted(self):
@@ -71,8 +79,7 @@ class Composite(Elastic):
     async def remove(self):
         exploded_path = self.path.split('.')
         comp_name = exploded_path[-1]
-        parent_id = exploded_path[-2]
-        parent = await db.get_item(parent_id)
+        parent = await self.parent
         comp = getattr(parent, comp_name)
         if hasattr(comp, 'remove'):
             # composition
