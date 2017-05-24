@@ -45,6 +45,10 @@
               is_system: Yes
               members:
                 - admin
+    - id: ustorage
+      type: UsersStorage
+      name: Users Storage
+      is_system: Yes
 
 - id: RB
   type: RecycleBin

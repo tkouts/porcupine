@@ -62,8 +62,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     The object schema is automatically updated the next time the
     object is written in the database.
 
-    :cvar event_handlers: A list containing all the object's event handlers.
-    :type event_handlers: list
     :cvar is_collection: A boolean indicating if the object is a container.
     :type is_collection: bool
     """
@@ -74,7 +72,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     is_collection: ClassVar[bool] = False
     is_deleted: ClassVar[bool] = False
-    event_handlers = []
 
     id = String(required=True, readonly=True)
     sig = SchemaSignature()
@@ -225,3 +222,13 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             clone.id = new_id
         clone.__is_new__ = True
         return clone
+
+    # event handlers
+    async def on_create(self):
+        pass
+
+    async def on_change(self):
+        pass
+
+    async def on_delete(self):
+        pass

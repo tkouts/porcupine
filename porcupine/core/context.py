@@ -110,11 +110,15 @@ class context_user:
     def __init__(self, user_id):
         self.user_id = user_id
         self.original_user = None
+        self.user_switched = False
 
     async def __aenter__(self):
-        from porcupine import db
-        self.original_user = context.user
-        context.user = await db.connector.get(self.user_id, quiet=False)
+        if context.user.id != self.user_id:
+            from porcupine import db
+            self.original_user = context.user
+            context.user = await db.connector.get(self.user_id, quiet=False)
+            self.user_switched = True
 
     async def __aexit__(self, exc_type, exc, tb):
-        context.user = self.original_user
+        if self.user_switched:
+            context.user = self.original_user

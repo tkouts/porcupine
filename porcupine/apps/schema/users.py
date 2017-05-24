@@ -1,8 +1,12 @@
 import hashlib
+
+from porcupine import db, permissions, context_user
 from porcupine.schema import Container
 from porcupine.schema import Item
 from porcupine.datatypes import String, RelatorN, Password, Reference1, \
     Dictionary
+
+from .userstorage import UserStorage
 
 
 class SystemUser(Item):
@@ -92,9 +96,8 @@ class User(Membership):
     email = String()
     password = Password(required=True)
     settings = Dictionary()
-    personal_folder = Reference1()
-    # event_handlers = GenericUser.event_handlers +
-    # [handlers.PersonalFolderHandler]
+    personal_folder = Reference1(accepts=(UserStorage, ),
+                                 required=True)
 
     def authenticate(self, password):
         """Checks if the given string matches the
@@ -105,9 +108,21 @@ class User(Membership):
 
         @rtype: bool
         """
-        hex_digest = hashlib.sha3_256(
-            password.encode('utf-8')).hexdigest()
+        hex_digest = hashlib.sha3_256(password.encode('utf-8')).hexdigest()
         return hex_digest == self.password
+
+    async def on_create(self):
+        # create user's storage
+        async with context_user('system'):
+            storage_container = await db.get_item('ustorage')
+            user_storage = UserStorage()
+            user_storage.name = self.name
+            # set acl
+            await user_storage.acl.reset({
+                self.id: permissions.CONTENT_CO
+            })
+            await user_storage.append_to(storage_container)
+            self.personal_folder = user_storage.id
 
 
 class UsersContainer(Container):

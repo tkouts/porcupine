@@ -101,7 +101,7 @@ class DataType:
 
     def on_create(self, instance, value):
         self.validate(value)
-        if self.unique and instance.parent_id:
+        if self.unique and instance.__storage__.pid:
             unique_key = get_key_of_unique(instance.__storage__.pid,
                                            self.name,
                                            value)
@@ -109,7 +109,7 @@ class DataType:
 
     def on_change(self, instance, value, old_value):
         DataType.on_create(self, instance, value)
-        if self.unique and instance.parent_id:
+        if self.unique and instance.__storage__.pid:
             old_unique_key = get_key_of_unique(
                 instance.get_snapshot_of('pid'), self.name, old_value)
             context.txn.delete_external(old_unique_key)
@@ -118,7 +118,7 @@ class DataType:
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 
     def on_delete(self, instance, value):
-        if self.unique and instance.parent_id:
+        if self.unique and instance.__storage__.pid:
             unique_key = get_key_of_unique(instance.get_snapshot_of('pid'),
                                            self.name,
                                            value)

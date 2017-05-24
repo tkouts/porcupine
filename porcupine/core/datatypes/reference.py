@@ -70,9 +70,8 @@ class Reference1(String, Acceptable):
     async def on_create(self, instance, value):
         super().on_create(instance, value)
         if value:
-            try:
-                ref_item = await db.get_item(value, quiet=False)
-            except (exceptions.NotFound, exceptions.Forbidden):
+            ref_item = await db.get_item(value)
+            if ref_item is None:
                 # TODO: change wording
                 raise exceptions.InvalidUsage('Invalid item {0}'.format(value))
             if not await self.accepts_item(ref_item):

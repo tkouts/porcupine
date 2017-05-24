@@ -132,7 +132,9 @@ class Transaction:
             if inserted_items or snapshots or removed_items:
                 async_handlers = []
                 for item in inserted_items:
-                    # execute on_create handlers
+                    # execute item's on_create handler
+                    await item.on_create()
+                    # execute data types on_create handlers
                     for data_type in item.__schema__.values():
                         try:
                             _ = data_type.on_create(item,
@@ -143,8 +145,10 @@ class Transaction:
                             raise exceptions.InvalidUsage(str(e))
 
                 for item_id, snapshot in snapshots.items():
-                    # execute on change handlers
                     item = self._items[item_id]
+                    # execute item's on_change handler
+                    await item.on_change()
+                    # execute data types on_change handlers
                     for attr, old_value in snapshot.items():
                         data_type = utils.get_descriptor_by_storage_key(
                             item.__class__, attr)
@@ -158,7 +162,9 @@ class Transaction:
                             raise exceptions.InvalidUsage(str(e))
 
                 for item in removed_items:
-                    # execute on delete handlers
+                    # execute item's on_delete handler
+                    await item.on_delete()
+                    # execute data types on_delete handlers
                     for dt in list(item.__schema__.values()):
                         _ = dt.on_delete(item, dt.get_value(item))
                         if asyncio.iscoroutine(_):
