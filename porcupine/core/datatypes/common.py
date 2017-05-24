@@ -49,5 +49,5 @@ class Password(String):
         super().__set__(instance, digest)
 
     def validate(self, value):
-        if self.required and value == self.empty:
-            raise ValueError('Attribute {0} is mandatory.'.format(self.name))
+        if self.required and (not value or value == self.empty):
+            raise ValueError('Attribute {0} is mandatory'.format(self.name))
