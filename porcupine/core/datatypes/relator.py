@@ -111,7 +111,13 @@ class Relator1(Reference1, RelatorBase):
 class RelatorCollection(ItemCollection):
     async def items(self):
         async for item in super().items():
-            if self._desc.rel_attr in item.__schema__:
+            rel_attr = getattr(item, self._desc.rel_attr, None)
+            if rel_attr:
+                if isinstance(rel_attr, RelatorItem) \
+                        and rel_attr != self._inst.id:
+                    # concurrency safety
+                    # TODO: remove stale id
+                    continue
                 yield item
 
     async def add(self, *items):
