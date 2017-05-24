@@ -61,23 +61,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
             item = self.persist.loads(item)
             return item
 
-    async def get_partial(self, object_id, *paths, snapshot=False):
-
-        def snapshot_getter(i, p):
-            return i.get_snapshot_of(p)
-
-        def normal_getter(i, p):
-            return getattr(i.__storage__, p)
-
-        if context.txn is not None and object_id in context.txn:
-            item = context.txn[object_id]
-            if snapshot:
-                getter = snapshot_getter
-            else:
-                getter = normal_getter
-            return {path: getter(item, path) for path in paths}
-        return await self.get_partial_raw(object_id, *paths)
-
     async def get_multi(self, object_ids):
         loads = self.persist.loads
         if context.txn is not None:
@@ -115,9 +98,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     # @abc.abstractmethod
     async def get_raw(self, key, quiet=True):
-        raise NotImplementedError
-
-    async def get_partial_raw(self, key, *paths):
         raise NotImplementedError
 
     # @abc.abstractmethod

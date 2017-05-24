@@ -84,10 +84,6 @@ class Couchbase(AbstractConnector):
         multi = await self.bucket.get_multi(keys, quiet=True)
         return [multi[key].value for key in keys]
 
-    async def get_partial_raw(self, key, *paths):
-        values = await self.bucket.retrieve_in(key, *paths)
-        return dict(zip(paths, values))
-
     async def insert_multi(self, insertions):
         try:
             await self.bucket.insert_multi(insertions,
