@@ -23,7 +23,10 @@ class Group(Membership):
 
         @rtype: bool
         """
-        return user.id in await self.members.get()
+        async for member_id in self.members:
+            if member_id == user.id:
+                return True
+        return False
 
 
 class EveryoneGroup(Item):
