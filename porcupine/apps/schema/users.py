@@ -97,6 +97,7 @@ class User(Membership):
     password = Password(required=True)
     settings = Dictionary()
     personal_folder = Reference1(accepts=(UserStorage, ),
+                                 cascade_delete=True,
                                  required=True)
 
     def authenticate(self, password):
@@ -123,6 +124,13 @@ class User(Membership):
             })
             await user_storage.append_to(storage_container)
             self.personal_folder = user_storage.id
+
+    async def on_change(self):
+        if self.name != self.get_snapshot_of('name'):
+            async with context_user('system'):
+                user_storage = await self.personal_folder.item()
+                user_storage.name = self.name
+                await user_storage.update()
 
 
 class UsersContainer(Container):

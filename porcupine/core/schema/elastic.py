@@ -148,9 +148,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             dt.set_default(self)
 
     def get_snapshot_of(self, attr_name: str):
+        storage_key = self.__schema__[attr_name].storage_key
         return self.__snapshot__.get(
-            attr_name,
-            getattr(self.__storage__, attr_name))
+            storage_key,
+            getattr(self.__storage__, storage_key))
 
     def to_dict(self) -> dict:
         return {

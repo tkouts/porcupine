@@ -109,15 +109,18 @@ class Transaction:
                          for i in self._items.values()
                          if i.__snapshot__}
 
-            # clear snapshots
+            for item_id in snapshots:
+                item = self._items[item_id]
+                # execute item's on_change handler
+                await item.on_change()
+                item.__reset__()
+
             for item in inserted_items:
                 item.__reset__()
                 # clear new flag
                 item.__is_new__ = False
                 # add to items so that later can be modified
                 self._items[item.id] = item
-            for item_id in snapshots:
-                self._items[item_id].__reset__()
 
             removed_items = list(self._deleted_items.values())
             deletions.extend(self._deleted_items.keys())
@@ -146,12 +149,10 @@ class Transaction:
 
                 for item_id, snapshot in snapshots.items():
                     item = self._items[item_id]
-                    # execute item's on_change handler
-                    await item.on_change()
                     # execute data types on_change handlers
                     for attr, old_value in snapshot.items():
                         data_type = utils.get_descriptor_by_storage_key(
-                            item.__class__, attr)
+                            type(item), attr)
                         try:
                             _ = data_type.on_change(item,
                                                     data_type.get_value(item),

@@ -111,7 +111,7 @@ class DataType:
         DataType.on_create(self, instance, value)
         if self.unique and instance.__storage__.pid:
             old_unique_key = get_key_of_unique(
-                instance.get_snapshot_of('pid'), self.name, old_value)
+                instance.get_snapshot_of('parent_id'), self.name, old_value)
             context.txn.delete_external(old_unique_key)
         if self.storage == '__storage__':
             context.txn.mutate(instance, self.storage_key,
@@ -119,9 +119,10 @@ class DataType:
 
     def on_delete(self, instance, value):
         if self.unique and instance.__storage__.pid:
-            unique_key = get_key_of_unique(instance.get_snapshot_of('pid'),
-                                           self.name,
-                                           value)
+            unique_key = get_key_of_unique(
+                instance.get_snapshot_of('parent_id'),
+                self.name,
+                value)
             context.txn.delete_external(unique_key)
 
     # HTTP views

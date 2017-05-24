@@ -116,12 +116,12 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             chunk.append(item_id)
             if len(chunk) > chunk_size:
                 async for i in get_multi(chunk):
-                        yield i
+                    yield i
                 chunk = []
 
         if chunk:
             async for i in get_multi(chunk):
-                    yield i
+                yield i
 
     async def get_item_by_id(self,
                              item_id: TYPING.ITEM_ID,

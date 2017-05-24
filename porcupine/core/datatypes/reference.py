@@ -10,12 +10,15 @@ from .asyncsetter import AsyncSetter
 
 
 class Acceptable:
+    cascade_delete = False
     accepts = ()
 
     def __init__(self, **kwargs):
         self.accepts_resolved = False
         if 'accepts' in kwargs:
             self.accepts = kwargs['accepts']
+        if 'cascade_delete' in kwargs:
+            self.cascade_delete = kwargs['cascade_delete']
 
     @property
     def allowed_types(self):
@@ -81,6 +84,14 @@ class Reference1(String, Acceptable):
     async def on_change(self, instance, value, old_value):
         super().on_change(instance, value, old_value)
         return await self.on_create(instance, value)
+
+    async def on_delete(self, instance, value):
+        super().on_delete(instance, value)
+        if value and self.cascade_delete:
+            ref_item = await db.connector.get(value)
+            if ref_item:
+                with system_override():
+                    await ref_item.remove()
 
     def clone(self, instance, memo):
         value = super().__get__(instance, None)
@@ -171,6 +182,11 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
 
     async def on_delete(self, instance, value):
         super().on_delete(instance, value)
+        collection = self.__get__(instance, None)
+        if self.cascade_delete:
+            with system_override():
+                async for ref_item in collection.items():
+                    await ref_item.remove()
         active_chunk_key = utils.get_active_chunk_key(self.name)
         active_chunk = getattr(instance.__storage__, active_chunk_key) - 1
         if active_chunk > -1:
