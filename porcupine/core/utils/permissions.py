@@ -34,7 +34,8 @@ async def resolve_acl(acl, user_or_group):
             return acl[user_or_group.id]
 
         # get membership
-        member_of.update(set(await user_or_group.member_of.get()))
+        member_of.update({group_id
+                          async for group_id in user_or_group.member_of})
 
         if member_of:
             # resolve nested groups membership
@@ -58,7 +59,7 @@ async def resolve_membership(group_ids):
     groups = await db.connector.get_multi(group_ids)
     for group in groups:
         extended_membership.update({
-            group_id for group_id in await group.member_of.get()})
+            group_id async for group_id in group.member_of})
     if extended_membership:
         extended_membership.update(
             await resolve_membership(frozenset(extended_membership)))
