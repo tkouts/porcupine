@@ -1,6 +1,6 @@
 import abc
 from porcupine import context
-from porcupine.utils import permissions
+from porcupine.core.utils import permissions
 from porcupine.schema import Shortcut
 
 
