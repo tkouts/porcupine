@@ -97,8 +97,9 @@ class Transaction:
         try:
             await self.connector.insert_multi({lock_key: ''}, ttl=20)
         except exceptions.DBAlreadyExists:
-            raise exceptions.DBDeadlockError('')
-        # add lock key to deletions
+            raise exceptions.DBDeadlockError(
+                'Failed to lock {0}'.format(attr_name))
+        # add lock key to deletions in order to be released
         self._deletions[lock_key] = True
 
     async def prepare(self):

@@ -73,7 +73,7 @@ def transactional(auto_commit=True):
         @wraps(func)
         async def transactional_wrapper(*args, **kwargs):
             if context.txn is None:
-                # top level function
+                # top level co-routine
                 retries = 0
                 sleep_time = min_sleep_time
                 max_retries = connector.txn_max_retries
