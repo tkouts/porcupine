@@ -87,6 +87,10 @@ def hash_series(*args, using='md5') -> str:
     return h.hexdigest()
 
 
+def get_attribute_lock_key(item_id: str, attr_name: str) -> str:
+    return 'lck_{0}_{1}'.format(item_id, attr_name)
+
+
 def get_blob_key(item_id: str, blob_name: str) -> str:
     return '{0}/{1}'.format(item_id, blob_name)
 

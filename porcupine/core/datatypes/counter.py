@@ -11,7 +11,7 @@ class Counter(Integer):
                     type_error_message.format(self.__class__.__name__, kwarg))
         super().__init__(default, **kwargs)
 
-    async def on_change(self, instance, value, old_value):
+    def on_change(self, instance, value, old_value):
         delta = value - old_value
         if delta:
             context.txn.mutate(instance,

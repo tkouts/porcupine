@@ -90,7 +90,16 @@ class Transaction:
         else:
             if key is self._upsertions:
                 del self._upsertions[key]
-            self._deletions[key] = True
+            self._deletions[key] = None
+
+    async def lock_attribute(self, item, attr_name):
+        lock_key = utils.get_attribute_lock_key(item.id, attr_name)
+        try:
+            await self.connector.insert_multi({lock_key: ''}, ttl=20)
+        except exceptions.DBAlreadyExists:
+            raise exceptions.DBDeadlockError('')
+        # add lock key to deletions
+        self._deletions[lock_key] = True
 
     async def prepare(self):
         connector = self.connector
@@ -185,7 +194,7 @@ class Transaction:
         deletions.extend(self._deletions.keys())
         return insertions, upsertions, deletions
 
-    async def commit(self):
+    async def commit(self) -> None:
         """
         Commits the transaction.
 
@@ -235,10 +244,13 @@ class Transaction:
 
         self.connector.active_txns -= 1
 
-    async def abort(self):
+    async def abort(self) -> None:
         """
         Aborts the transaction.
 
         @return: None
         """
+        # release attribute locks
+        locks = [k for k, v in self._deletions.items() if v]
+        await self.connector.delete_multi(locks)
         self.connector.active_txns -= 1

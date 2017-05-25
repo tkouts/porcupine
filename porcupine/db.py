@@ -76,11 +76,11 @@ def transactional(auto_commit=True):
                 # top level function
                 retries = 0
                 sleep_time = min_sleep_time
-                context.txn = txn = connector.get_transaction()
                 max_retries = connector.txn_max_retries
                 try:
                     while retries < max_retries:
                         # print('trying.... %d' % retries)
+                        context.txn = txn = connector.get_transaction()
                         try:
                             args_copy = [
                                 copy.deepcopy(arg)
@@ -114,7 +114,8 @@ def transactional(auto_commit=True):
                             await txn.abort()
                             raise
                     # maximum retries exceeded
-                    raise exceptions.DBDeadlockError
+                    raise exceptions.DBDeadlockError(
+                        'Maximum transaction retries exceeded')
                 finally:
                     context.txn = None
             else:

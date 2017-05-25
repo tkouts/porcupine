@@ -92,7 +92,7 @@ class Relator1(Reference1, RelatorBase):
             await self.add_reference(instance, ref_item)
 
     async def on_change(self, instance, value, old_value):
-        ref_item = super().on_change(instance, value, old_value)
+        ref_item = await super().on_change(instance, value, old_value)
         if ref_item:
             await self.add_reference(instance, ref_item)
         if old_value:

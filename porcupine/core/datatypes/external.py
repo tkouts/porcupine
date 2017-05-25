@@ -71,8 +71,8 @@ class Blob(DataType):
         if value is not None:
             context.txn.insert_external(self.key_for(instance), value)
 
-    def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
+    async def on_change(self, instance, value, old_value):
+        await super().on_change(instance, value, old_value)
         if value is not None:
             context.txn.put_external(self.key_for(instance), value)
         else:

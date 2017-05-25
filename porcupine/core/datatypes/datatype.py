@@ -107,9 +107,11 @@ class DataType:
                                            value)
             context.txn.insert_external(unique_key, instance.__storage__.id)
 
-    def on_change(self, instance, value, old_value):
+    async def on_change(self, instance, value, old_value):
         DataType.on_create(self, instance, value)
         if self.unique and instance.__storage__.pid:
+            # try to lock attribute
+            await context.txn.lock_attribute(instance, self.name)
             old_unique_key = get_key_of_unique(
                 instance.get_snapshot_of('parent_id'), self.name, old_value)
             context.txn.delete_external(old_unique_key)

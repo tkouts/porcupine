@@ -47,14 +47,14 @@ class Acl(AsyncSetter, Dictionary):
         children = await container.get_children()
         for child in children:
             if child.acl == old_acl:
-                super().on_change(child, acl, old_acl)
+                await super().on_change(child, acl, old_acl)
                 if child.is_collection:
                     tasks.append(self.apply_acl(child, acl, old_acl))
         if tasks:
             await gather(*tasks)
 
     async def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
+        await super().on_change(instance, value, old_value)
         if instance.is_collection:
             with system_override():
                 await self.apply_acl(instance, value, old_value)
@@ -66,7 +66,7 @@ class SchemaSignature(String):
     protected = True
 
     async def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
+        await super().on_change(instance, value, old_value)
         await SchemaMaintenance.clean_schema(instance.id)
 
 
