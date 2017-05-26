@@ -1,8 +1,13 @@
+import tempfile
+
+temp_folder = tempfile.gettempdir()
+
 default_settings = {
     'host': '0.0.0.0',
     'port': 8000,
     'workers': 1,
-    'temp_folder': '/tmp',
+    'temp_folder': temp_folder,
+    'pid_file': '{0}/porcupine.pid'.format(temp_folder),
     'db': {
         'type': 'porcupine.connectors.Couchbase',
         'hosts': ['localhost'],

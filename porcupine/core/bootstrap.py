@@ -12,8 +12,6 @@ from .server import server
 from .services.blueprint import services_blueprint, services
 from .daemon import Daemon
 
-PID_FILE = '/tmp/porcupine.pid'
-
 
 def run_server(log_config, debug=False):
     # register services blueprint
@@ -42,7 +40,7 @@ def run_server(log_config, debug=False):
 
 class PorcupineDaemon(Daemon):
     def __init__(self, log_config, debug=False):
-        super().__init__(PID_FILE)
+        super().__init__(settings['pid_file'])
         self.debug = debug
         self.log_config = log_config
 
