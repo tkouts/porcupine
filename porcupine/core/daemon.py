@@ -70,7 +70,6 @@ class Daemon:
         # Check for a pid file to see if the daemon already runs
         try:
             with open(self.pid_file, 'r') as pf:
-
                 pid = int(pf.read().strip())
         except IOError:
             pid = None
@@ -88,7 +87,7 @@ class Daemon:
     def stop(self):
         """Stop the daemon."""
 
-        # Get the pid from the pidfile
+        # Get the pid from the pid file
         try:
             with open(self.pid_file, 'r') as pf:
                 pid = int(pf.read().strip())

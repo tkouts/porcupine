@@ -1,12 +1,11 @@
 import argparse
 import logging
 import sys
-import asyncio
 
 from porcupine import __version__
 from porcupine import apps
-from porcupine.config import settings
-from . import log
+from porcupine.config import settings, setup_logging
+from .log import porcupine_log
 from .loader import install_apps
 from .server import server
 from .services.blueprint import services_blueprint, services
@@ -15,63 +14,52 @@ from .daemon import Daemon
 PID_FILE = '/tmp/porcupine.pid'
 
 
-def run_server(debug=False, loop=None):
+def run_server(log_config, debug=False):
+    # register services blueprint
+    server.blueprint(services_blueprint)
+    porcupine_log.info('Starting Porcupine {0}'.format(__version__))
+    # prepare services
+    porcupine_log.info('Preparing services')
+    for service in services:
+        service.prepare()
+    # install native apps
+    install_apps(apps.__path__, prefix='porcupine.apps.')
     server.run(host=settings['host'],
                port=settings['port'],
                workers=settings['workers'],
-               loop=loop,
                debug=debug,
-               backlog=150)
+               backlog=150,
+               log_config=log_config)
 
 
 class PorcupineDaemon(Daemon):
-    def __init__(self, debug=False):
+    def __init__(self, log_config, debug=False):
         super().__init__(PID_FILE)
         self.debug = debug
+        self.log_config = log_config
 
     def run(self):
-        loop = asyncio.get_event_loop()
-        run_server(self.debug, loop=loop)
+        run_server(self.log_config, debug=self.debug)
 
 
 def start(args):
     if args.debug:
         settings['log']['level'] = logging.DEBUG
 
-    is_multi_process = settings['workers'] > 1
-    log.setup(args.daemon, is_multi_process)
+    log_config = setup_logging(log_to_files=args.daemon)
 
-    before_start = server.listeners['before_server_start']
-    if is_multi_process:
-        before_start.append(log.setup_mp)
-
-    # register services blueprint
-    server.blueprint(services_blueprint)
-    log.porcupine_log.info('Starting Porcupine {0}'.format(__version__))
-
-    try:
-        # prepare services
-        log.porcupine_log.info('Preparing services')
-        for service in services:
-            service.prepare()
-
-        # install native apps
-        install_apps(apps.__path__, prefix='porcupine.apps.')
-
-        if args.daemon or args.stop or args.graceful:
-            # daemon commands
-            daemon = PorcupineDaemon(debug=args.debug)
-            if args.daemon:
-                daemon.start()
-            elif args.stop:
-                daemon.stop()
-            elif args.graceful:
-                daemon.restart()
-            sys.exit()
-        else:
-            run_server(debug=args.debug)
-    finally:
-        log.shutdown()
+    if args.daemon or args.stop or args.graceful:
+        # daemon commands
+        daemon = PorcupineDaemon(log_config, debug=args.debug)
+        if args.daemon:
+            daemon.start()
+        elif args.stop:
+            daemon.stop()
+        elif args.graceful:
+            daemon.restart()
+        sys.exit()
+    else:
+        run_server(log_config, debug=args.debug)
 
 
 def run():
@@ -99,7 +87,7 @@ def run():
     args = parser.parse_args()
 
     # override settings values
-    for arg in ('host', 'port', 'workers', 'daemon'):
+    for arg in ('host', 'port', 'workers'):
         override = getattr(args, arg, None)
         if override:
             settings[arg] = override

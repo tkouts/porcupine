@@ -2,24 +2,24 @@ default_settings = {
     'host': '0.0.0.0',
     'port': 8000,
     'workers': 1,
-    'daemon': False,
     'temp_folder': '/tmp',
     'db': {
-        # how many times a transaction is retried
-        # before an error is raised
         'type': 'porcupine.connectors.Couchbase',
         'hosts': ['localhost'],
         # 'protocol': 'couchbase',
         'bucket': 'porcupine',
         'password': '',
 
+        # how many times a transaction is retried
+        # before an error is raised
         'txn_max_retries': 16,
         'multi_fetch_chunk_size': 500,
+        # dirtiness threshold
         'collection_compact_threshold': 0.3,
         # split threshold set to 64K
         'collection_split_threshold': 64 * 1024,
-        # optional for running unit tests suite
-        # 'tests_bucket': 'porcupine_tests'
+
+        # indexes map - maintained by the system
         '__indices__': {},
     },
     'session_manager': {
@@ -39,9 +39,16 @@ default_settings = {
         # 40 - ERROR
         # 50 - CRITICAL
         'level': 20,
-        'max_bytes': 0,
-        'backups': 3,
-        'format': '%(asctime)s %(processName)s [%(levelname)s] %(message)s',
-        # 'mp_format': '%(asctime)s [%(levelname)s/%(processName)s] %(message)s'
+        # keep log for up to 1 week
+        'when': 'D',
+        'interval': 1,
+        'backups': 7,
+        'date_format': '%Y-%m-%d %H:%M:%S',
+        'format': '%(asctime)s [%(levelname)s][%(processName)s]: %(message)s',
+
+        # access log
+        'access_log': False,
+        'access_format': '%(asctime)s [%(levelname)s][%(host)s]: ' +
+                         '%(request)s %(message)s %(status)d %(byte)d',
     }
 }

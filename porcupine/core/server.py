@@ -5,4 +5,4 @@ from .router import ContextRouter
 # add session to request
 Request.session = property(lambda req: req.get('session'))
 
-server = Sanic(router=ContextRouter())
+server = Sanic(router=ContextRouter(), log_config=None)
