@@ -6,7 +6,7 @@ from .app import App
 from .log import porcupine_log
 
 
-def install_apps(path, prefix=''):
+def install_apps(path: list, prefix: str='') -> None:
     for loader, name, is_pkg in pkgutil.walk_packages(path, prefix=prefix):
         if name not in sys.modules:
             mod = loader.find_module(name).load_module(name)

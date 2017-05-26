@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+import os
 
 from porcupine import __version__
 from porcupine import apps
@@ -24,6 +25,13 @@ def run_server(log_config, debug=False):
         service.prepare()
     # install native apps
     install_apps(apps.__path__, prefix='porcupine.apps.')
+    current_dir = os.getcwd()
+    porcupine_path = os.path.dirname(
+        os.path.dirname(sys.modules['porcupine'].__file__))
+    if not current_dir.startswith(porcupine_path):
+        # install user apps
+        install_apps([current_dir])
+
     server.run(host=settings['host'],
                port=settings['port'],
                workers=settings['workers'],
