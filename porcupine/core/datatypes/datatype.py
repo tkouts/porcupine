@@ -9,6 +9,7 @@ class DataType:
     required = False
     allow_none = False
     readonly = False
+    immutable = False
     protected = False
     store_as = None
     indexed = False
@@ -21,7 +22,7 @@ class DataType:
         self.name = None
         for arg in ('required', 'allow_none', 'readonly',
                     'protected', 'store_as', 'indexed',
-                    'unique'):
+                    'unique', 'immutable'):
             if arg in kwargs:
                 setattr(self, arg, kwargs[arg])
         self.validate_value(None, default)
@@ -36,11 +37,15 @@ class DataType:
 
     def validate_value(self, instance, value):
         if instance is not None:
-            if self.readonly and not context.system_override:
-                if value != self.get_value(instance):
+            if not context.system_override:
+                if self.readonly and value != self.get_value(instance):
                     raise AttributeError(
                         'Attribute {0} of {1} is readonly'.format(
-                            self.name, instance.__class__.__name__))
+                            self.name, type(instance).__name__))
+                elif self.immutable and not instance.__is_new__:
+                    raise AttributeError(
+                        'Attribute {0} of {1} is immutable'.format(
+                            self.name, type(instance).__name__))
         if self.allow_none and value is None:
             return
         if not isinstance(value, self.safe_type):

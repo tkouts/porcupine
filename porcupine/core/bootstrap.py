@@ -52,7 +52,7 @@ def start(args):
     if args.debug:
         settings['log']['level'] = logging.DEBUG
 
-    log_config = setup_logging(log_to_files=args.daemon)
+    log_config = setup_logging(log_to_files=args.daemon or args.graceful)
 
     if args.daemon or args.stop or args.graceful:
         # daemon commands
