@@ -253,5 +253,6 @@ class Transaction:
         """
         # release attribute locks
         locks = [k for k, v in self._deletions.items() if v]
-        await self.connector.delete_multi(locks)
+        if locks:
+            await self.connector.delete_multi(locks)
         self.connector.active_txns -= 1

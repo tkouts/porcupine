@@ -124,6 +124,7 @@ class User(Membership):
             })
             await user_storage.append_to(storage_container)
             self.personal_folder = user_storage.id
+        return user_storage
 
     async def on_change(self):
         if self.name != self.get_snapshot_of('name'):
