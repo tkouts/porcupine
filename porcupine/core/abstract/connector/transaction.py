@@ -94,13 +94,14 @@ class Transaction:
 
     async def lock_attribute(self, item, attr_name):
         lock_key = utils.get_attribute_lock_key(item.id, attr_name)
-        try:
-            await self.connector.insert_multi({lock_key: ''}, ttl=20)
-        except exceptions.DBAlreadyExists:
-            raise exceptions.DBDeadlockError(
-                'Failed to lock {0}'.format(attr_name))
-        # add lock key to deletions in order to be released
-        self._deletions[lock_key] = True
+        if lock_key not in self._deletions:
+            try:
+                await self.connector.insert_multi({lock_key: ''}, ttl=20)
+            except exceptions.DBAlreadyExists:
+                raise exceptions.DBDeadlockError(
+                    'Failed to lock {0}'.format(attr_name))
+            # add lock key to deletions in order to be released
+            self._deletions[lock_key] = True
 
     async def prepare(self):
         connector = self.connector
