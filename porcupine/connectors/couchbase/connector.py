@@ -6,7 +6,7 @@ import couchbase.subdocument as sub_doc
 from couchbase.bucket import Bucket
 from couchbase.n1ql import N1QLQuery
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
-    SubdocPathNotFoundError, KeyExistsError
+    SubdocPathNotFoundError, KeyExistsError, NotStoredError
 
 from porcupine import exceptions, log
 from porcupine.core.abstract.connector import AbstractConnector
@@ -91,9 +91,8 @@ class Couchbase(AbstractConnector):
                                            format=couchbase.FMT_AUTO)
         except KeyExistsError as e:
             existing_key = e.key
-            inserted = [key
-                        for key, result in e.all_results.items()
-                        if result.rc == 0]
+            inserted = [key for key, result in e.all_results.items()
+                        if result.success]
             # rollback
             if inserted:
                 await self.delete_multi(inserted)
@@ -116,20 +115,23 @@ class Couchbase(AbstractConnector):
         return self.bucket.mutate_in(item_id, *mutations)
 
     async def append_multi(self, appends):
-        # make sure keys are initialized
-        # tasks = [self.exists(key)
-        #          for key in appends]
-        # completed, _ = await asyncio.wait(tasks)
-        # keys_exist = [c.result() for c in completed]
-        # initializations = {key: '' for key, exists in keys_exist
-        #                    if not exists}
-        # if initializations:
-        try:
-            await self.bucket.insert_multi({key: '' for key in appends},
-                                           format=couchbase.FMT_AUTO)
-        except KeyExistsError:
-            pass
-        await self.bucket.append_multi(appends)
+        while appends:
+            try:
+                await self.bucket.append_multi(appends)
+            except NotStoredError as e:
+                inserts = {}
+                for key, result in e.all_results.items():
+                    if result.success:
+                        del appends[key]
+                    else:
+                        inserts[key] = ''
+                try:
+                    await self.bucket.insert_multi(inserts,
+                                                   format=couchbase.FMT_AUTO)
+                except KeyExistsError:
+                    pass
+            else:
+                break
 
     async def swap_if_not_modified(self, key, xform):
         try:

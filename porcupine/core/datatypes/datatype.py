@@ -115,8 +115,9 @@ class DataType:
     async def on_change(self, instance, value, old_value):
         DataType.on_create(self, instance, value)
         if self.unique and instance.__storage__.pid:
-            # try to lock attribute
-            await context.txn.lock_attribute(instance, self.name)
+            if not instance.__is_new__:
+                # try to lock attribute
+                await context.txn.lock_attribute(instance, self.name)
             old_unique_key = get_key_of_unique(
                 instance.get_snapshot_of('parent_id'), self.name, old_value)
             context.txn.delete_external(old_unique_key)

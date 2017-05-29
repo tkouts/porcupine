@@ -151,7 +151,6 @@ class Transaction:
         insertions = {key: dumps(item)
                       for key, item in self._items.items()
                       if item.__is_new__}
-
         # update insertions with externals
         insertions.update({key: v for key, v in self._ext_insertions.items()
                            if v})
@@ -189,10 +188,11 @@ class Transaction:
 
         # sub document mutations
         # print('SD', self._sd)
-        for item_id, mutations in self._sd.items():
-            task = connector.mutate_in(item_id, mutations)
-            if isawaitable(task):
-                tasks.append(task)
+        if self._sd:
+            for item_id, mutations in self._sd.items():
+                task = connector.mutate_in(item_id, mutations)
+                if isawaitable(task):
+                    tasks.append(task)
 
         # appends
         # print('Appends', self._appends)
