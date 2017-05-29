@@ -122,24 +122,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def swap_if_not_modified(self, key, xform):
         raise NotImplementedError
 
-    # @abc.abstractmethod
-    # async def delete_raw(self, key, value):
-    #     raise NotImplementedError
-
-    # containers
-    # @abc.abstractmethod
-    async def get_children(self, container_id, deep=False):
-        raise NotImplementedError
-
-    # @abc.abstractmethod
-    async def get_child_id_by_name(self, container_id, name):
-        raise NotImplementedError
-
-    async def get_child_by_name(self, container_id, name):
-        child_id = await self.get_child_id_by_name(container_id, name)
-        if child_id:
-            return await self.get(child_id)
-
     # atomic operations
     # @abc.abstractmethod
     async def get_atomic(self, object_id, name):
@@ -155,14 +137,6 @@ class AbstractConnector(metaclass=abc.ABCMeta):
 
     # @abc.abstractmethod
     async def increment_atomic(self, object_id, name, amount, default):
-        raise NotImplementedError
-
-    # @abc.abstractmethod
-    # async def put_external(self, ext_id, stream):
-    #     raise NotImplementedError
-
-    # @abc.abstractmethod
-    async def delete_external(self, ext_id):
         raise NotImplementedError
 
     # transaction

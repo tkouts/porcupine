@@ -1,6 +1,5 @@
 import asyncio
 from inspect import isawaitable
-
 from collections import defaultdict
 
 from porcupine import exceptions
@@ -145,9 +144,9 @@ class Transaction:
             self._attr_locks[lock_key] = True
 
     def prepare(self):
-        connector = self.connector
-        dumps = connector.persist.dumps
+        dumps = self.connector.persist.dumps
 
+        # insertions
         insertions = {key: dumps(item)
                       for key, item in self._items.items()
                       if item.__is_new__}
@@ -155,7 +154,7 @@ class Transaction:
         insertions.update({key: v for key, v in self._ext_insertions.items()
                            if v})
 
-        # external upsertions
+        # upsertions
         upsertions = self._ext_upsertions
 
         # update deletions with externals
