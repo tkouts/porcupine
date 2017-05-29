@@ -70,9 +70,13 @@ class Composite(Elastic):
                                    for oid in self.path.split('.')])
         return clone
 
+    async def touch(self):
+        item = await self.item
+        await item.touch()
+
     async def update(self):
         if self.__snapshot__:
-            context.txn.upsert(self)
+            await context.txn.upsert(self)
         item = await self.item
         await item.update()
 
@@ -87,7 +91,7 @@ class Composite(Elastic):
         else:
             # embedded
             setattr(parent, comp_name, None)
-            context.txn.upsert(parent)
+            await context.txn.upsert(parent)
 
     # HTTP views
     def get(self, _):

@@ -120,7 +120,7 @@ class DataType:
             old_unique_key = get_key_of_unique(
                 instance.get_snapshot_of('parent_id'), self.name, old_value)
             context.txn.delete_external(old_unique_key)
-        if self.storage == '__storage__':
+        if self.storage == '__storage__' and not instance.__is_new__:
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 

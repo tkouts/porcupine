@@ -46,13 +46,13 @@ class EmbeddedCollection(ItemCollection, CompositeFactory):
             for composite in composites:
                 if not composite.__is_new__:
                     raise TypeError('Can only add new items to composition')
-                context.txn.insert(composite)
+                await context.txn.insert(composite)
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
         with system_override():
             await super().remove(*composites)
             for composite in composites:
-                context.txn.delete(composite)
+                await context.txn.delete(composite)
 
 
 class Composition(ReferenceN):
@@ -80,7 +80,7 @@ class Composition(ReferenceN):
             if not composite.__is_new__:
                 # TODO: revisit
                 raise TypeError('Can only add new items to composition')
-            context.txn.insert(composite)
+            await context.txn.insert(composite)
         with system_override():
             await super().on_create(instance,
                                     [c.__storage__.id for c in value])
@@ -97,23 +97,23 @@ class Composition(ReferenceN):
         with system_override():
             for composite in value:
                 if composite.__is_new__:
-                    context.txn.insert(composite)
+                    await context.txn.insert(composite)
                     added.append(composite)
                 else:
-                    context.txn.upsert(composite)
+                    await context.txn.upsert(composite)
             await super(EmbeddedCollection, collection).add(*added)
             if removed_ids:
                 removed = []
                 get_multi = utils.multi_with_stale_resolution
                 async for composite in get_multi(removed_ids):
                     removed.append(composite)
-                    context.txn.delete(composite)
+                    await context.txn.delete(composite)
                 await super(EmbeddedCollection, collection).remove(*removed)
 
     async def on_delete(self, instance, value):
         collection = self.__get__(instance, None)
         async for composite in collection.items():
-            context.txn.delete(composite)
+            await context.txn.delete(composite)
         # remove collection documents
         await super().on_delete(instance, value)
 
@@ -233,7 +233,7 @@ class Embedded(Reference1):
 
     async def on_create(self, instance, composite):
         if composite is not None:
-            context.txn.insert(composite)
+            await context.txn.insert(composite)
             with system_override():
                 await super().on_create(instance, composite.__storage__.id)
         else:
@@ -250,7 +250,7 @@ class Embedded(Reference1):
         embedded = self.__get__(instance, None)
         composite = await embedded.item()
         if composite:
-            context.txn.delete(composite)
+            await context.txn.delete(composite)
 
     # HTTP views
     # These are called when there is no embedded item

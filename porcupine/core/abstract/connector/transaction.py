@@ -3,197 +3,167 @@ from inspect import isawaitable
 
 from collections import defaultdict
 
-from porcupine import exceptions, gather
+from porcupine import exceptions
 from porcupine.core import utils
 
 
 class Transaction:
     __slots__ = ('connector', 'options',
-                 '_inserted_items', '_items', '_deleted_items',
-                 '_insertions', '_upsertions', '_deletions',
-                 '_sd', '_appends')
+                 '_items',
+                 '_ext_insertions', '_ext_upsertions',
+                 '_deletions',
+                 '_sd', '_appends',
+                 '_attr_locks')
 
     def __init__(self, connector, **options):
         self.connector = connector
         self.connector.active_txns += 1
         self.options = options
-        self._inserted_items = {}
         self._items = {}
-        self._deleted_items = {}
-        self._insertions = {}
-        self._upsertions = {}
+        self._ext_insertions = {}
+        self._ext_upsertions = {}
+
         self._deletions = {}
+        self._attr_locks = {}
 
         # sub document mutations
         self._sd = defaultdict(dict)
         self._appends = defaultdict(list)
 
     def __contains__(self, key):
-        return key in self._items \
-               or key in self._inserted_items \
-               or key in self._deleted_items \
-               or key in self._insertions \
-               or key in self._deletions \
-               or key in self._upsertions
+        if key in self._deletions:
+            return True
+        elif key in self._items:
+            return True
+        elif key in self._ext_upsertions:
+            return True
+        elif key in self._ext_insertions:
+            return True
+        return False
 
     def __getitem__(self, key):
-        if key in self._deletions or key in self._deleted_items:
+        if key in self._deletions:
             return None
-        elif key in self._inserted_items:
-            return self._inserted_items[key]
         elif key in self._items:
-            return self._items[key]
-        elif key in self._insertions:
-            return self._insertions[key]
-        elif key in self._upsertions:
-            return self._upsertions[key]
-        raise KeyError
+            item = self._items[key]
+            if item.__snapshot__:
+                # changes not persisted - restore originals
+                for key, old_value in item.__snapshot__.items():
+                    data_type = utils.get_descriptor_by_storage_key(
+                        type(item), key)
+                    storage = getattr(item, data_type.storage)
+                    setattr(storage, key, old_value)
+            return item
+        elif key in self._ext_upsertions:
+            return self._ext_upsertions[key]
+        elif key in self._ext_insertions:
+            return self._ext_insertions[key]
+        raise KeyError(key)
 
-    def insert(self, item):
-        if item.id in self._inserted_items:
+    async def insert(self, item):
+        if item.id in self._items:
             self.connector.raise_exists(item.id)
-        self._inserted_items[item.id] = item
 
-    def upsert(self, item):
-        if item.id not in self._inserted_items:
-            self._items[item.id] = item
+        await item.on_create()
+        item.__reset__()
+        # execute data types on_create handlers
+        for data_type in item.__schema__.values():
+            try:
+                _ = data_type.on_create(item,
+                                        data_type.get_value(item))
+                if asyncio.iscoroutine(_):
+                    await _
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
 
-    def delete(self, item):
-        if item.id in self._inserted_items:
-            del self._inserted_items[item.id]
-        else:
-            if item.id in self._items:
-                del self._items[item.id]
-            self._deleted_items[item.id] = item
+        self._items[item.id] = item
+
+    async def upsert(self, item):
+        if item.__snapshot__:
+            # print(item.id, item.__snapshot__)
+            await item.on_change()
+            snapshot = item.__snapshot__
+            item.__reset__()
+            # execute data types on_change handlers
+            for key, old_value in snapshot.items():
+                data_type = utils.get_descriptor_by_storage_key(type(item), key)
+                try:
+                    _ = data_type.on_change(item,
+                                            data_type.get_value(item),
+                                            old_value)
+                    if asyncio.iscoroutine(_):
+                        await _
+                except exceptions.AttributeSetError as e:
+                    raise exceptions.InvalidUsage(str(e))
+        self._items[item.id] = item
+
+    async def delete(self, item):
+        await item.on_delete()
+        # execute data types on_delete handlers
+        for dt in list(item.__schema__.values()):
+            _ = dt.on_delete(item, dt.get_value(item))
+            if asyncio.iscoroutine(_):
+                await _
+        self._deletions[item.id] = None
 
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = (mutation_type, value)
 
     def append(self, key, value):
-        if value not in self._appends[key]:
+        if key in self._ext_insertions:
+            self._ext_insertions[key] += value
+        elif value not in self._appends[key]:
             self._appends[key].append(value)
 
     def insert_external(self, key, value):
-        if key in self._insertions:
+        if key in self._ext_insertions:
             self.connector.raise_exists(key)
-        self._insertions[key] = value
+        self._ext_insertions[key] = value
 
     def put_external(self, key, value):
-        if key in self._insertions:
-            self._insertions[key] = value
+        if key in self._ext_insertions:
+            self._ext_insertions[key] = value
             return
-        self._upsertions[key] = value
+        self._ext_upsertions[key] = value
 
     def delete_external(self, key):
-        if key in self._insertions:
-            del self._insertions[key]
-        else:
-            if key is self._upsertions:
-                del self._upsertions[key]
-            self._deletions[key] = None
+        if key in self._ext_insertions:
+            del self._ext_insertions[key]
+        elif key is self._ext_upsertions:
+            del self._ext_upsertions[key]
+        self._deletions[key] = None
 
     async def lock_attribute(self, item, attr_name):
         lock_key = utils.get_attribute_lock_key(item.id, attr_name)
-        if lock_key not in self._deletions:
+        if lock_key not in self._attr_locks:
             try:
                 await self.connector.insert_multi({lock_key: ''}, ttl=20)
             except exceptions.DBAlreadyExists:
                 raise exceptions.DBDeadlockError(
                     'Failed to lock {0}'.format(attr_name))
             # add lock key to deletions in order to be released
-            self._deletions[lock_key] = True
+            self._attr_locks[lock_key] = True
 
-    async def prepare(self):
+    def prepare(self):
         connector = self.connector
         dumps = connector.persist.dumps
-        deletions = []
-        insertions = {}
-        # call event handlers
-        # till insertions, snapshots and deletions are drained
-        while True:
-            inserted_items = list(self._inserted_items.values())
 
-            insertions.update({i.__storage__.id: dumps(i)
-                               for i in inserted_items})
+        insertions = {key: dumps(item)
+                      for key, item in self._items.items()
+                      if item.__is_new__}
 
-            snapshots = {i.__storage__.id: i.__snapshot__
-                         for i in self._items.values()
-                         if i.__snapshot__}
-
-            for item_id in snapshots:
-                item = self._items[item_id]
-                # execute item's on_change handler
-                await item.on_change()
-                item.__reset__()
-
-            for item in inserted_items:
-                item.__reset__()
-                # clear new flag
-                item.__is_new__ = False
-                # add to items so that later can be modified
-                self._items[item.id] = item
-
-            removed_items = list(self._deleted_items.values())
-            deletions.extend(self._deleted_items.keys())
-
-            # clear inserted items
-            self._inserted_items = {}
-
-            # clear deleted items
-            self._deleted_items = {}
-
-            # print(snapshots, removed_items)
-            if inserted_items or snapshots or removed_items:
-                async_handlers = []
-                for item in inserted_items:
-                    # execute item's on_create handler
-                    await item.on_create()
-                    # execute data types on_create handlers
-                    for data_type in item.__schema__.values():
-                        try:
-                            _ = data_type.on_create(item,
-                                                    data_type.get_value(item))
-                            if asyncio.iscoroutine(_):
-                                async_handlers.append(_)
-                        except exceptions.AttributeSetError as e:
-                            raise exceptions.InvalidUsage(str(e))
-
-                for item_id, snapshot in snapshots.items():
-                    item = self._items[item_id]
-                    # execute data types on_change handlers
-                    for attr, old_value in snapshot.items():
-                        data_type = utils.get_descriptor_by_storage_key(
-                            type(item), attr)
-                        try:
-                            _ = data_type.on_change(item,
-                                                    data_type.get_value(item),
-                                                    old_value)
-                            if asyncio.iscoroutine(_):
-                                async_handlers.append(_)
-                        except exceptions.AttributeSetError as e:
-                            raise exceptions.InvalidUsage(str(e))
-
-                for item in removed_items:
-                    # execute item's on_delete handler
-                    await item.on_delete()
-                    # execute data types on_delete handlers
-                    for dt in list(item.__schema__.values()):
-                        _ = dt.on_delete(item, dt.get_value(item))
-                        if asyncio.iscoroutine(_):
-                            async_handlers.append(_)
-
-                if async_handlers:
-                    # execute async handlers
-                    await gather(*async_handlers)
-            else:
-                break
         # update insertions with externals
-        insertions.update(self._insertions)
+        insertions.update({key: v for key, v in self._ext_insertions.items()
+                           if v})
+
         # external upsertions
-        upsertions = self._upsertions
+        upsertions = self._ext_upsertions
 
         # update deletions with externals
-        deletions.extend(self._deletions.keys())
+        deletions = list(self._deletions.keys())
+        # remove locks
+        deletions.extend(self._attr_locks.keys())
+
         return insertions, upsertions, deletions
 
     async def commit(self) -> None:
@@ -202,7 +172,7 @@ class Transaction:
 
         @return: None
         """
-        insertions, upsertions, deletions = await self.prepare()
+        insertions, upsertions, deletions = self.prepare()
         connector = self.connector
 
         tasks = []
@@ -218,12 +188,14 @@ class Transaction:
                 tasks.append(task)
 
         # sub document mutations
+        # print('SD', self._sd)
         for item_id, mutations in self._sd.items():
             task = connector.mutate_in(item_id, mutations)
             if isawaitable(task):
                 tasks.append(task)
 
         # appends
+        # print('Appends', self._appends)
         if self._appends:
             appends = {k: ''.join(v) for k, v in self._appends.items()}
             task = connector.append_multi(appends)
@@ -253,7 +225,6 @@ class Transaction:
         @return: None
         """
         # release attribute locks
-        locks = [k for k, v in self._deletions.items() if v]
-        if locks:
-            await self.connector.delete_multi(locks)
+        if self._attr_locks:
+            await self.connector.delete_multi(self._attr_locks.keys())
         self.connector.active_txns -= 1

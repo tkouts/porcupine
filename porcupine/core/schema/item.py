@@ -66,36 +66,6 @@ class GenericItem(Removable, Elastic):
             clone.parent_id = None
         return clone
 
-    async def append_to(self, parent) -> None:
-        """
-        Adds the item to the specified container.
-
-        @param parent: The destination container 
-        @type parent: L{Container}
-        @return: None
-        """
-        if not self.__is_new__:
-            raise exceptions.DBAlreadyExists(
-                'Object already exists. Use "copy_to" '
-                'or "move_to" methods instead.')
-
-        user = context.user
-        with system_override():
-            self.owner = user.id
-            self.created = self.modified = date.utcnow()
-            self.modified_by = user.name
-            if parent is not None:
-                self.parent_id = parent.__storage__.id
-            if self.__storage__.acl is None:
-                self.__storage__.acl = parent.__storage__.acl
-
-        context.txn.insert(self)
-        if parent is not None:
-            if self.is_collection:
-                await parent.containers.add(self)
-            else:
-                await parent.items.add(self)
-
     async def is_contained_in(self, item: 'GenericItem') -> bool:
         """
         Checks if the item is contained in the specified container.
@@ -162,13 +132,53 @@ class GenericItem(Removable, Elastic):
         path = '/'.join([p.name for p in parents])
         return '/%s' % path if not path.startswith('/') else path
 
+    async def append_to(self, parent) -> None:
+        """
+        Adds the item to the specified container.
+
+        @param parent: The destination container 
+        @type parent: L{Container}
+        @return: None
+        """
+        if not self.__is_new__:
+            raise exceptions.DBAlreadyExists(
+                'Object already exists. Use "copy_to" '
+                'or "move_to" methods instead.')
+
+        user = context.user
+        with system_override():
+            self.owner = user.id
+            self.created = self.modified = date.utcnow()
+            self.modified_by = user.name
+            if parent is not None:
+                self.parent_id = parent.__storage__.id
+            if self.__storage__.acl is None:
+                self.__storage__.acl = parent.__storage__.acl
+
+        await context.txn.insert(self)
+        if parent is not None:
+            if self.is_collection:
+                await parent.containers.add(self)
+            else:
+                await parent.items.add(self)
+
+    async def touch(self) -> None:
+        if not context.system_override:
+            user = context.user
+            user_role = await permissions.resolve(self, user)
+            if user_role < permissions.AUTHOR:
+                raise exceptions.Forbidden('Forbidden')
+        with system_override():
+            self.modified = date.utcnow()
+        await context.txn.upsert(self)
+
     async def update(self) -> None:
         """
         Updates the item.
 
         @return: None
         """
-        if self.__snapshot__ or context.system_override:
+        if self.__snapshot__:
             if self.parent_id is not None:
                 parent = await db.connector.get(self.parent_id)
             else:
@@ -183,10 +193,9 @@ class GenericItem(Removable, Elastic):
             with system_override():
                 self.modified_by = user.name
                 self.modified = date.utcnow()
-                context.txn.upsert(self)
                 if parent is not None:
-                    parent.modified = self.modified
-                    context.txn.upsert(parent)
+                    await parent.touch()
+            await context.txn.upsert(self)
 
     # HTTP views
     def get(self, _):

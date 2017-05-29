@@ -138,19 +138,13 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             descriptor, instance = self._desc, self._inst
             collection_key = descriptor.key_for(instance)
             for item in items:
+                if not await descriptor.accepts_item(item):
+                    raise exceptions.ContainmentError(instance,
+                                                      descriptor.name, item)
                 item_id = item.__storage__.id
-                if instance.__is_new__:
-                    storage = getattr(instance, descriptor.storage)
-                    collection = getattr(storage, descriptor.name)
-                    if item_id not in collection:
-                        collection.append(item_id)
-                else:
-                    if not await descriptor.accepts_item(item):
-                        raise exceptions.ContainmentError(instance,
-                                                          descriptor.name, item)
-                    context.txn.append(collection_key, ' {0}'.format(item_id))
+                context.txn.append(collection_key, ' {0}'.format(item_id))
             if not instance.__is_new__:
-                await instance.update()
+                await instance.touch()
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
@@ -158,15 +152,9 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             collection_key = descriptor.key_for(instance)
             for item in items:
                 item_id = item.__storage__.id
-                if instance.__is_new__:
-                    storage = getattr(instance, descriptor.storage)
-                    collection = getattr(storage, descriptor.name)
-                    if item_id in collection:
-                        collection.remove(item_id)
-                else:
-                    context.txn.append(collection_key, ' -{0}'.format(item_id))
+                context.txn.append(collection_key, ' -{0}'.format(item_id))
             if not instance.__is_new__:
-                await instance.update()
+                await instance.touch()
 
     async def reset(self, value: TYPING.ID_LIST) -> None:
         if not self.is_fetched:

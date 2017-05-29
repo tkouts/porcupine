@@ -153,12 +153,11 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
                 if not await self.accepts_item(item):
                     raise exceptions.ContainmentError(instance,
                                                       self.name, item)
-            if ref_items:
-                # write external
-                raw_value = ' '.join([i.__storage__.id for i in ref_items])
-                super().on_create(instance, raw_value)
         else:
             ref_items = []
+        # write external
+        raw_value = ' '.join([i.__storage__.id for i in ref_items])
+        super().on_create(instance, raw_value)
         return ref_items, []
 
     async def on_change(self, instance, value, old_value):

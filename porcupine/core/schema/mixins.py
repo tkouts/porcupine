@@ -68,7 +68,7 @@ class Cloneable(TYPING.ITEM_TYPE):
                 await target.items.add(clone)
 
         clone.parent_id = id_map[item.parent_id]
-        context.txn.insert(clone)
+        await context.txn.insert(clone)
         return clone
 
     async def _copy(self,
@@ -164,7 +164,7 @@ class Movable(TYPING.ITEM_TYPE):
                 await target.items.add(self)
                 await parent.items.remove(self)
 
-            context.txn.upsert(self)
+            await context.txn.upsert(self)
 
 
 class Removable(TYPING.ITEM_TYPE):
@@ -193,7 +193,7 @@ class Removable(TYPING.ITEM_TYPE):
             if item.is_collection:
                 children = await item.get_children()
                 await gather(*[_delete(child) for child in children])
-            context.txn.delete(item)
+            await context.txn.delete(item)
 
         if not context.system_override:
             user = context.user
@@ -239,7 +239,7 @@ class Recyclable(TYPING.ITEM_TYPE):
         async def restore(item: 'Recyclable') -> None:
             # mark as deleted
             self.is_deleted -= 1
-            context.txn.upsert(item)
+            await context.txn.upsert(item)
             if item.is_collection:
                 children = await item.get_children()
                 await gather(*[restore(child) for child in children])
@@ -282,7 +282,7 @@ class Recyclable(TYPING.ITEM_TYPE):
                     .format(item.name))
             # mark as deleted
             self.is_deleted += 1
-            context.txn.upsert(item)
+            await context.txn.upsert(item)
             if item.is_collection:
                 children = await item.get_children()
                 await gather(*[recycle(child) for child in children])

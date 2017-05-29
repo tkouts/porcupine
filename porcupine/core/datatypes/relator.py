@@ -27,7 +27,7 @@ class RelatorBase(Acceptable):
                     await super(RelatorCollection, rel_attr_value).add(instance)
                 elif isinstance(rel_attr_value, RelatorItem):
                     setattr(item, self.rel_attr, instance.id)
-                    context.txn.upsert(item)
+                    await context.txn.upsert(item)
 
     async def remove_reference(self, instance, *items):
         with system_override():
@@ -39,7 +39,7 @@ class RelatorBase(Acceptable):
                                 rel_attr_value).remove(instance)
                 elif isinstance(rel_attr_value, RelatorItem):
                     setattr(item, self.rel_attr, None)
-                    context.txn.upsert(item)
+                    await context.txn.upsert(item)
 
 
 class RelatorItem(ItemReference):
@@ -170,12 +170,12 @@ class RelatorN(ReferenceN, RelatorBase):
         if added:
             await self.add_reference(instance, *added)
 
-    async def on_change(self, instance, value, old_value):
-        added, removed = await super().on_change(instance, value, old_value)
-        if added:
-            await self.add_reference(instance, *added)
-        if removed:
-            await self.remove_reference(instance, *removed)
+    # async def on_change(self, instance, value, old_value):
+    #     added, removed = await super().on_change(instance, value, old_value)
+    #     if added:
+    #         await self.add_reference(instance, *added)
+    #     if removed:
+    #         await self.remove_reference(instance, *removed)
 
     async def on_delete(self, instance, value):
         collection = self.__get__(instance, None)
