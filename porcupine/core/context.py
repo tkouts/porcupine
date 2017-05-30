@@ -107,16 +107,19 @@ def context_cacheable(size=100):
 
 
 class context_user:
-    def __init__(self, user_id):
-        self.user_id = user_id
+    def __init__(self, user):
+        self.user = user
         self.original_user = None
         self.user_switched = False
 
     async def __aenter__(self):
-        if context.user.id != self.user_id:
+        if isinstance(self.user, str):
             from porcupine import db
+            self.user = await db.connector.get(self.user, quiet=False)
+
+        if context.user.id != self.user.id:
             self.original_user = context.user
-            context.user = await db.connector.get(self.user_id, quiet=False)
+            context.user = self.user
             self.user_switched = True
 
     async def __aexit__(self, exc_type, exc, tb):
