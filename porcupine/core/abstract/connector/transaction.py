@@ -59,6 +59,15 @@ class Transaction:
             return self._ext_insertions[key]
         raise KeyError(key)
 
+    def get_key_append(self, key):
+        if key in self._appends:
+            return ''.join(self._appends[key])
+        return ''
+
+    def reset_key_append(self, key):
+        if key in self._appends:
+            del self._appends[key]
+
     async def insert(self, item):
         if item.id in self._items:
             self.connector.raise_exists(item.id)
