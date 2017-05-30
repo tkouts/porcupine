@@ -54,9 +54,9 @@ async def resolve_acl(acl, user_or_group):
 
 
 @context_cacheable(1000)
-async def resolve_membership(group_ids):
+async def resolve_membership(group_ids: frozenset) -> set:
     extended_membership = set()
-    groups = await db.connector.get_multi(group_ids)
+    groups = [g async for g in db.connector.get_multi(group_ids) if g]
     for group in groups:
         extended_membership.update({
             group_id async for group_id in group.member_of})
