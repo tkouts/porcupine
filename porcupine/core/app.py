@@ -35,25 +35,34 @@ class App(Blueprint):
 
     async def __process_item(self, item_dict, parent):
         item_id = item_dict.pop('id', None)
-        item_type = item_dict.pop('type')
+        item_type = item_dict.pop('type', None)
         children = item_dict.pop('children', [])
+
+        # resolve item
         if item_id:
-            item = await db.connector.get(item_id)
+            if parent:
+                item = await parent.get_child_by_id(item_id)
+            else:
+                item = await db.connector.get(item_id)
+        elif parent:
+            item = await parent.get_child_by_name(item_dict['name'])
         else:
             item = None
+
         if item is None:
             item = utils.get_content_class(item_type)()
             if item_id:
                 # restore id in dict so it is set
                 item_dict['id'] = item_id
 
-        with system_override():
-            await item.apply_patch(item_dict)
+        if item_dict:
+            with system_override():
+                await item.apply_patch(item_dict)
 
-        if item.__is_new__:
-            await item.append_to(parent)
-        else:
-            await item.update()
+            if item.__is_new__:
+                await item.append_to(parent)
+            else:
+                await item.update()
 
         for child_dict in children:
             await self.__process_item(child_dict, item)
