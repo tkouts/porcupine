@@ -9,10 +9,14 @@ from .default import default_settings
 
 settings = default_settings
 log_settings = settings['log']
+DEBUG = False
 
 
 def setup_logging(log_to_files: bool) -> dict:
     log_level = log_settings['level']
+    if log_level <= logging.DEBUG:
+        global DEBUG
+        DEBUG = True
     log_config = {
         'version': 1,
         'filters': {

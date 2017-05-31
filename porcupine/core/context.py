@@ -1,6 +1,7 @@
-import asyncio
 from functools import wraps
 from lru import LRU
+from porcupine import config
+from .log import porcupine_log
 from .aiolocals.local import Local, Context
 
 connector = None
@@ -54,10 +55,15 @@ def with_context(identity=None):
                 elif isinstance(user, str):
                     user = await connector.get(user)
                 context.user = user
-                result = func(*args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    return await result
-                return result
+                try:
+                    return await func(*args, **kwargs)
+                finally:
+                    if config.DEBUG:
+                        size = len(context.db_cache)
+                        hits, misses = context.db_cache.get_stats()
+                        porcupine_log.debug(
+                            'Cache Size: {0} Hits: {1} Misses: {2}'
+                            .format(size, hits, misses))
 
         return context_wrapper
     return decorator
