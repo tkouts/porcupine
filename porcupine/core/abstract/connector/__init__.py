@@ -16,6 +16,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     coll_compact_threshold = settings['collection_compact_threshold']
     coll_split_threshold = settings['collection_split_threshold']
     txn_max_retries = settings['txn_max_retries']
+    cache_size = settings['cache_size']
 
     indexes = {}
     active_txns = 0
@@ -56,39 +57,57 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get(self, object_id, quiet=True):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
+        elif object_id in context.db_cache:
+            return context.db_cache[object_id]
         item = await self.get_raw(object_id, quiet=quiet)
         if item is not None:
             item = self.persist.loads(item)
-            return item
+        context.db_cache[object_id] = item
+        return item
 
     async def get_multi(self, object_ids):
         loads = self.persist.loads
-        if context.txn is not None:
-            txn = context.txn
-            in_txn = ([context.txn[object_id]
-                       for object_id in object_ids
-                       if object_id in txn])
-            for item in in_txn:
-                yield item
-            object_ids = [object_id for object_id in object_ids
-                          if object_id not in txn]
         if object_ids:
-            for chunk in utils.chunks(object_ids, self.multi_fetch_chunk_size):
-                batch = await self.get_multi_raw(chunk)
-                for raw_item in batch:
-                    if raw_item is None:
-                        yield None
+            for chunk in utils.chunks(list(object_ids),
+                                      self.multi_fetch_chunk_size):
+                fetched = {}
+                for item_id in chunk:
+                    if context.txn is not None and item_id in context.txn:
+                        fetched[item_id] = context.txn[item_id]
+                    elif item_id in context.db_cache:
+                        fetched[item_id] = context.db_cache[item_id]
+                db_fetch_keys = [item_id for item_id in chunk
+                                 if item_id not in fetched]
+                db_fetch = {}
+                if db_fetch_keys:
+                    db_fetch = await self.get_multi_raw(db_fetch_keys)
+                for item_id in chunk:
+                    if item_id in fetched:
+                        yield fetched[item_id]
                     else:
-                        yield loads(raw_item)
+                        raw_item = db_fetch[item_id]
+                        if raw_item is None:
+                            context.db_cache[item_id] = None
+                            yield None
+                        else:
+                            item = loads(raw_item)
+                            context.db_cache[item_id] = item
+                            yield item
 
     async def get_external(self, ext_id):
         if context.txn is not None and ext_id in context.txn:
             return context.txn[ext_id]
-        return await self.get_raw(ext_id)
+        elif ext_id in context.db_cache:
+            return context.db_cache[ext_id]
+        ext = await self.get_raw(ext_id)
+        context.db_cache[ext_id] = ext
+        return ext
 
     async def exists(self, key):
         if context.txn is not None and key in context.txn:
-            return key, True
+            return key, context.txn[key] is not None
+        elif key in context.db_cache:
+            return key, context.db_cache[key] is not None
         key_exists = await self.key_exists(key)
         return key, key_exists
 

@@ -3,36 +3,22 @@ from functools import wraps
 from lru import LRU
 from .aiolocals.local import Local, Context
 
+connector = None
+
 
 class PContext(Local):
     @property
-    def txn(self):
-        try:
-            return self.__getattr__('txn')
-        except AttributeError:
-            return None
-
-    @property
     def system_override(self):
-        try:
-            return self.__getattr__('__sys__')
-        except AttributeError:
-            return False
+        return self.__sys__
 
-    @property
-    def caches(self):
-        try:
-            return self.__caches__
-        except AttributeError:
-            caches = {}
-            self.__setattr__('__caches__', caches)
-            return caches
-
-    def reset(self):
-        # clear caches
-        setattr(self, '__caches__', {})
-        setattr(self, 'user', None)
-        setattr(self, 'txn', None)
+    def prepare(self):
+        global connector
+        if connector is None:
+            from porcupine.db import connector
+        self.__setattr__('__sys__', False)
+        self.__setattr__('caches', {})
+        self.__setattr__('db_cache', LRU(connector.cache_size))
+        self.__setattr__('txn', None)
 
 
 context = PContext()
@@ -40,7 +26,7 @@ context = PContext()
 
 class system_override:
     def __init__(self):
-        self.override = context.system_override
+        self.override = context.__sys__
 
     def __enter__(self):
         context.__sys__ = True
@@ -50,8 +36,6 @@ class system_override:
 
 
 def with_context(identity=None):
-    from porcupine import db
-
     def decorator(func):
         """
         Creates the security context
@@ -60,22 +44,21 @@ def with_context(identity=None):
         @wraps(func)
         async def context_wrapper(*args, **kwargs):
             with Context(locals=(context, )):
+                context.prepare()
                 user = identity
                 if user is None:
                     session = args[0].session
                     if session is not None and session['uid'] is not None:
                         # print('user is', session['uid'])
-                        user = await db.connector.get(session['uid'])
+                        user = await connector.get(session['uid'])
                 elif isinstance(user, str):
-                    user = await db.connector.get(user)
+                    user = await connector.get(user)
                 context.user = user
-                try:
-                    result = func(*args, **kwargs)
-                    if asyncio.iscoroutine(result):
-                        return await result
-                    return result
-                finally:
-                    context.reset()
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
+
         return context_wrapper
     return decorator
 
@@ -112,12 +95,20 @@ class context_user:
         self.original_user = None
         self.user_switched = False
 
+    def __enter__(self):
+        raise AttributeError('__enter__')
+
+    def __exit__(self):
+        pass
+
     async def __aenter__(self):
         if isinstance(self.user, str):
-            from porcupine import db
-            self.user = await db.connector.get(self.user, quiet=False)
-
-        if context.user.id != self.user.id:
+            should_switch = context.user.id != self.user
+            if should_switch:
+                self.user = await connector.get(self.user, quiet=False)
+        else:
+            should_switch = context.user.id != self.user.id
+        if should_switch:
             self.original_user = context.user
             context.user = self.user
             self.user_switched = True

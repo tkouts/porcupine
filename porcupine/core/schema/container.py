@@ -130,8 +130,8 @@ class Container(Item):
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
 
-        location = server.url_for('resources.resource_handler',
-                                  item_id=new_item.id)
+        location = '/resources/{0}'.format(new_item.id)
+
         return json(
             new_item,
             status=201,

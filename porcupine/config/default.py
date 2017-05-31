@@ -11,9 +11,11 @@ default_settings = {
     'db': {
         'type': 'porcupine.connectors.Couchbase',
         'hosts': ['localhost'],
-        # 'protocol': 'couchbase',
         'bucket': 'porcupine',
         'password': '',
+
+        # cache
+        'cache_size': 1000,
 
         # how many times a transaction is retried
         # before an error is raised

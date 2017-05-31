@@ -82,7 +82,7 @@ class Couchbase(AbstractConnector):
 
     async def get_multi_raw(self, keys):
         multi = await self.bucket.get_multi(keys, quiet=True)
-        return [multi[key].value for key in keys]
+        return {key: multi[key].value for key in multi}
 
     async def insert_multi(self, insertions, ttl=0):
         try:

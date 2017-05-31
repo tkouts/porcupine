@@ -137,7 +137,7 @@ class Transaction:
     def delete_external(self, key):
         if key in self._ext_insertions:
             del self._ext_insertions[key]
-        elif key is self._ext_upsertions:
+        elif key in self._ext_upsertions:
             del self._ext_upsertions[key]
         self._deletions[key] = None
 
