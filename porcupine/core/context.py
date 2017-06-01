@@ -37,12 +37,12 @@ class system_override:
 
 
 def with_context(identity=None):
-    def decorator(func):
+    def decorator(task):
         """
         Creates the security context
         :return: asyncio.Task
         """
-        @wraps(func)
+        @wraps(task)
         async def context_wrapper(*args, **kwargs):
             with Context(locals=(context, )):
                 context.prepare()
@@ -56,7 +56,7 @@ def with_context(identity=None):
                     user = await connector.get(user)
                 context.user = user
                 try:
-                    return await func(*args, **kwargs)
+                    return await task(*args, **kwargs)
                 finally:
                     if config.DEBUG:
                         size = len(context.db_cache)

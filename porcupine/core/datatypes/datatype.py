@@ -31,7 +31,10 @@ class DataType:
     def storage_key(self):
         return self.store_as or self.name
 
-    def get_value(self, instance):
+    def get_value(self, instance, snapshot=True):
+        if snapshot and self.storage_key in instance.__snapshot__:
+            # modified attr
+            return instance.__snapshot__[self.storage_key]
         storage = getattr(instance, self.storage)
         return getattr(storage, self.storage_key)
 
@@ -51,8 +54,8 @@ class DataType:
         if not isinstance(value, self.safe_type):
             raise TypeError(
                 'Unsupported type {0} for {1}'.format(
-                    value.__class__.__name__,
-                    self.name or self.__class__.__name__))
+                    type(value).__name__,
+                    self.name or type(self).__name__))
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -61,9 +64,7 @@ class DataType:
 
     def __set__(self, instance, value):
         self.validate_value(instance, value)
-        storage = getattr(instance, self.storage)
-        self.snapshot(instance, value, getattr(storage, self.storage_key))
-        setattr(storage, self.storage_key, value)
+        self.snapshot(instance, value, self.get_value(instance, snapshot=False))
 
     def set_default(self, instance, value=None):
         if value is None:
@@ -76,10 +77,9 @@ class DataType:
 
     def snapshot(self, instance, new_value, previous_value):
         storage_key = self.storage_key
-        if storage_key not in instance.__snapshot__:
-            if previous_value != new_value:
-                instance.__snapshot__[storage_key] = previous_value
-        elif instance.__snapshot__[storage_key] == new_value:
+        if new_value != previous_value:
+            instance.__snapshot__[storage_key] = new_value
+        elif storage_key in instance.__snapshot__:
             del instance.__snapshot__[storage_key]
 
     def validate(self, value) -> None:

@@ -221,12 +221,11 @@ class Embedded(Reference1):
         return utils.get_composite_path(instance.id, self.name)
 
     def snapshot(self, instance, composite, previous_value):
-        storage_key = self.storage_key
-        if storage_key not in instance.__snapshot__:
-            instance.__snapshot__[storage_key] = previous_value
+        # unconditional snapshot
+        instance.__snapshot__[self.storage_key] = composite
 
     async def clone(self, instance, memo):
-        embedded = self.__get__(instance, None)
+        embedded = self.__get__(instance, type(instance))
         composite = await embedded.item()
         if composite:
             self.__set__(instance, await composite.clone(memo))
@@ -247,7 +246,7 @@ class Embedded(Reference1):
             await self.on_create(instance, composite)
 
     async def on_delete(self, instance, value):
-        embedded = self.__get__(instance, None)
+        embedded = self.__get__(instance, type(instance))
         composite = await embedded.item()
         if composite:
             await context.txn.delete(composite)
@@ -268,7 +267,7 @@ class Embedded(Reference1):
         :param request: 
         :return: 
         """
-        value = self.__get__(instance, None)
+        value = self.__get__(instance, type(instance))
         item_dict = request.json
         try:
             embedded = value.factory()

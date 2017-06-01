@@ -137,11 +137,29 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             self._ext = self.__ext_record__()
         return self._ext
 
+    @property
+    def friendly_name(self):
+        return '{0}({1})'.format(self.id, self.content_class)
+
     def __reset__(self) -> None:
+        snapshot_items = self._snap.items()
+        self.__storage__.update({
+            k: v for k, v in snapshot_items
+            if hasattr(self.__storage__, k)
+        })
+        self.__externals__.update({
+            k: v for k, v in snapshot_items
+            if hasattr(self.__externals__, k)
+        })
         self._snap = {}
 
     def __repr__(self) -> str:
-        return repr(self.__storage__)
+        store = self.__storage__.as_dict()
+        store.update({
+            k: v for k, v in self._snap.items()
+            if hasattr(self.__storage__, k)
+        })
+        return repr(self.__record__(**store))
 
     def __add_defaults(self, data_types: List[DataType]) -> None:
         for dt in data_types:
@@ -149,9 +167,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     def get_snapshot_of(self, attr_name: str):
         storage_key = self.__schema__[attr_name].storage_key
-        return self.__snapshot__.get(
-            storage_key,
-            getattr(self.__storage__, storage_key))
+        return getattr(self.__storage__, storage_key)
 
     def to_dict(self) -> dict:
         return {

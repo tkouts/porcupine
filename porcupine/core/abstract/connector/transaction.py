@@ -2,7 +2,7 @@ import asyncio
 from inspect import isawaitable
 from collections import defaultdict
 
-from porcupine import exceptions
+from porcupine import exceptions, config, log
 from porcupine.core import utils
 
 
@@ -44,15 +44,7 @@ class Transaction:
         if key in self._deletions:
             return None
         elif key in self._items:
-            item = self._items[key]
-            if item.__snapshot__:
-                # changes not persisted - restore originals
-                for key, old_value in item.__snapshot__.items():
-                    data_type = utils.get_descriptor_by_storage_key(
-                        type(item), key)
-                    storage = getattr(item, data_type.storage)
-                    setattr(storage, key, old_value)
-            return item
+            return self._items[key]
         elif key in self._ext_upsertions:
             return self._ext_upsertions[key]
         elif key in self._ext_insertions:
@@ -90,19 +82,19 @@ class Transaction:
         if item.__snapshot__:
             # print(item.id, item.__snapshot__)
             await item.on_change()
-            snapshot = item.__snapshot__
-            item.__reset__()
             # execute data types on_change handlers
-            for key, old_value in snapshot.items():
+            for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
                 try:
-                    _ = data_type.on_change(item,
-                                            data_type.get_value(item),
-                                            old_value)
+                    _ = data_type.on_change(
+                        item,
+                        new_value,
+                        data_type.get_value(item, snapshot=False))
                     if asyncio.iscoroutine(_):
                         await _
                 except exceptions.AttributeSetError as e:
                     raise exceptions.InvalidUsage(str(e))
+        item.__reset__()
         self._items[item.id] = item
 
     async def delete(self, item):
@@ -154,6 +146,14 @@ class Transaction:
 
     def prepare(self):
         dumps = self.connector.persist.dumps
+
+        if config.DEBUG:
+            # check for any non persisted modifications
+            modified = [i.friendly_name for i in self._items.values()
+                        if i.__snapshot__]
+            if modified:
+                log.debug('Detected uncommitted changes to {0}'
+                          .format(' '.join(modified)))
 
         # insertions
         insertions = {key: dumps(item)

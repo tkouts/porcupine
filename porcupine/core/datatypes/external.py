@@ -31,37 +31,38 @@ class Blob(DataType):
         super().__init__(default, **kwargs)
 
     async def fetch(self, instance, set_storage=True):
-        name = self.name
         value = await db.connector.get_external(self.key_for(instance))
         if set_storage:
             storage = getattr(instance, self.storage)
-            storage[name] = value
+            setattr(storage, self.name, value)
         return value
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        storage = getattr(instance, self.storage)
-        if self.storage_key in storage:
+        value = super().__get__(instance, owner)
+        if value is not None:
             future = asyncio.Future()
-            future.set_result(storage[self.storage_key])
+            future.set_result(value)
             return future
         return self.fetch(instance)
 
     def set_default(self, instance, value=None):
-        # if value is None:
-        #     value = self._default
         super().set_default(instance, value)
         # add external info
         setattr(instance.__storage__, self.name, self.storage_info)
+        if not instance.__is_new__ and context.txn:
+            # add schema info
+            context.txn.mutate(instance, self.name,
+                               db.connector.SUB_DOC_INSERT,
+                               self.storage_info)
 
     def key_for(self, instance):
         return utils.get_blob_key(instance.id, self.name)
 
     def snapshot(self, instance, new_value, old_value):
-        if self.name not in instance.__snapshot__:
-            if new_value is not None:
-                instance.__snapshot__[self.name] = None
+        # unconditional snapshot
+        instance.__snapshot__[self.name] = new_value
 
     def clone(self, instance, memo):
         pass

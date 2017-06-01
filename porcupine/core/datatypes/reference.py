@@ -129,6 +129,11 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
         # add active key index
         active_chunk_key = utils.get_active_chunk_key(self.name)
         setattr(instance.__storage__, active_chunk_key, 0)
+        if not instance.__is_new__ and context.txn:
+            # add schema info
+            context.txn.mutate(instance, active_chunk_key,
+                               db.connector.SUB_DOC_INSERT,
+                               0)
 
     def key_for(self, instance, chunk=None):
         if chunk is None:

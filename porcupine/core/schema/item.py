@@ -55,6 +55,10 @@ class GenericItem(Removable, Elastic):
             return not parent_exists
         return False
 
+    @property
+    def friendly_name(self):
+        return '{0}({1})'.format(self.name, self.content_class)
+
     async def clone(self, memo: dict=None) -> 'GenericItem':
         clone: 'GenericItem' = await super().clone(memo)
         now = date.utcnow()
@@ -152,8 +156,8 @@ class GenericItem(Removable, Elastic):
             self.modified_by = user.name
             if parent is not None:
                 self.parent_id = parent.__storage__.id
-            if self.__storage__.acl is None:
-                self.__storage__.acl = parent.__storage__.acl
+                if self.__storage__.acl is None:
+                    self.__storage__.acl = parent.__storage__.acl
 
         await context.txn.insert(self)
         if parent is not None:

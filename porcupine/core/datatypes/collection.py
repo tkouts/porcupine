@@ -12,14 +12,15 @@ from .external import Text
 class ItemCollection(AsyncSetterValue, AsyncIterable):
     __slots__ = ('_desc', '_inst')
 
-    def __init__(self, descriptor: TYPING.DT_MULTI_REFERENCE_CO,
+    def __init__(self,
+                 descriptor: TYPING.DT_MULTI_REFERENCE_CO,
                  instance: TYPING.ANY_ITEM_CO):
         self._desc = descriptor
         self._inst = instance
 
     @property
     def is_fetched(self) -> bool:
-        return self._desc.get_value(self._inst) is not None
+        return self._desc.get_value(self._inst, snapshot=False) is not None
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
         instance = self._inst
@@ -31,9 +32,9 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
         removed = {}
         resolved = OrderedDict()
         dirtiness = 0.0
-        storage = getattr(instance, descriptor.storage)
+        current_value = descriptor.get_value(instance)
 
-        def resolve_chunk(c: str):
+        def resolve_chunk(c: str, add_to_resolved=True):
             nonlocal total_count, dirty_count, removed, resolved
             ids = reversed([e for e in c.split(' ') if e])
             for oid in ids:
@@ -50,20 +51,30 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                         # duplicate
                         dirty_count += 1
                     else:
-                        resolved[oid] = None
+                        if add_to_resolved:
+                            resolved[oid] = None
                         yield oid
 
-        if self.is_fetched:
-            for item_id in getattr(storage, descriptor.storage_key):
-                yield item_id
-            return
-
+        # compute deltas first without adding to resolved map
+        append = ''
         if context.txn is not None:
             collection_key = descriptor.key_for(instance)
             append = context.txn.get_key_append(collection_key)
             if append:
-                for item_id in resolve_chunk(append):
+                for item_id in resolve_chunk(append, add_to_resolved=False):
                     yield item_id
+
+        if current_value:
+            if append:
+                # w/appends: need to recompute
+                for item_id in resolve_chunk(' '.join(current_value),
+                                             add_to_resolved=False):
+                    yield item_id
+            else:
+                # no appends: as is
+                for item_id in current_value:
+                    yield item_id
+            return
 
         chunk = await self._desc.fetch(instance, set_storage=False)
         if chunk:
@@ -90,6 +101,8 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                     break
 
         # set storage / no snapshot
+        # mark as fetched
+        storage = getattr(instance, descriptor.storage)
         setattr(storage, descriptor.storage_key, list(resolved.keys()))
 
         # compute dirtiness factor
@@ -143,38 +156,33 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
             descriptor, instance = self._desc, self._inst
+            is_set = descriptor.storage_key in instance.__snapshot__
             collection_key = descriptor.key_for(instance)
-            collection = descriptor.get_value(instance)
             for item in items:
                 if not await descriptor.accepts_item(item):
                     raise exceptions.ContainmentError(instance,
                                                       descriptor.name, item)
                 item_id = item.__storage__.id
                 context.txn.append(collection_key, ' {0}'.format(item_id))
-                if self.is_fetched:
-                    if item_id not in collection:
-                        collection.append(item_id)
-            if not instance.__is_new__:
+            if not instance.__is_new__ and not is_set:
                 await instance.touch()
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
             descriptor, instance = self._desc, self._inst
+            is_set = descriptor.storage_key in instance.__snapshot__
             collection_key = descriptor.key_for(instance)
-            collection = descriptor.get_value(instance)
             for item in items:
                 item_id = item.__storage__.id
                 context.txn.append(collection_key, ' -{0}'.format(item_id))
-                if self.is_fetched:
-                    if item_id in collection:
-                        collection.remove(item_id)
-            if not instance.__is_new__:
+            if not instance.__is_new__ and not is_set:
                 await instance.touch()
 
     async def reset(self, value: TYPING.ID_LIST) -> None:
         descriptor, instance = self._desc, self._inst
         # remove collection appends
         context.txn.reset_key_append(descriptor.key_for(instance))
+        # fetch value from db
         if not self.is_fetched:
             # fetch collection for snapshot to work
             async for _ in self:

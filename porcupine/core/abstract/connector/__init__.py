@@ -28,6 +28,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     # Sub Document Mutation Codes
     SUB_DOC_UPSERT_MUT = 0
     SUB_DOC_COUNTER = 1
+    SUB_DOC_INSERT = 2
 
     @staticmethod
     def raise_exists(key):

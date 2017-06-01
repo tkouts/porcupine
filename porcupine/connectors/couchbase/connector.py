@@ -112,6 +112,8 @@ class Couchbase(AbstractConnector):
                 mutations.append(sub_doc.upsert(path, value))
             elif mutation_type == self.SUB_DOC_COUNTER:
                 mutations.append(sub_doc.counter(path, value))
+            elif mutation_type == self.SUB_DOC_INSERT:
+                mutations.append(sub_doc.insert(path, value))
         return self.bucket.mutate_in(item_id, *mutations)
 
     async def append_multi(self, appends):

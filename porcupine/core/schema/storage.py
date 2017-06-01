@@ -8,6 +8,9 @@ class Storage(namedlist('Storage', '')):
     def fields(cls):
         return getattr(cls, '_fields')
 
+    def update(self, *args, **kwargs):
+        return self._update(*args, **kwargs)
+
     def as_dict(self):
         return self._asdict()
 
