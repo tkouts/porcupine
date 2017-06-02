@@ -7,9 +7,7 @@ import cbor
 import functools
 import hashlib
 import random
-import binascii
-import struct
-from typing import Optional, AsyncIterator
+from typing import Optional, AsyncIterator, Union
 import mmh3
 
 from porcupine.hinting import TYPING
@@ -83,14 +81,13 @@ def get_rto_by_name(name: str):
         return mod
 
 
-def hash_series(*args, using='md5') -> str:
+def hash_series(*args, using='md5') -> Union[str, int]:
     if len(args) == 1 and isinstance(args[0], str):
         b = args[0].encode()
     else:
         b = cbor.dumps(args)
     if using == 'mmh3':
-        h = mmh3.hash(b)
-        return binascii.hexlify(struct.pack('>i', h)).decode()
+        return mmh3.hash(b) & 0xffffffff
     else:
         hash_provider = getattr(hashlib, using)
         h = hash_provider(b)
