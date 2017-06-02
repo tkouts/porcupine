@@ -151,10 +151,9 @@ class Movable(TYPING.ITEM_TYPE):
                 'The user has insufficient permissions.')
 
         with system_override():
-            now = date.utcnow()
             parent_id = self.parent_id
             self.parent_id = target.id
-            self.modified = now
+            self.modified = date.utcnow()
             parent = await db.connector.get(parent_id)
 
             if self.is_collection:

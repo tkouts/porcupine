@@ -1,6 +1,6 @@
 import asyncio
 from inspect import isawaitable
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from porcupine import exceptions, config, log
 from porcupine.core import utils
@@ -18,7 +18,7 @@ class Transaction:
         self.connector = connector
         self.connector.active_txns += 1
         self.options = options
-        self._items = {}
+        self._items = OrderedDict()
         self._ext_insertions = {}
         self._ext_upsertions = {}
 
@@ -66,8 +66,10 @@ class Transaction:
 
         await item.on_create()
         item.__reset__()
+        data_types = list(item.__schema__.values())
+
         # execute data types on_create handlers
-        for data_type in item.__schema__.values():
+        for data_type in data_types:
             try:
                 _ = data_type.on_create(item,
                                         data_type.get_value(item))
@@ -76,15 +78,32 @@ class Transaction:
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
 
+        # unique handling
+        parent_id = item.parent_id
+        if parent_id:
+            get_unique_key = utils.get_key_of_unique
+            # insert unique keys
+            for unique in [dt for dt in data_types if dt.unique]:
+                unique_key = get_unique_key(parent_id, unique.name,
+                                            unique.get_value(item))
+                self.insert_external(unique_key, item.__storage__.id)
+
         self._items[item.id] = item
 
     async def upsert(self, item):
         if item.__snapshot__:
             # print(item.id, item.__snapshot__)
+            unique = [dt for dt in item.__schema__.values() if dt.unique]
+            unique_changed = []
             await item.on_change()
             # execute data types on_change handlers
             for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
+                if data_type.name == 'parent_id':
+                    # we need to handle all uniques
+                    unique_changed = unique
+                elif data_type.unique and data_type not in unique_changed:
+                    unique_changed.append(data_type)
                 try:
                     _ = data_type.on_change(
                         item,
@@ -94,16 +113,53 @@ class Transaction:
                         await _
                 except exceptions.AttributeSetError as e:
                     raise exceptions.InvalidUsage(str(e))
+
+            # unique handling
+            if unique_changed:
+                if not item.__is_new__:
+                    # try to lock attributes
+                    await self.lock_attributes(
+                        item,
+                        *[u.name for u in unique_changed])
+                get_unique_key = utils.get_key_of_unique
+                for unique in unique_changed:
+                    old_unique = get_unique_key(
+                        item.get_snapshot_of('parent_id'),
+                        unique.name,
+                        item.get_snapshot_of(unique.name))
+                    self.delete_external(old_unique)
+                    new_unique = get_unique_key(
+                        item.parent_id,
+                        unique.name,
+                        unique.get_value(item)
+                    )
+                    self.insert_external(new_unique, item.__storage__.id)
         item.__reset__()
         self._items[item.id] = item
 
     async def delete(self, item):
         await item.on_delete()
+
+        data_types = list(item.__schema__.values())
+
         # execute data types on_delete handlers
-        for dt in list(item.__schema__.values()):
+        for dt in data_types:
             _ = dt.on_delete(item, dt.get_value(item))
             if asyncio.iscoroutine(_):
                 await _
+
+        # unique handling
+        parent_id = item.get_snapshot_of('parent_id')
+        if parent_id:
+            get_unique_key = utils.get_key_of_unique
+            # insert unique keys
+            for unique in [dt for dt in data_types if dt.unique]:
+                unique_key = get_unique_key(
+                        parent_id,
+                        unique.name,
+                        item.get_snapshot_of(unique.name))
+                self.delete_external(unique_key)
+
         self._deletions[item.id] = None
 
     def mutate(self, item, path, mutation_type, value):
@@ -133,16 +189,19 @@ class Transaction:
             del self._ext_upsertions[key]
         self._deletions[key] = None
 
-    async def lock_attribute(self, item, attr_name):
-        lock_key = utils.get_attribute_lock_key(item.id, attr_name)
-        if lock_key not in self._attr_locks:
+    async def lock_attributes(self, item, *attrs):
+        lock_keys = [utils.get_attribute_lock_key(item.id, attr_name)
+                     for attr_name in attrs]
+        # filter out the ones already locked
+        multi_insert = {key: '' for key in lock_keys
+                        if key not in self._attr_locks}
+        if multi_insert:
             try:
-                await self.connector.insert_multi({lock_key: ''}, ttl=20)
+                await self.connector.insert_multi(multi_insert, ttl=20)
             except exceptions.DBAlreadyExists:
-                raise exceptions.DBDeadlockError(
-                    'Failed to lock {0}'.format(attr_name))
+                raise exceptions.DBDeadlockError('Failed to lock unique')
             # add lock key to deletions in order to be released
-            self._attr_locks[lock_key] = True
+            self._attr_locks.update(multi_insert)
 
     def prepare(self):
         dumps = self.connector.persist.dumps

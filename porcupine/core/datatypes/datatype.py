@@ -106,32 +106,15 @@ class DataType:
 
     def on_create(self, instance, value):
         self.validate(value)
-        if self.unique and instance.__storage__.pid:
-            unique_key = get_key_of_unique(instance.__storage__.pid,
-                                           self.name,
-                                           value)
-            context.txn.insert_external(unique_key, instance.__storage__.id)
 
     async def on_change(self, instance, value, old_value):
-        DataType.on_create(self, instance, value)
-        if self.unique and instance.__storage__.pid:
-            if not instance.__is_new__:
-                # try to lock attribute
-                await context.txn.lock_attribute(instance, self.name)
-            old_unique_key = get_key_of_unique(
-                instance.get_snapshot_of('parent_id'), self.name, old_value)
-            context.txn.delete_external(old_unique_key)
+        self.validate(value)
         if self.storage == '__storage__' and not instance.__is_new__:
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 
     def on_delete(self, instance, value):
-        if self.unique and instance.__storage__.pid:
-            unique_key = get_key_of_unique(
-                instance.get_snapshot_of('parent_id'),
-                self.name,
-                value)
-            context.txn.delete_external(unique_key)
+        pass
 
     # HTTP views
 
