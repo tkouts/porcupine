@@ -93,7 +93,7 @@ class Transaction:
     async def upsert(self, item):
         if item.__snapshot__:
             # print(item.id, item.__snapshot__)
-            unique = [dt for dt in item.__schema__.values() if dt.unique]
+            uniques = [dt for dt in item.__schema__.values() if dt.unique]
             unique_changed = []
             await item.on_change()
             # execute data types on_change handlers
@@ -101,7 +101,7 @@ class Transaction:
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
                 if data_type.name == 'parent_id':
                     # we need to handle all uniques
-                    unique_changed = unique
+                    unique_changed = uniques
                 elif data_type.unique and data_type not in unique_changed:
                     unique_changed.append(data_type)
                 try:
@@ -122,16 +122,16 @@ class Transaction:
                         item,
                         *[u.name for u in unique_changed])
                 get_unique_key = utils.get_key_of_unique
-                for unique in unique_changed:
+                for uniques in unique_changed:
                     old_unique = get_unique_key(
                         item.get_snapshot_of('parent_id'),
-                        unique.name,
-                        item.get_snapshot_of(unique.name))
+                        uniques.name,
+                        item.get_snapshot_of(uniques.name))
                     self.delete_external(old_unique)
                     new_unique = get_unique_key(
                         item.parent_id,
-                        unique.name,
-                        unique.get_value(item)
+                        uniques.name,
+                        uniques.get_value(item)
                     )
                     self.insert_external(new_unique, item.__storage__.id)
         item.__reset__()

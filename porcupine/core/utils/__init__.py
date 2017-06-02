@@ -7,7 +7,10 @@ import cbor
 import functools
 import hashlib
 import random
+import binascii
+import struct
 from typing import Optional, AsyncIterator
+import mmh3
 
 from porcupine.hinting import TYPING
 from porcupine import db
@@ -81,10 +84,17 @@ def get_rto_by_name(name: str):
 
 
 def hash_series(*args, using='md5') -> str:
-    b = cbor.dumps(args)
-    hash_provider = getattr(hashlib, using)
-    h = hash_provider(b)
-    return h.hexdigest()
+    if len(args) == 1 and isinstance(args[0], str):
+        b = args[0].encode()
+    else:
+        b = cbor.dumps(args)
+    if using == 'mmh3':
+        h = mmh3.hash(b)
+        return binascii.hexlify(struct.pack('>i', h)).decode()
+    else:
+        hash_provider = getattr(hashlib, using)
+        h = hash_provider(b)
+        return h.hexdigest()
 
 
 def get_attribute_lock_key(item_id: str, attr_name: str) -> str:
@@ -105,7 +115,8 @@ def get_collection_key(item_id: str, collection_name: str,
 
 
 def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
-    return '{0}>{1}>{2}'.format(parent_id, attr_name, hash_series(attr_value))
+    return '{0}>{1}>{2}'.format(parent_id, attr_name,
+                                hash_series(attr_value, using='mmh3'))
 
 
 def get_composite_path(parent_path: str, comp_name: str) -> str:
