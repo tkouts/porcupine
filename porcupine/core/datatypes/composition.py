@@ -95,13 +95,6 @@ class Composition(ReferenceN):
         removed_ids = old_ids.difference(new_ids)
         added = []
         with system_override():
-            for composite in value:
-                if composite.__is_new__:
-                    await context.txn.insert(composite)
-                    added.append(composite)
-                else:
-                    await context.txn.upsert(composite)
-            await super(EmbeddedCollection, collection).add(*added)
             if removed_ids:
                 removed = []
                 get_multi = utils.multi_with_stale_resolution
@@ -109,6 +102,13 @@ class Composition(ReferenceN):
                     removed.append(composite)
                     await context.txn.delete(composite)
                 await super(EmbeddedCollection, collection).remove(*removed)
+            for composite in value:
+                if composite.__is_new__:
+                    await context.txn.insert(composite)
+                    added.append(composite)
+                else:
+                    await context.txn.upsert(composite)
+            await super(EmbeddedCollection, collection).add(*added)
 
     async def on_delete(self, instance, value):
         collection = self.__get__(instance, None)

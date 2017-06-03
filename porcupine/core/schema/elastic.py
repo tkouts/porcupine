@@ -19,7 +19,7 @@ class ElasticMeta(type):
             dct['__slots__'] = ()
         return super().__new__(mcs, name, bases, dct)
 
-    def __init__(cls, name, bases, dct):
+    def __init__(cls: 'Elastic', name, bases, dct):
         schema = {}
         field_spec = []
         ext_spec = []
@@ -38,6 +38,10 @@ class ElasticMeta(type):
                         if isinstance(attr, ReferenceN):
                             field_spec.append(
                                 utils.get_active_chunk_key(attr.storage_key))
+                    if cls.is_composite and (attr.unique or attr.indexed):
+                        raise TypeError("Data type '{0}' of composite '{1}' "
+                                        "cannot be unique or indexed"
+                                        .format(attr.name, cls.__name__))
                     if attr.indexed:
                         config.add_index(attr)
             except AttributeError:
@@ -71,6 +75,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     __ext_record__: TYPING.STORAGE = None
 
     is_collection: ClassVar[bool] = False
+    is_composite: ClassVar[bool] = False
     is_deleted: ClassVar[bool] = False
 
     id = String(required=True, readonly=True)

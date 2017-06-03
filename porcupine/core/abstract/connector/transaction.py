@@ -1,6 +1,6 @@
 import asyncio
 from inspect import isawaitable
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 
 from porcupine import exceptions, config, log
 from porcupine.core import utils
@@ -18,7 +18,7 @@ class Transaction:
         self.connector = connector
         self.connector.active_txns += 1
         self.options = options
-        self._items = OrderedDict()
+        self._items = {}
         self._ext_insertions = {}
         self._ext_upsertions = {}
 
@@ -66,27 +66,28 @@ class Transaction:
 
         await item.on_create()
         item.__reset__()
-        data_types = list(item.__schema__.values())
+        data_types = item.__schema__.values()
 
         # execute data types on_create handlers
         for data_type in data_types:
             try:
                 _ = data_type.on_create(item,
                                         data_type.get_value(item))
-                if asyncio.iscoroutine(_):
+                if isawaitable(_):
                     await _
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
 
         # unique handling
-        parent_id = item.parent_id
-        if parent_id:
-            get_unique_key = utils.get_key_of_unique
-            # insert unique keys
-            for unique in [dt for dt in data_types if dt.unique]:
-                unique_key = get_unique_key(parent_id, unique.name,
-                                            unique.get_value(item))
-                self.insert_external(unique_key, item.__storage__.id)
+        if not item.is_composite:
+            parent_id = item.__storage__.pid
+            if parent_id is not None:
+                get_unique_key = utils.get_key_of_unique
+                # insert unique keys
+                for unique in [dt for dt in data_types if dt.unique]:
+                    unique_key = get_unique_key(parent_id, unique.name,
+                                                unique.get_value(item))
+                    self.insert_external(unique_key, item.__storage__.id)
 
         self._items[item.id] = item
 
@@ -94,35 +95,34 @@ class Transaction:
         if item.__snapshot__:
             # print(item.id, item.__snapshot__)
             uniques = [dt for dt in item.__schema__.values() if dt.unique]
-            unique_changed = []
+            uniques_changed = []
             await item.on_change()
             # execute data types on_change handlers
             for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
                 if data_type.name == 'parent_id':
                     # we need to handle all uniques
-                    unique_changed = uniques
-                elif data_type.unique and data_type not in unique_changed:
-                    unique_changed.append(data_type)
+                    uniques_changed = uniques
+                elif data_type.unique and data_type not in uniques_changed:
+                    uniques_changed.append(data_type)
                 try:
                     _ = data_type.on_change(
                         item,
                         new_value,
                         data_type.get_value(item, snapshot=False))
-                    if asyncio.iscoroutine(_):
+                    if isawaitable(_):
                         await _
                 except exceptions.AttributeSetError as e:
                     raise exceptions.InvalidUsage(str(e))
 
             # unique handling
-            if unique_changed:
+            if uniques_changed and item.__storage__.pid is not None:
                 if not item.__is_new__:
                     # try to lock attributes
                     await self.lock_attributes(
-                        item,
-                        *[u.name for u in unique_changed])
+                        item, *[u.name for u in uniques_changed])
                 get_unique_key = utils.get_key_of_unique
-                for uniques in unique_changed:
+                for uniques in uniques_changed:
                     old_unique = get_unique_key(
                         item.get_snapshot_of('parent_id'),
                         uniques.name,
@@ -145,20 +145,21 @@ class Transaction:
         # execute data types on_delete handlers
         for dt in data_types:
             _ = dt.on_delete(item, dt.get_value(item))
-            if asyncio.iscoroutine(_):
+            if isawaitable(_):
                 await _
 
         # unique handling
-        parent_id = item.get_snapshot_of('parent_id')
-        if parent_id:
-            get_unique_key = utils.get_key_of_unique
-            # insert unique keys
-            for unique in [dt for dt in data_types if dt.unique]:
-                unique_key = get_unique_key(
-                        parent_id,
-                        unique.name,
-                        item.get_snapshot_of(unique.name))
-                self.delete_external(unique_key)
+        if not item.is_composite:
+            parent_id = item.get_snapshot_of('parent_id')
+            if parent_id is not None:
+                get_unique_key = utils.get_key_of_unique
+                # insert unique keys
+                for unique in [dt for dt in data_types if dt.unique]:
+                    unique_key = get_unique_key(
+                            parent_id,
+                            unique.name,
+                            item.get_snapshot_of(unique.name))
+                    self.delete_external(unique_key)
 
         self._deletions[item.id] = None
 

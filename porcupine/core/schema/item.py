@@ -145,9 +145,7 @@ class GenericItem(Removable, Elastic):
         @return: None
         """
         if not self.__is_new__:
-            raise exceptions.DBAlreadyExists(
-                'Object already exists. Use "copy_to" '
-                'or "move_to" methods instead.')
+            raise exceptions.DBAlreadyExists('Object already exists')
 
         user = context.user
         with system_override():
