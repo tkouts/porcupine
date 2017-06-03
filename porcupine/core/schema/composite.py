@@ -21,7 +21,8 @@ class Composite(Elastic):
 
     @see: L{porcupine.datatypes.Composition}
     """
-    path = String(required=True, readonly=True, protected=True)  # type: str
+    path = String(required=True, readonly=True, protected=True,
+                  immutable=True)  # type: str
 
     def __init__(self, dict_storage=None):
         super().__init__(dict_storage)

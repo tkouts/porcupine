@@ -5,20 +5,16 @@ from porcupine.core import utils
 from .collection import ItemCollection
 from .datatype import DataType
 from .common import String
-from .external import Text
+from .external import Text, Blob
 from .asyncsetter import AsyncSetter
 
 
 class Acceptable:
-    cascade_delete = False
-    accepts = ()
 
-    def __init__(self, **kwargs):
+    def __init__(self, accepts, cascade_delete):
         self.accepts_resolved = False
-        if 'accepts' in kwargs:
-            self.accepts = kwargs['accepts']
-        if 'cascade_delete' in kwargs:
-            self.cascade_delete = kwargs['cascade_delete']
+        self.accepts = accepts
+        self.cascade_delete = cascade_delete
 
     @property
     def allowed_types(self):
@@ -57,11 +53,10 @@ class Reference1(String, Acceptable):
     @cvar relates_to: a list of strings containing all the permitted content
                     classes that the instances of this type can reference.
     """
-    allow_none = True
-
-    def __init__(self, default=None, **kwargs):
-        super().__init__(default, **kwargs)
-        Acceptable.__init__(self, **kwargs)
+    def __init__(self, default=None, accepts=(), cascade_delete=False,
+                 **kwargs):
+        super().__init__(default, allow_none=True, **kwargs)
+        Acceptable.__init__(self, accepts, cascade_delete)
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -110,12 +105,10 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
     safe_type = (list, tuple)
     allow_none = False
 
-    def __init__(self, default=(), **kwargs):
-        if 'required' in kwargs:
-            raise TypeError(
-                self.type_error_message.format(type(self).__name__, 'required'))
-        super().__init__(default, **kwargs)
-        Acceptable.__init__(self, **kwargs)
+    def __init__(self, default=(), accepts=(), cascade_delete=False, **kwargs):
+        super(Blob, self).__init__(default, allow_none=False,
+                                   store_as=None, indexed=False, **kwargs)
+        Acceptable.__init__(self, accepts, cascade_delete)
 
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)

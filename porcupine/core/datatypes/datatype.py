@@ -6,25 +6,22 @@ class DataType:
     """
     Base data type class.
     """
-    required = False
-    allow_none = False
-    readonly = False
-    immutable = False
-    protected = False
-    store_as = None
-    indexed = False
-    unique = False
     safe_type = object
     storage = '__storage__'
 
-    def __init__(self, default=None, **kwargs):
+    def __init__(self, default=None, required=False, allow_none=False,
+                 readonly=False, immutable=False, protected=False,
+                 store_as=None, indexed=False, unique=False):
         self.default = default
+        self.required = required
+        self.allow_none = allow_none
+        self.readonly = readonly
+        self.immutable = immutable
+        self.protected = protected
+        self.store_as = store_as
+        self.indexed = indexed
+        self.unique = unique
         self.name = None
-        for arg in ('required', 'allow_none', 'readonly',
-                    'protected', 'store_as', 'indexed',
-                    'unique', 'immutable'):
-            if arg in kwargs:
-                setattr(self, arg, kwargs[arg])
         self.validate_value(None, default)
 
     @property

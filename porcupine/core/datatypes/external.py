@@ -18,17 +18,12 @@ class Blob(DataType):
     Base class for binary large objects.
     """
     safe_type = bytes
-    allow_none = True
     storage_info = '_blob_'
     storage = '__externals__'
-    type_error_message = "{0}() got an unexpected keyword argument '{1}'"
 
     def __init__(self, default=None, **kwargs):
-        for kwarg in ('store_as', 'indexed'):
-            if kwarg in kwargs:
-                raise TypeError(
-                    self.type_error_message.format(type(self).__name__, kwarg))
-        super().__init__(default, **kwargs)
+        super().__init__(default, allow_none=True, store_as=None,
+                         indexed=False, **kwargs)
 
     async def fetch(self, instance, set_storage=True):
         value = await db.connector.get_external(self.key_for(instance))
@@ -103,13 +98,10 @@ class ExternalFile(String):
     Data type for linking external files. Its value
     is a string which contains the path to the file.
     """
-    allow_none = True
-    remove_file_on_deletion = True
 
-    def __init__(self, default=None, **kwargs):
-        super(ExternalFile, self).__init__(default, **kwargs)
-        if 'remove_file_on_deletion' in kwargs:
-            self.remove_file_on_deletion = kwargs['remove_file_on_deletion']
+    def __init__(self, default=None, remove_file_on_deletion=True, **kwargs):
+        super().__init__(default, allow_none=True, **kwargs)
+        self.remove_file_on_deletion = remove_file_on_deletion
 
     def __get__(self, instance, owner):
         if instance is None:

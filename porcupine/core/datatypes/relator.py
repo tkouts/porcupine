@@ -8,15 +8,13 @@ from .reference import Reference1, ReferenceN, ItemReference, Acceptable
 from .collection import ItemCollection
 
 
-class RelatorBase(Acceptable):
-    respects_references = False
+class RelatorBase:
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.rel_attr = kwargs['rel_attr']
-        if 'respects_references' in kwargs:
-            self.respects_references = kwargs['respects_references']
-        self.name = None
+    def __init__(self, rel_attr, respects_references):
+        # super().__init__(**kwargs)
+        self.rel_attr = rel_attr
+        self.respects_references = respects_references
+        # self.name = None
 
     async def add_reference(self, instance, *items):
         with system_override():
@@ -75,9 +73,10 @@ class Relator1(Reference1, RelatorBase):
                          will be deleted upon the object's deletion.
     @type cascade_delete: bool
     """
-    def __init__(self, default=None, **kwargs):
+    def __init__(self, default=None, rel_attr=None, respects_references=False,
+                 **kwargs):
         super().__init__(default, **kwargs)
-        RelatorBase.__init__(self, **kwargs)
+        RelatorBase.__init__(self, rel_attr, respects_references)
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -152,9 +151,10 @@ class RelatorN(ReferenceN, RelatorBase):
     """
     storage_info_prefix = '_relN_'
 
-    def __init__(self, default=(), **kwargs):
+    def __init__(self, default=(), rel_attr=None, respects_references=False,
+                 **kwargs):
         super().__init__(default, **kwargs)
-        RelatorBase.__init__(self, **kwargs)
+        RelatorBase.__init__(self, rel_attr, respects_references)
 
     def __get__(self, instance, owner):
         if instance is None:

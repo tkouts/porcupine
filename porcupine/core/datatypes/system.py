@@ -33,10 +33,9 @@ class AclValue(AsyncSetterValue, collections.FrozenDict):
 
 
 class Acl(AsyncSetter, Dictionary):
-    protected = True
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self):
+        super().__init__(protected=True)
         self.default = None
 
     def getter(self, instance, value=None):
@@ -61,9 +60,8 @@ class Acl(AsyncSetter, Dictionary):
 
 
 class SchemaSignature(String):
-    required = True
-    readonly = True
-    protected = True
+    def __init__(self):
+        super().__init__(required=True, readonly=True, protected=True)
 
     async def on_change(self, instance, value, old_value):
         await super().on_change(instance, value, old_value)
@@ -71,8 +69,10 @@ class SchemaSignature(String):
 
 
 class Children(ReferenceN):
-    readonly = True
     name = None
+
+    def __init__(self, **kwargs):
+        super().__init__(readonly=True, **kwargs)
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -133,8 +133,9 @@ class Containers(Children):
 
 
 class Deleted(Counter):
-    readonly = True
-    protected = True
+
+    def __init__(self):
+        super().__init__(readonly=True, protected=True, store_as='dl')
 
     @contract(accepts=bool)
     @db.transactional()
@@ -148,8 +149,10 @@ class Deleted(Counter):
 
 
 class ParentId(String):
-    readonly = True
-    allow_none = True
+
+    def __init__(self):
+        super().__init__(default=None, readonly=True, allow_none=True,
+                         store_as='pid')
 
     @contract(accepts=str)
     @db.transactional()

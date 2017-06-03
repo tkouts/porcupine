@@ -4,10 +4,9 @@ from porcupine.core.datatypes.common import String
 
 class DateTime(String):
     """Date data type"""
-    allow_none = True
 
     def __init__(self, default=None, **kwargs):
-        super().__init__(default, **kwargs)
+        super().__init__(default, allow_none=True, **kwargs)
 
     def __get__(self, instance, owner):
         if instance is None:

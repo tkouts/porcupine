@@ -117,7 +117,7 @@ class Movable(TYPING.ITEM_TYPE):
     """
     __slots__ = ()
 
-    parent_id = ParentId(default=None, store_as='pid')
+    parent_id = ParentId()
 
     async def move_to(self, target: TYPING.CONTAINER_CO) -> None:
         """
@@ -226,7 +226,7 @@ class Removable(TYPING.ITEM_TYPE):
 class Recyclable(TYPING.ITEM_TYPE):
     __slots__ = ()
 
-    is_deleted = Deleted(store_as='dl')
+    is_deleted = Deleted()
 
     async def restore(self) -> None:
         def restore_unique_keys(item: 'Recyclable') -> None:
