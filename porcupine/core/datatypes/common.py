@@ -42,7 +42,9 @@ class Boolean(DataType):
 class Password(String):
     """Password data type"""
     empty = hashlib.sha3_256(b'').hexdigest()
-    protected = True
+
+    def __init__(self):
+        super().__init__(protected=True, required=True)
 
     def __set__(self, instance, value):
         digest = hashlib.sha3_256(value.encode('utf-8')).hexdigest()

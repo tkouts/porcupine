@@ -94,7 +94,7 @@ class User(Membership):
     first_name = String()
     last_name = String()
     email = String()
-    password = Password(required=True)
+    password = Password()
     settings = Dictionary()
     personal_folder = Reference1(accepts=(UserStorage, ),
                                  cascade_delete=True,
