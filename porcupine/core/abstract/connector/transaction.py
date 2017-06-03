@@ -80,14 +80,7 @@ class Transaction:
 
         # unique handling
         if not item.is_composite:
-            parent_id = item.__storage__.pid
-            if parent_id is not None:
-                get_unique_key = utils.get_key_of_unique
-                # insert unique keys
-                for unique in [dt for dt in data_types if dt.unique]:
-                    unique_key = get_unique_key(parent_id, unique.name,
-                                                unique.get_value(item))
-                    self.insert_external(unique_key, item.__storage__.id)
+            utils.add_uniques(item)
 
         self._items[item.id] = item
 
@@ -140,7 +133,7 @@ class Transaction:
     async def delete(self, item):
         await item.on_delete()
 
-        data_types = list(item.__schema__.values())
+        data_types = item.__schema__.values()
 
         # execute data types on_delete handlers
         for dt in data_types:
@@ -150,16 +143,7 @@ class Transaction:
 
         # unique handling
         if not item.is_composite:
-            parent_id = item.get_snapshot_of('parent_id')
-            if parent_id is not None:
-                get_unique_key = utils.get_key_of_unique
-                # insert unique keys
-                for unique in [dt for dt in data_types if dt.unique]:
-                    unique_key = get_unique_key(
-                            parent_id,
-                            unique.name,
-                            item.get_snapshot_of(unique.name))
-                    self.delete_external(unique_key)
+            utils.remove_uniques(item)
 
         self._deletions[item.id] = None
 

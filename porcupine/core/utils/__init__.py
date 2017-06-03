@@ -11,7 +11,7 @@ from typing import Optional, AsyncIterator, Union
 import mmh3
 
 from porcupine.hinting import TYPING
-from porcupine import db
+from porcupine import db, context
 from porcupine.core.utils.collections import WriteOnceDict
 from .permissions import resolve
 
@@ -155,3 +155,27 @@ def locate_descriptor_by_storage_key(cls, key):
     for desc in cls.__schema__.values():
         if desc.storage_key == key:
             return desc
+
+
+def add_uniques(item):
+    parent_id = item.__storage__.pid
+    if parent_id is not None:
+        txn = context.txn
+        # insert unique keys
+        for unique in item.unique_data_types():
+            unique_key = get_key_of_unique(parent_id, unique.name,
+                                           unique.get_value(item))
+            txn.insert_external(unique_key, item.__storage__.id)
+
+
+def remove_uniques(item):
+    parent_id = item.get_snapshot_of('parent_id')
+    if parent_id is not None:
+        txn = context.txn
+        # insert unique keys
+        for unique in item.unique_data_types():
+            unique_key = get_key_of_unique(
+                parent_id,
+                unique.name,
+                item.get_snapshot_of(unique.name))
+            txn.delete_external(unique_key)

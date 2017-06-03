@@ -99,6 +99,13 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 if not data_type.protected
                 and data_type.storage == '__storage__']
 
+    @classmethod
+    @functools.lru_cache(maxsize=None)
+    def unique_data_types(cls):
+        schema = cls.__schema__.values()
+        return [data_type for data_type in schema
+                if data_type.unique]
+
     def __init__(self, dict_storage=None):
         if dict_storage is None:
             dict_storage = {}

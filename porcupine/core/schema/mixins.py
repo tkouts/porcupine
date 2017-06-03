@@ -6,7 +6,7 @@ from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.core import utils
 from porcupine.core.utils import permissions, date
-from porcupine.datatypes import Embedded, Composition, DataType
+from porcupine.datatypes import Embedded, Composition
 
 
 class Cloneable(TYPING.ITEM_TYPE):
@@ -229,12 +229,6 @@ class Recyclable(TYPING.ITEM_TYPE):
     is_deleted = Deleted()
 
     async def restore(self) -> None:
-        def restore_unique_keys(item: 'Recyclable') -> None:
-            uniques = [dt for dt in item.__schema__.values()
-                       if dt.unique]
-            for data_type in uniques:
-                DataType.on_create(data_type, item, data_type.get_value(item))
-
         async def restore(item: 'Recyclable') -> None:
             # mark as deleted
             self.is_deleted -= 1
@@ -255,7 +249,7 @@ class Recyclable(TYPING.ITEM_TYPE):
                 'The user has insufficient permissions.')
 
         with system_override():
-            restore_unique_keys(self)
+            utils.add_uniques(self)
             await restore(self)
 
     async def recycle_to(self, recycle_bin: TYPING.RECYCLE_BIN_CO) -> None:
@@ -268,12 +262,6 @@ class Recyclable(TYPING.ITEM_TYPE):
         @type recycle_bin: RecycleBin
         @return: None
         """
-        def remove_unique_keys(item: 'Recyclable') -> None:
-            uniques = [dt for dt in item.__schema__.values()
-                       if dt.unique]
-            for data_type in uniques:
-                DataType.on_delete(data_type, item, data_type.get_value(item))
-
         async def recycle(item: 'Recyclable') -> None:
             if item.is_system:
                 raise exceptions.Forbidden(
@@ -299,7 +287,7 @@ class Recyclable(TYPING.ITEM_TYPE):
 
         from .recycle import DeletedItem
         with system_override():
-            remove_unique_keys(self)
+            utils.remove_uniques(self)
             await recycle(self)
             deleted = DeletedItem(deleted_item=self)
             deleted.location = await self.full_path(include_self=False)
