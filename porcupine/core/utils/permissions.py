@@ -1,8 +1,6 @@
 """
 Helper module for resolving object permissions
 """
-import inspect
-
 from porcupine import db
 from porcupine.core.context import context_cacheable
 
