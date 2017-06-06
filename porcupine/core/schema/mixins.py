@@ -185,10 +185,6 @@ class Removable(TYPING.ITEM_TYPE):
         @return: None
         """
         async def _delete(item: 'Removable'):
-            if item.is_system:
-                raise exceptions.Forbidden(
-                    'The object {0} is systemic and can not be removed'
-                    .format(item.name))
             if item.is_collection:
                 children = await item.get_children()
                 await gather(*[_delete(child) for child in children])
@@ -201,10 +197,11 @@ class Removable(TYPING.ITEM_TYPE):
                 (user_role > permissions.AUTHOR) or
                 (user_role == permissions.AUTHOR and self.owner == user.id)
             )
-            if not can_delete:
-                raise exceptions.Forbidden(
-                    'The object was not deleted.\n'
-                    'The user has insufficient permissions.')
+        else:
+            can_delete = True
+
+        if not can_delete or self.is_system:
+            raise exceptions.Forbidden('Forbidden')
 
         with system_override():
             if self.parent_id is not None:
@@ -244,9 +241,7 @@ class Recyclable(TYPING.ITEM_TYPE):
             (user_role == permissions.AUTHOR and self.owner == user.id)
         )
         if not can_restore:
-            raise exceptions.Forbidden(
-                'The object was not restored. '
-                'The user has insufficient permissions.')
+            raise exceptions.Forbidden('Forbidden')
 
         with system_override():
             utils.add_uniques(self)
@@ -263,10 +258,6 @@ class Recyclable(TYPING.ITEM_TYPE):
         @return: None
         """
         async def recycle(item: 'Recyclable') -> None:
-            # if item.is_system:
-            #     raise exceptions.Forbidden(
-            #         'The object {0} is systemic and can not be recycled'
-            #         .format(item.name))
             # mark as deleted
             self.is_deleted += 1
             await context.txn.upsert(item)
