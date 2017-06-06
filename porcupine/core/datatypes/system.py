@@ -1,4 +1,4 @@
-from porcupine import context, exceptions, db, gather
+from porcupine import context, exceptions, db
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.services.schema import SchemaMaintenance
@@ -20,43 +20,32 @@ class AclValue(AsyncSetterValue, collections.FrozenDict):
         self._desc = descriptor
         self._inst = instance
 
+    def is_set(self):
+        return self._dct is not None
+
+    def to_dict(self):
+        if self._dct is None:
+            return None
+        return super().to_dict()
+
+    toDict = to_dict
+
     async def reset(self, acl):
         # check user permissions
         instance = self._inst
         user_role = await permissions.resolve(instance, context.user)
         if user_role < permissions.COORDINATOR:
-            raise exceptions.Forbidden(
-                'The user does not have permissions '
-                'to modify the access control list.')
+            raise exceptions.Forbidden('Forbidden')
         # set acl
         super(Dictionary, self._desc).__set__(instance, acl)
 
 
 class Acl(AsyncSetter, Dictionary):
-
     def __init__(self):
-        super().__init__(protected=True)
-        self.default = None
+        super().__init__(default=None, protected=True, allow_none=True)
 
     def getter(self, instance, value=None):
-        return AclValue(self, instance, value or {})
-
-    async def apply_acl(self, container, acl, old_acl):
-        tasks = []
-        children = await container.get_children()
-        for child in children:
-            if child.acl == old_acl:
-                await super().on_change(child, acl, old_acl)
-                if child.is_collection:
-                    tasks.append(self.apply_acl(child, acl, old_acl))
-        if tasks:
-            await gather(*tasks)
-
-    async def on_change(self, instance, value, old_value):
-        await super().on_change(instance, value, old_value)
-        if instance.is_collection:
-            with system_override():
-                await self.apply_acl(instance, value, old_value)
+        return AclValue(self, instance, value)
 
 
 class SchemaSignature(String):

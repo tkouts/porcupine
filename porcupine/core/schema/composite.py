@@ -31,6 +31,11 @@ class Composite(Elastic):
             raise TypeError('Composite objects cannot be instantiated')
 
     @property
+    async def effective_acl(self):
+        item = await self.item
+        return await item.effective_acl
+
+    @property
     def item_id(self):
         return self.path.split('.')[0]
 
@@ -39,30 +44,12 @@ class Composite(Elastic):
         return self.path.split('.')[-2]
 
     @property
-    async def is_stale(self):
-        _, exists = await db.connector.exists(self.parent_id)
-        return not exists
-
-    @property
     async def item(self):
         return await db.connector.get(self.item_id)
 
     @property
     async def parent(self):
         return await db.connector.get(self.parent_id)
-
-    @property
-    async def is_deleted(self):
-        parent = await self.item
-        if parent is None:
-            # stale composite
-            return 1
-        return parent.is_deleted
-
-    @property
-    async def acl(self):
-        parent = await self.item
-        return parent.acl
 
     async def clone(self, memo: dict=None) -> 'Composite':
         clone: 'Composite' = await super().clone(memo)

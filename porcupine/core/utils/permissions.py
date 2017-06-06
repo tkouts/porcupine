@@ -6,6 +6,7 @@ import inspect
 from porcupine import db
 from porcupine.core.context import context_cacheable
 
+# 0 - no access
 # 1 - read
 # 2 - update, delete if owner
 # 4 - update, delete anyway
@@ -18,9 +19,7 @@ COORDINATOR = 8
 
 
 async def resolve(item, user):
-    acl = item.acl
-    if inspect.isawaitable(acl):
-        acl = await acl
+    acl = await item.effective_acl
     return await resolve_acl(acl, user)
 
 

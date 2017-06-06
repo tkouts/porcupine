@@ -41,7 +41,6 @@ class GenericItem(Removable, Elastic):
 
     # security attributes
     is_system = Boolean(readonly=True, protected=True, store_as='sys')
-    # roles_inherited = Boolean(default=True, store_as='ri')
     acl = Acl()
 
     # common attributes
@@ -49,15 +48,19 @@ class GenericItem(Removable, Elastic):
     description = String(store_as='desc')
 
     @property
-    async def is_stale(self):
-        if self.parent_id is not None:
-            _, parent_exists = await db.connector.exists(self.__storage__.pid)
-            return not parent_exists
-        return False
-
-    @property
     def friendly_name(self):
         return '{0}({1})'.format(self.name, self.content_class)
+
+    @property
+    async def effective_acl(self):
+        connector = db.connector
+        item = self
+        while True:
+            acl = item.acl
+            if acl.is_set() or item.parent_id is None:
+                break
+            item = await connector.get(self.parent_id)
+        return acl
 
     async def clone(self, memo: dict=None) -> 'GenericItem':
         clone: 'GenericItem' = await super().clone(memo)
@@ -154,8 +157,6 @@ class GenericItem(Removable, Elastic):
             self.modified_by = user.name
             if parent is not None:
                 self.parent_id = parent.__storage__.id
-                if self.__storage__.acl is None:
-                    self.__storage__.acl = parent.__storage__.acl
 
         await context.txn.insert(self)
         if parent is not None:

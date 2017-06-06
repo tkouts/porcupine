@@ -66,10 +66,10 @@ class Transaction:
 
         await item.on_create()
         item.__reset__()
-        data_types = item.__schema__.values()
+        self._items[item.id] = item
 
         # execute data types on_create handlers
-        for data_type in data_types:
+        for data_type in item.__schema__.values():
             try:
                 _ = data_type.on_create(item,
                                         data_type.get_value(item))
@@ -81,8 +81,6 @@ class Transaction:
         # unique handling
         if not item.is_composite:
             utils.add_uniques(item)
-
-        self._items[item.id] = item
 
     async def upsert(self, item):
         if item.__snapshot__:

@@ -166,12 +166,15 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         self._snap = {}
 
     def __repr__(self) -> str:
-        store = self.__storage__.as_dict()
-        store.update({
-            k: v for k, v in self._snap.items()
-            if hasattr(self.__storage__, k)
-        })
-        return repr(self.__record__(**store))
+        if self._snap:
+            store = self.__storage__.as_dict()
+            store.update({
+                k: v for k, v in self._snap.items()
+                if hasattr(self.__storage__, k)
+            })
+            return repr(self.__record__(**store))
+        else:
+            return repr(self.__storage__)
 
     def __add_defaults(self, data_types: List[DataType]) -> None:
         for dt in data_types:
@@ -215,7 +218,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         return result
 
     @property
-    async def is_stale(self):
+    async def effective_acl(self):
         raise NotImplementedError
 
     def reset(self):

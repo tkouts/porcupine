@@ -1,8 +1,6 @@
 """
 Porcupine utilities package
 """
-
-import inspect
 import cbor
 import functools
 import hashlib
@@ -13,7 +11,7 @@ import mmh3
 from porcupine.hinting import TYPING
 from porcupine import db, context
 from porcupine.core.utils.collections import WriteOnceDict
-from .permissions import resolve
+from .permissions import resolve_acl
 
 VALID_ID_CHARS = [
     chr(x) for x in
@@ -121,17 +119,29 @@ def get_composite_path(parent_path: str, comp_name: str) -> str:
 
 
 async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
-    is_stale = await item.is_stale
-    if is_stale:
-        # TODO: remove from DB
-        return None
-    is_deleted = item.is_deleted
-    if inspect.isawaitable(is_deleted):
-        is_deleted = await is_deleted
-    if is_deleted:
-        return None
+    if item.__is_new__:
+        return 1
+    connector = db.connector
+    computed_acl = None
+    while True:
+        if not item.is_composite:
+            if item.is_deleted:
+                return None
+            acl = item.acl
+            if computed_acl is None and acl.is_set():
+                computed_acl = acl
+            if item.is_system and computed_acl is not None:
+                break
+        if item.parent_id is None:
+            break
+        else:
+            item = await connector.get(item.parent_id)
+            if item is None:
+                # TODO: stale remove from DB
+                return None
+
     # return user role
-    return await resolve(item, user)
+    return await resolve_acl(computed_acl, user)
 
 
 async def multi_with_stale_resolution(
