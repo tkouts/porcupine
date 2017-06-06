@@ -171,9 +171,15 @@ class GenericItem(Removable, Elastic):
             user_role = await permissions.resolve(self, user)
             if user_role < permissions.AUTHOR:
                 raise exceptions.Forbidden('Forbidden')
-        with system_override():
-            self.modified = date.utcnow()
-        await context.txn.upsert(self)
+        # touch has to be fast / no event handlers
+        now = date.utcnow().isoformat()
+        self.__storage__.md = now
+        if 'md' in self.__snapshot__:
+            # clear previous setting
+            del self.__snapshot__['md']
+        if not self.__is_new__:
+            context.txn.mutate(self, 'md',
+                               db.connector.SUB_DOC_UPSERT_MUT, now)
 
     async def update(self) -> None:
         """
