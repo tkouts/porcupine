@@ -29,6 +29,10 @@ def run_server(log_config, debug=False):
     if not current_dir.startswith(porcupine_path):
         # install user apps
         install_apps([current_dir])
+        # check if there is a static directory
+        static_dir_path = os.path.join(current_dir, 'static')
+        if os.path.isdir(static_dir_path):
+            server.static('/', static_dir_path)
 
     server.run(host=settings['host'],
                port=settings['port'],
