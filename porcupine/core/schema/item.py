@@ -166,7 +166,7 @@ class GenericItem(Removable, Elastic):
                 await parent.items.add(self)
 
     async def touch(self) -> None:
-        if not context.system_override:
+        if not (self.__is_new__ or context.system_override):
             user = context.user
             user_role = await permissions.resolve(self, user)
             if user_role < permissions.AUTHOR:
