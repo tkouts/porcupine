@@ -233,9 +233,9 @@ class Recyclable(TYPING.ITEM_TYPE):
             # mark as deleted
             self.is_deleted -= 1
             await context.txn.upsert(item)
-            if item.is_collection:
-                children = await item.get_children()
-                await gather(*[restore(child) for child in children])
+            # if item.is_collection:
+            #     children = await item.get_children()
+            #     await gather(*[restore(child) for child in children])
 
         user = context.user
         user_role = await permissions.resolve(self, user)
@@ -263,16 +263,17 @@ class Recyclable(TYPING.ITEM_TYPE):
         @return: None
         """
         async def recycle(item: 'Recyclable') -> None:
-            if item.is_system:
-                raise exceptions.Forbidden(
-                    'The object {0} is systemic and can not be recycled'
-                    .format(item.name))
+            # if item.is_system:
+            #     raise exceptions.Forbidden(
+            #         'The object {0} is systemic and can not be recycled'
+            #         .format(item.name))
             # mark as deleted
             self.is_deleted += 1
             await context.txn.upsert(item)
-            if item.is_collection:
-                children = await item.get_children()
-                await gather(*[recycle(child) for child in children])
+            # TODO: check consistency requirements
+            # if item.is_collection:
+            #     children = await item.get_children()
+            #     await gather(*[recycle(child) for child in children])
 
         user = context.user
         user_role = await permissions.resolve(self, user)
@@ -280,10 +281,8 @@ class Recyclable(TYPING.ITEM_TYPE):
             (user_role > permissions.AUTHOR) or
             (user_role == permissions.AUTHOR and self.owner == user.id)
         )
-        if not can_delete:
-            raise exceptions.Forbidden(
-                'The object was not deleted. '
-                'The user has insufficient permissions.')
+        if not can_delete or self.is_s:
+            raise exceptions.Forbidden('Forbidden')
 
         from .recycle import DeletedItem
         with system_override():

@@ -47,6 +47,10 @@ class Acl(AsyncSetter, Dictionary):
     def getter(self, instance, value=None):
         return AclValue(self, instance, value)
 
+    # HTTP views
+    async def get(self, instance, _):
+        return await instance.effective_acl
+
 
 class SchemaSignature(String):
     def __init__(self):

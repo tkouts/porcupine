@@ -59,7 +59,7 @@ class GenericItem(Removable, Elastic):
             acl = item.acl
             if acl.is_set() or item.parent_id is None:
                 break
-            item = await connector.get(self.parent_id)
+            item = await connector.get(item.parent_id)
         return acl
 
     async def clone(self, memo: dict=None) -> 'GenericItem':
