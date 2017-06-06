@@ -226,14 +226,6 @@ class Recyclable(TYPING.ITEM_TYPE):
     is_deleted = Deleted()
 
     async def restore(self) -> None:
-        async def restore(item: 'Recyclable') -> None:
-            # mark as deleted
-            self.is_deleted -= 1
-            await context.txn.upsert(item)
-            # if item.is_collection:
-            #     children = await item.get_children()
-            #     await gather(*[restore(child) for child in children])
-
         user = context.user
         user_role = await permissions.resolve(self, user)
         can_restore = (
@@ -245,7 +237,8 @@ class Recyclable(TYPING.ITEM_TYPE):
 
         with system_override():
             utils.add_uniques(self)
-            await restore(self)
+            self.is_deleted -= 1
+            await context.txn.upsert(self)
 
     async def recycle_to(self, recycle_bin: TYPING.RECYCLE_BIN_CO) -> None:
         """
@@ -272,7 +265,7 @@ class Recyclable(TYPING.ITEM_TYPE):
             (user_role > permissions.AUTHOR) or
             (user_role == permissions.AUTHOR and self.owner == user.id)
         )
-        if not can_delete or self.is_s:
+        if not can_delete or self.is_system:
             raise exceptions.Forbidden('Forbidden')
 
         from .recycle import DeletedItem
