@@ -99,9 +99,7 @@ class Cloneable(TYPING.ITEM_TYPE):
         user = context.user
         user_role = await permissions.resolve(target, user)
         if user_role < permissions.AUTHOR:
-            raise exceptions.Forbidden(
-                'The object was not copied. '
-                'The user has insufficient permissions.')
+            raise exceptions.Forbidden('Forbidden')
         with system_override():
             return await self._copy(target,
                                     {'_dup_ext_': True,
@@ -128,9 +126,7 @@ class Movable(TYPING.ITEM_TYPE):
         @return: None
         """
         if self.is_system:
-            raise exceptions.Forbidden(
-                'The object {0} is systemic and can not be moved'
-                .format(self.name))
+            raise exceptions.Forbidden('Forbidden')
 
         user = context.user
         user_role = await permissions.resolve(self, user)
@@ -146,9 +142,7 @@ class Movable(TYPING.ITEM_TYPE):
                 'The destination is contained in the source.')
 
         if not can_move or user_role2 < permissions.AUTHOR:
-            raise exceptions.Forbidden(
-                'The object was not moved. '
-                'The user has insufficient permissions.')
+            raise exceptions.Forbidden('Forbidden')
 
         with system_override():
             parent_id = self.parent_id
