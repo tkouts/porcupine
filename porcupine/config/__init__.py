@@ -2,6 +2,7 @@ import os
 import sys
 import logging.config
 
+import yaml
 from sanic.defaultFilter import DefaultFilter
 
 from .default import default_settings
@@ -9,6 +10,11 @@ from .default import default_settings
 
 settings = default_settings
 DEBUG = False
+
+
+def parse(config_file):
+    with open(config_file, encoding='utf-8') as f:
+        return yaml.load(f.read())
 
 
 def setup_logging(log_to_files: bool) -> dict:

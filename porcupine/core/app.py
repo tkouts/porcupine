@@ -1,9 +1,9 @@
 import sys
 import os
-import yaml
+
 from sanic import Blueprint
 
-from porcupine import db
+from porcupine import db, config
 from porcupine.apps.schema.users import SystemUser
 from porcupine.core import utils
 from porcupine.db import transactional
@@ -23,8 +23,7 @@ class App(Blueprint):
                 os.path.dirname(
                     sys.modules[type(self).__module__].__file__))
             blueprint_file = os.path.join(app_class_dir, self.db_blueprint)
-            with open(blueprint_file, encoding='utf-8') as f:
-                db_blueprint = yaml.load(f.read())
+            db_blueprint = config.parse(blueprint_file)
             await self.__initialize_db(db_blueprint)
 
     @with_context(SystemUser())
