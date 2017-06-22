@@ -3,6 +3,7 @@ Porcupine data types
 ====================
 """
 import hashlib
+from validate_email import validate_email
 
 from .datatype import DataType
 
@@ -53,3 +54,12 @@ class Password(String):
     def validate(self, value):
         if self.required and (not value or value == self.empty):
             raise ValueError('Attribute {0} is mandatory'.format(self.name))
+
+
+class Email(String):
+    """Email data type"""
+
+    def validate_value(self, instance, value):
+        super().validate_value(instance, value)
+        if value and not validate_email(value):
+            raise ValueError('Invalid email')

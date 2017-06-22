@@ -36,6 +36,7 @@ setup(
         'cbor>=1.0.0',
         'arrow>=0.10.0',
         'mmh3>=2.4',
+        'validate-email>=1.3'
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

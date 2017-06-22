@@ -4,7 +4,7 @@ from porcupine import db, permissions, context_user
 from porcupine.schema import Container
 from porcupine.schema import Item
 from porcupine.datatypes import String, RelatorN, Password, Reference1, \
-    Dictionary
+    Dictionary, Email
 
 from .userstorage import UserStorage
 
@@ -93,7 +93,7 @@ class User(Membership):
     """
     first_name = String()
     last_name = String()
-    email = String()
+    email = Email()
     password = Password()
     settings = Dictionary()
     personal_folder = Reference1(accepts=(UserStorage, ),
