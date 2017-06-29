@@ -21,7 +21,7 @@ class SessionManager(AbstractSessionManager):
         i = 0
         chunks = []
         cookie = request.cookies.get('_s{0}'.format(i))
-        while cookie is not None:
+        while cookie:
             chunks.append(cookie)
             i += 1
             cookie = request.cookies.get('_s{0}'.format(i))

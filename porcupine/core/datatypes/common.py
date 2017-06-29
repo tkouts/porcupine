@@ -58,6 +58,8 @@ class Password(String):
 
 class Email(String):
     """Email data type"""
+    def __init__(self, default='', **kwargs):
+        super().__init__(default, xform=str.lower, **kwargs)
 
     def validate_value(self, instance, value):
         super().validate_value(instance, value)

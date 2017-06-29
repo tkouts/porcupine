@@ -11,7 +11,7 @@ class DataType:
 
     def __init__(self, default=None, required=False, allow_none=False,
                  readonly=False, immutable=False, protected=False,
-                 store_as=None, indexed=False, unique=False):
+                 store_as=None, indexed=False, unique=False, xform=None):
         self.default = default
         self.required = required
         self.allow_none = allow_none
@@ -21,6 +21,7 @@ class DataType:
         self.store_as = store_as
         self.indexed = indexed
         self.unique = unique
+        self.xform = xform
         self.name = None
         self.validate_value(None, default)
 
@@ -60,6 +61,8 @@ class DataType:
         return self.get_value(instance)
 
     def __set__(self, instance, value):
+        if value is not None and self.xform is not None:
+            value = self.xform(value)
         self.validate_value(instance, value)
         self.snapshot(instance, value, self.get_value(instance, snapshot=False))
 
