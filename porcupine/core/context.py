@@ -109,7 +109,8 @@ class context_user:
 
     async def __aenter__(self):
         if isinstance(self.user, str):
-            should_switch = context.user.id != self.user
+            should_switch = context.user is None \
+                            or context.user.id != self.user
             if should_switch:
                 self.user = await connector.get(self.user, quiet=False)
         else:
