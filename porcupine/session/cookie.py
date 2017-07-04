@@ -47,12 +47,12 @@ class SessionManager(AbstractSessionManager):
             response.cookies[cookie_name] = chunks[i]
             response.cookies[cookie_name]['httponly'] = True
         # remove extra cookies
-        self.remove(request, response, len(chunks))
+        self.remove(request, response, start=len(chunks))
 
     def remove(self, request, response, start=0):
-        j = 0
+        j = start
         next_cookie = request.cookies.get('_s{0}'.format(j))
-        while next_cookie is not None:
+        while next_cookie:
             del response.cookies['_s{0}'.format(j)]
             j += 1
             next_cookie = request.cookies.get('_s{0}'.format(j))
