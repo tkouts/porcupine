@@ -20,8 +20,11 @@ class AclValue(AsyncSetterValue, collections.FrozenDict):
         self._desc = descriptor
         self._inst = instance
 
-    def is_set(self):
+    def is_set(self) -> bool:
         return self._dct is not None
+
+    def is_partial(self) -> bool:
+        return self._dct is not None and '__partial__' in self._dct
 
     def to_dict(self):
         if self._dct is None:
@@ -30,8 +33,10 @@ class AclValue(AsyncSetterValue, collections.FrozenDict):
 
     toDict = to_dict
 
-    async def reset(self, acl):
+    async def reset(self, acl, partial=False):
         # check user permissions
+        if partial:
+            acl['__partial__'] = True
         instance = self._inst
         user_role = await permissions.resolve(instance, context.user)
         if user_role < permissions.COORDINATOR:

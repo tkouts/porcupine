@@ -1,4 +1,5 @@
 from typing import List, Optional
+from collections import ChainMap
 
 from porcupine.hinting import TYPING
 from porcupine import context, exceptions, db
@@ -52,15 +53,20 @@ class GenericItem(Removable, Elastic):
         return '{0}({1})'.format(self.name, self.content_class)
 
     @property
-    async def effective_acl(self):
-        connector = db.connector
+    async def effective_acl(self) -> ChainMap:
+        get = db.connector.get
         item = self
+        acl_list = []
         while True:
             acl = item.acl
-            if acl.is_set() or item.parent_id is None:
+            if item.parent_id is None:
                 break
-            item = await connector.get(item.parent_id)
-        return acl
+            if acl.is_set():
+                acl_list.append(acl)
+                if not acl.is_partial():
+                    break
+            item = await get(item.parent_id)
+        return ChainMap(*acl_list)
 
     async def clone(self, memo: dict=None) -> 'GenericItem':
         clone: 'GenericItem' = await super().clone(memo)

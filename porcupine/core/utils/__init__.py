@@ -6,6 +6,7 @@ import functools
 import hashlib
 import random
 from typing import Optional, AsyncIterator, Union
+from collections import ChainMap
 import mmh3
 
 from porcupine.hinting import TYPING
@@ -122,15 +123,18 @@ async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
     if item.__is_new__:
         return 1
     connector = db.connector
-    computed_acl = None
+    acl_list = []
+    got_acl = False
     while True:
         if not item.is_composite:
             if item.is_deleted:
                 return None
             acl = item.acl
-            if computed_acl is None and acl.is_set():
-                computed_acl = acl
-            if item.is_system and computed_acl is not None:
+            if not got_acl and acl.is_set():
+                acl_list.append(acl)
+                if not acl.is_partial():
+                    got_acl = True
+            if item.is_system and got_acl:
                 break
         if item.parent_id is None:
             break
@@ -141,7 +145,7 @@ async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
                 return None
 
     # return user role
-    return await resolve_acl(computed_acl, user)
+    return await resolve_acl(ChainMap(*acl_list), user)
 
 
 async def multi_with_stale_resolution(

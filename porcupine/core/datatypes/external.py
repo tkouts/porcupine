@@ -3,9 +3,10 @@ Porcupine external data types
 =============================
 """
 import asyncio
-
 import os.path
 import shutil
+
+import aiofiles
 
 from porcupine import db, context
 from porcupine.core import utils
@@ -90,7 +91,7 @@ class File(Blob):
 class ExternalFileValue(str):
 
     def get_file(self, mode='rb'):
-        return open(self, mode)
+        return aiofiles.open(self, mode)
 
 
 class ExternalFile(String):
