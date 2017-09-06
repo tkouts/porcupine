@@ -144,8 +144,14 @@ async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
                 # TODO: stale remove from DB
                 return None
 
+    acl_chain = ChainMap(*acl_list)
+
+    if acl_chain.get('everyone', 0) > 0:
+        if 0 not in acl_chain.values():
+            return 1
+
     # return user role
-    return await resolve_acl(ChainMap(*acl_list), user)
+    return await resolve_acl(acl_chain, user)
 
 
 async def multi_with_stale_resolution(
