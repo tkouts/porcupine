@@ -109,6 +109,8 @@ class User(Membership):
 
         @rtype: bool
         """
+        if password == self.password:
+            return True
         hex_digest = hashlib.sha3_256(password.encode('utf-8')).hexdigest()
         return hex_digest == self.password
 
