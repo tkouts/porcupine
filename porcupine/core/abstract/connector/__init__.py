@@ -1,7 +1,6 @@
 import abc
 
 from porcupine import context
-from porcupine.config import settings
 from porcupine.core.abstract.connector.join import Join
 from porcupine.core.abstract.connector.persist import DefaultPersistence
 from porcupine.core import utils
@@ -10,14 +9,6 @@ from .transaction import Transaction
 
 
 class AbstractConnector(metaclass=abc.ABCMeta):
-    # configuration
-    settings = settings['db']
-    multi_fetch_chunk_size = settings['multi_fetch_chunk_size']
-    coll_compact_threshold = settings['collection_compact_threshold']
-    coll_split_threshold = settings['collection_split_threshold']
-    txn_max_retries = settings['txn_max_retries']
-    cache_size = settings['cache_size']
-
     indexes = {}
     active_txns = 0
     TransactionType = Transaction
@@ -43,9 +34,19 @@ class AbstractConnector(metaclass=abc.ABCMeta):
             raise DBAlreadyExists(
                 'A resource having an ID of {0} already exists'.format(key))
 
-    def __init__(self):
+    def __init__(self, server):
+        # configuration
+        self.server = server
+        self.multi_fetch_chunk_size = int(server.config.DB_MULTI_FETCH_SIZE)
+        self.coll_compact_threshold = \
+            int(server.config.DB_COLLECTION_COMPACT_THRESHOLD)
+        self.coll_split_threshold = \
+            float(server.config.DB_COLLECTION_SPLIT_THRESHOLD)
+        self.txn_max_retries = int(server.config.DB_TXN_MAX_RETRIES)
+        self.cache_size = int(server.config.DB_CACHE_SIZE)
+
         # create index map
-        indexed_data_types = self.settings['__indices__']
+        indexed_data_types = server.config.__indices__
         self.indexes = {
             k: self.get_index(v)
             for k, v in indexed_data_types.items()

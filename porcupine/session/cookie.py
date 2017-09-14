@@ -4,9 +4,9 @@ from porcupine.core.abstract.session import AbstractSessionManager
 
 
 class SessionManager(AbstractSessionManager):
-    def __init__(self, **params):
-        super().__init__(**params)
-        self.secret = self.params['secret'].encode('utf-8')
+    def __init__(self, server):
+        super().__init__(server)
+        self.secret = server.config.SM_SECRET.encode('utf-8')
 
     def generate_sig(self, session):
         h = hashlib.blake2b(

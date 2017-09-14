@@ -4,7 +4,7 @@ import functools
 from typing import List, ClassVar
 
 from porcupine.hinting import TYPING
-from porcupine import config
+from porcupine import server
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.core import utils
@@ -43,7 +43,7 @@ class ElasticMeta(type):
                                         "cannot be unique or indexed"
                                         .format(attr.name, cls.__name__))
                     if attr.indexed:
-                        config.add_index(attr)
+                        server.config.__indices__[attr.name] = attr
             except AttributeError:
                 continue
         cls.__schema__ = schema

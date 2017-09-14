@@ -2,7 +2,7 @@ import asyncio
 from inspect import isawaitable
 from collections import defaultdict
 
-from porcupine import exceptions, config, log
+from porcupine import exceptions, log
 from porcupine.core import utils
 
 
@@ -189,7 +189,7 @@ class Transaction:
     def prepare(self):
         dumps = self.connector.persist.dumps
 
-        if config.DEBUG:
+        if self.connector.server.debug:
             # check for any non persisted modifications
             modified = [i.friendly_name for i in self._items.values()
                         if i.__snapshot__]

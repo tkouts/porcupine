@@ -1,6 +1,5 @@
 import abc
 
-from porcupine.config import settings
 from porcupine.core import utils
 from porcupine.core.utils.observables import ObservableDict
 
@@ -35,14 +34,13 @@ class Session(ObservableDict):
 
 
 class AbstractSessionManager(metaclass=abc.ABCMeta):
-    settings = settings['session_manager']
-    timeout = settings['timeout']
-    guest_user_id = settings['guest_user_id']
     revive_threshold = 60.0
     SessionType = Session
 
-    def __init__(self, **params):
-        self.params = params
+    def __init__(self, server):
+        self.server = server
+        self.timeout = int(server.config.SM_SESSION_TIMEOUT)
+        self.guest_user_id = server.config.SM_GUEST_USER_ID
 
     async def initialize(self):
         pass

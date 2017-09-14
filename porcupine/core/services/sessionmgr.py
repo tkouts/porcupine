@@ -6,7 +6,6 @@ import asyncio
 from sanic import Blueprint
 
 from porcupine import log
-from porcupine.config import settings
 from porcupine.core import utils
 from .service import AbstractService
 
@@ -40,8 +39,8 @@ class SessionManager(AbstractService):
     async def start(cls, server):
         global session_manager
         log.info('Creating session manager')
-        sm_type = utils.get_rto_by_name(settings['session_manager']['type'])
-        session_manager = sm_type(**settings['session_manager']['params'])
+        sm_type = utils.get_rto_by_name(server.config.SM_IF)
+        session_manager = sm_type(server)
         await session_manager.initialize()
         # register middleware
         server.blueprint(session_manager_bp)

@@ -1,6 +1,5 @@
 from functools import wraps
 from lru import LRU
-from porcupine import config
 from .log import porcupine_log
 from .aiolocals.local import Local, Context
 
@@ -36,7 +35,7 @@ class system_override:
         context.__sys__ = self.override
 
 
-def with_context(identity=None):
+def with_context(identity=None, debug=False):
     def decorator(task):
         """
         Creates the security context
@@ -58,7 +57,7 @@ def with_context(identity=None):
                 try:
                     return await task(*args, **kwargs)
                 finally:
-                    if config.DEBUG:
+                    if debug:
                         size = len(context.db_cache)
                         hits, misses = context.db_cache.get_stats()
                         porcupine_log.debug(
@@ -105,7 +104,7 @@ class context_user:
         raise AttributeError('__enter__')
 
     def __exit__(self):
-        pass
+        ...
 
     async def __aenter__(self):
         if isinstance(self.user, str):

@@ -1,14 +1,14 @@
 import argparse
-import logging
 import sys
 import os
+import logging
+import logging.config
 
 from porcupine import __version__
+from porcupine.core.server import server
 from porcupine import apps
-from porcupine.config import settings, setup_logging
 from .log import porcupine_log
 from .loader import install_apps
-from .server import server
 from .services.blueprint import services_blueprint, services
 from .daemon import Daemon
 
@@ -20,7 +20,7 @@ def run_server(log_config, debug=False):
     # prepare services
     porcupine_log.info('Preparing services')
     for service in services:
-        service.prepare()
+        service.prepare(server)
     # install native apps
     install_apps(apps.__path__, prefix='porcupine.apps.')
     current_dir = os.getcwd()
@@ -34,9 +34,9 @@ def run_server(log_config, debug=False):
         if os.path.isdir(static_dir_path):
             server.static('/', static_dir_path)
 
-    server.run(host=settings['host'],
-               port=settings['port'],
-               workers=settings['workers'],
+    server.run(host=server.config.HOST,
+               port=int(server.config.PORT),
+               workers=int(server.config.WORKERS),
                debug=debug,
                backlog=150,
                log_config=log_config)
@@ -44,7 +44,7 @@ def run_server(log_config, debug=False):
 
 class PorcupineDaemon(Daemon):
     def __init__(self, log_config, debug=False):
-        super().__init__(settings['pid_file'])
+        super().__init__(server.config.PID_FILE)
         self.debug = debug
         self.log_config = log_config
 
@@ -54,9 +54,12 @@ class PorcupineDaemon(Daemon):
 
 def start(args):
     if args.debug:
-        settings['log']['level'] = logging.DEBUG
+        server.config.LOG_LEVEL = logging.DEBUG
 
-    log_config = setup_logging(log_to_files=args.daemon or args.graceful)
+    log_config = server.get_log_config(
+        log_to_files=args.daemon or args.graceful)
+    # load config
+    logging.config.dictConfig(log_config)
 
     if args.daemon or args.stop or args.graceful:
         # daemon commands
@@ -100,6 +103,6 @@ def run():
     for arg in ('host', 'port', 'workers'):
         override = getattr(args, arg, None)
         if override:
-            settings[arg] = override
+            server.config[arg.upper()] = override
     # start the server
     start(args)

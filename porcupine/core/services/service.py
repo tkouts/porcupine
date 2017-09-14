@@ -5,7 +5,7 @@ Abstract Service class
 
 class AbstractService:
     @classmethod
-    def prepare(cls):
+    def prepare(cls, server):
         pass
 
     @classmethod

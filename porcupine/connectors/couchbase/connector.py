@@ -26,24 +26,24 @@ class Couchbase(AbstractConnector):
     CursorType = Cursor
     IndexType = Index
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, server):
+        super().__init__(server)
         self.bucket = None
 
     @property
     def bucket_name(self):
-        return self.settings['bucket']
+        return self.server.config.DB_USER
 
     @property
     def protocol(self):
-        return self.settings.get('protocol', 'couchbase')
+        return self.server.config.get('DB_PROTOCOL', 'couchbase')
 
     @property
     def password(self):
-        return self.settings['password']
+        return self.server.config.DB_PASSWORD
 
     def connect(self, async=True):
-        hosts = self.settings['hosts'][:]
+        hosts = self.server.config.DB_HOST.split(',')
         random.shuffle(hosts)
         connection_string = '{0}://{1}/{2}'.format(self.protocol,
                                                    ','.join(hosts),

@@ -4,7 +4,6 @@ Database service
 from multiprocessing import Lock
 
 from porcupine import log, db
-from porcupine.config import settings
 from porcupine.core import utils
 from porcupine.core.app import App
 from .service import AbstractService
@@ -14,19 +13,19 @@ DB_BP_LOCK = Lock()
 
 class Db(AbstractService):
     @staticmethod
-    def get_connector():
-        connector_type = utils.get_rto_by_name(settings['db']['type'])
-        return connector_type()
+    def get_connector(server):
+        connector_type = utils.get_rto_by_name(server.config.DB_IF)
+        return connector_type(server)
 
     @classmethod
-    def prepare(cls):
-        connector = cls.get_connector()
+    def prepare(cls, server):
+        connector = cls.get_connector(server)
         connector.prepare_indexes()
 
     @classmethod
     async def start(cls, server):
         log.info('Opening database')
-        db.connector = cls.get_connector()
+        db.connector = cls.get_connector(server)
         await db.connector.connect()
         # allow only one process at a time
         # to install the db blueprints

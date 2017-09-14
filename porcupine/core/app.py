@@ -7,7 +7,7 @@ from porcupine import db, config
 from porcupine.apps.schema.users import SystemUser
 from porcupine.core import utils
 from porcupine.db import transactional
-from .context import with_context, system_override
+from porcupine.core.context import with_context, system_override
 
 
 class App(Blueprint):
