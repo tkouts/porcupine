@@ -9,4 +9,4 @@ class ContextRouter(Router):
 
     def get(self, request):
         handler, args, kwargs, uri = super().get(request)
-        return with_context(identity='system', debug=self.server.debug)(handler), args, kwargs, uri
+        return with_context(debug=self.server.debug)(handler), args, kwargs, uri

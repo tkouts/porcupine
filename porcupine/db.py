@@ -47,6 +47,7 @@ async def get_item(item_id: str, quiet: bool=True) -> Optional[
 async def get_multi(ids: TYPING.ID_LIST, return_none=False) -> AsyncIterator[
         Optional[TYPING.ANY_ITEM_CO]]:
     user = context.user
+    resolve_visibility = utils.resolve_visibility
     is_override = context.system_override
     if ids:
         async for item in connector.get_multi(ids):
@@ -54,7 +55,7 @@ async def get_multi(ids: TYPING.ID_LIST, return_none=False) -> AsyncIterator[
                 if is_override:
                     yield item
                     continue
-                visibility = await utils.resolve_visibility(item, user)
+                visibility = await resolve_visibility(item, user)
                 if visibility:
                     yield item
             elif return_none:
