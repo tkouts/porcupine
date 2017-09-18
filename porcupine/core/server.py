@@ -3,7 +3,12 @@ import sys
 
 from sanic import Sanic
 from sanic.request import Request
-from sanic.defaultFilter import DefaultFilter
+try:
+    from sanic.log import DefaultFilter
+except ImportError:
+    # sanic < 0.6.0
+    from sanic.defaultFilter import DefaultFilter
+
 
 from porcupine.config.default import DEFAULTS
 from porcupine.core.router import ContextRouter
