@@ -4,7 +4,7 @@ Porcupine
 import codecs
 import os
 import re
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 version = 'dev'
@@ -24,7 +24,9 @@ setup(
     author='Tassos Koutsovassilis',
     author_email='tkouts@innoscript.org',
     description='A web framework',
-    packages=['porcupine'],
+    packages=find_packages(exclude=['tests', 'tests.*'],
+                           include='porcupine.apps.*'),
+    package_data={'porcupine.apps': ['*.yml']},
     scripts=['bin/porcupine'],
     platforms='any',
     install_requires=[
