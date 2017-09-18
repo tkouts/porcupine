@@ -24,8 +24,9 @@ setup(
     author='Tassos Koutsovassilis',
     author_email='tkouts@innoscript.org',
     description='A web framework',
-    packages=find_packages(exclude=['tests', 'tests.*'],
-                           include='porcupine.apps.*'),
+    packages=find_packages(exclude=['tests', 'tests.*']) +
+         find_packages(where='./porcupine/apps',
+                       include=['porcupine.apps.*']),
     package_data={'porcupine.apps': ['*.yml']},
     scripts=['bin/porcupine'],
     platforms='any',
