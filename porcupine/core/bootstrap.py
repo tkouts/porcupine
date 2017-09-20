@@ -13,7 +13,7 @@ from .services.blueprint import services_blueprint, services
 from .daemon import Daemon
 
 
-def run_server(log_config, debug=False):
+def run_server(scan_dir, log_config, debug=False):
     # register services blueprint
     server.blueprint(services_blueprint)
     porcupine_log.info('Starting Porcupine {0}'.format(__version__))
@@ -23,14 +23,14 @@ def run_server(log_config, debug=False):
         service.prepare(server)
     # install native apps
     install_apps(apps.__path__, prefix='porcupine.apps.')
-    current_dir = os.getcwd()
     porcupine_path = os.path.dirname(
         os.path.dirname(sys.modules['porcupine'].__file__))
-    if not current_dir.startswith(porcupine_path):
+    if not scan_dir.startswith(porcupine_path):
         # install user apps
-        install_apps([current_dir])
+        os.chdir(scan_dir)
+        install_apps([scan_dir])
         # check if there is a static directory
-        static_dir_path = os.path.join(current_dir, 'static')
+        static_dir_path = os.path.join(scan_dir, 'static')
         if os.path.isdir(static_dir_path):
             server.static('/', static_dir_path)
 
@@ -43,13 +43,14 @@ def run_server(log_config, debug=False):
 
 
 class PorcupineDaemon(Daemon):
-    def __init__(self, log_config, debug=False):
+    def __init__(self, scan_dir, log_config, debug=False):
         super().__init__(server.config.PID_FILE)
         self.debug = debug
+        self.scan_dir = scan_dir
         self.log_config = log_config
 
     def run(self):
-        run_server(self.log_config, debug=self.debug)
+        run_server(self.scan_dir, self.log_config, debug=self.debug)
 
 
 def start(args):
@@ -60,10 +61,11 @@ def start(args):
         log_to_files=args.daemon or args.graceful)
     # load config
     logging.config.dictConfig(log_config)
+    current_dir = os.getcwd()
 
     if args.daemon or args.stop or args.graceful:
         # daemon commands
-        daemon = PorcupineDaemon(log_config, debug=args.debug)
+        daemon = PorcupineDaemon(current_dir, log_config, debug=args.debug)
         if args.daemon:
             daemon.start()
         elif args.stop:
@@ -72,7 +74,7 @@ def start(args):
             daemon.restart()
         sys.exit()
     else:
-        run_server(log_config, debug=args.debug)
+        run_server(current_dir, log_config, debug=args.debug)
 
 
 def run():
