@@ -49,10 +49,11 @@ def with_context(identity=None, debug=False):
                 if user is None:
                     session = args[0].session
                     if session is not None and session['uid'] is not None:
-                        # print('user is', session['uid'])
-                        user = await connector.get(session['uid'])
-                elif isinstance(user, str):
+                        user = session['uid']
+                if isinstance(user, str):
                     user = await connector.get(user)
+                    if user.is_deleted:
+                        user = None
                 context.user = user
                 try:
                     return await task(*args, **kwargs)
