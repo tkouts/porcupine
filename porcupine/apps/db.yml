@@ -6,6 +6,10 @@
   acl:
     everyone: 1
   children:
+    - id: ustorage
+      type: UsersStorage
+      name: Users Storage
+      is_system: Yes
     - id: admintools
       type: AdminTools
       name: Administrative Tools
@@ -45,10 +49,6 @@
               is_system: Yes
               members:
                 - admin
-    - id: ustorage
-      type: UsersStorage
-      name: Users Storage
-      is_system: Yes
 
 - id: RB
   type: RecycleBin
