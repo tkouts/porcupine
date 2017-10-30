@@ -262,7 +262,10 @@ class Recyclable(TYPING.ITEM_TYPE):
         if not can_delete or self.is_system:
             raise exceptions.Forbidden('Forbidden')
 
-        from .recycle import DeletedItem
+        from .recycle import DeletedItem, RecycleBin
+        if not(isinstance(recycle_bin, RecycleBin)):
+            raise TypeError("'{0}' is not instance of RecycleBin"
+                            .format(type(recycle_bin).__name__))
         with system_override():
             utils.remove_uniques(self)
             await recycle(self)
