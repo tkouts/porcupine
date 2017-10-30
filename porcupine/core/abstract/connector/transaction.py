@@ -2,7 +2,7 @@ import asyncio
 from inspect import isawaitable
 from collections import defaultdict
 
-from porcupine import exceptions, log
+from porcupine import exceptions, log, gather
 from porcupine.core import utils
 
 
@@ -129,10 +129,13 @@ class Transaction:
         self._items[item.id] = item
 
     async def delete(self, item):
+        if item.is_collection:
+            children = await item.get_children()
+            await gather(*[self.delete(child) for child in children])
+
         await item.on_delete()
 
         data_types = item.__schema__.values()
-
         # execute data types on_delete handlers
         for dt in data_types:
             _ = dt.on_delete(item, dt.get_value(item))
@@ -144,6 +147,30 @@ class Transaction:
             utils.remove_uniques(item)
 
         self._deletions[item.id] = None
+
+    async def recycle(self, item):
+        data_types = item.__schema__.values()
+        # execute data types on_recycle handlers
+        for dt in data_types:
+            _ = dt.on_recycle(item, dt.get_value(item))
+            if isawaitable(_):
+                await _
+
+        if item.is_collection:
+            children = await item.get_children()
+            await gather(*[self.recycle(child) for child in children])
+
+    async def restore(self, item):
+        data_types = item.__schema__.values()
+        # execute data types on_restore handlers
+        for dt in data_types:
+            _ = dt.on_restore(item, dt.get_value(item))
+            if isawaitable(_):
+                await _
+
+        if item.is_collection:
+            children = await item.get_children()
+            await gather(*[self.restore(child) for child in children])
 
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = (mutation_type, value)

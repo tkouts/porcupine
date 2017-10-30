@@ -88,6 +88,26 @@ class Reference1(String, Acceptable):
                 with system_override():
                     await ref_item.remove()
 
+    async def on_recycle(self, instance, value):
+        super().on_recycle(instance, value)
+        if value and self.cascade_delete:
+            ref_item = await db.connector.get(value)
+            if ref_item:
+                with system_override():
+                    utils.remove_uniques(ref_item)
+                    # mark as deleted
+                    ref_item.is_deleted += 1
+                    await context.txn.upsert(ref_item)
+                    await context.txn.recycle(ref_item)
+
+    async def on_restore(self, instance, value):
+        super().on_recycle(instance, value)
+        if value and self.cascade_delete:
+            ref_item = await db.connector.get(value)
+            if ref_item:
+                with system_override():
+                    await ref_item.restore()
+
     def clone(self, instance, memo):
         value = super().__get__(instance, None)
         super().__set__(instance, memo['_id_map_'].get(value, value))
@@ -196,6 +216,26 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
                     break
                 context.txn.delete_external(external_key)
                 active_chunk -= 1
+
+    async def on_recycle(self, instance, value):
+        super().on_recycle(instance, value)
+        collection = self.__get__(instance, None)
+        if self.cascade_delete:
+            with system_override():
+                async for ref_item in collection.items():
+                    utils.remove_uniques(ref_item)
+                    # mark as deleted
+                    ref_item.is_deleted += 1
+                    await context.txn.upsert(ref_item)
+                    await context.txn.recycle(ref_item)
+
+    async def on_restore(self, instance, value):
+        super().on_restore(instance, value)
+        collection = self.__get__(instance, None)
+        if self.cascade_delete:
+            with system_override():
+                async for ref_item in collection.items():
+                    await ref_item.restore()
 
     # HTTP views
 

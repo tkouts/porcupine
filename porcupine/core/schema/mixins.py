@@ -178,12 +178,6 @@ class Removable(TYPING.ITEM_TYPE):
 
         @return: None
         """
-        async def _delete(item: 'Removable'):
-            if item.is_collection:
-                children = await item.get_children()
-                await gather(*[_delete(child) for child in children])
-            await context.txn.delete(item)
-
         if not context.system_override:
             user = context.user
             user_role = await permissions.resolve(self, user)
@@ -206,7 +200,7 @@ class Removable(TYPING.ITEM_TYPE):
                         await parent.containers.remove(self)
                     else:
                         await parent.items.remove(self)
-            await _delete(self)
+            await context.txn.delete(self)
 
     @db.transactional()
     async def delete(self, request):
@@ -233,6 +227,7 @@ class Recyclable(TYPING.ITEM_TYPE):
             utils.add_uniques(self)
             self.is_deleted -= 1
             await context.txn.upsert(self)
+            await context.txn.restore(self)
 
     async def recycle_to(self, recycle_bin: TYPING.RECYCLE_BIN_CO) -> None:
         """
@@ -244,15 +239,6 @@ class Recyclable(TYPING.ITEM_TYPE):
         @type recycle_bin: RecycleBin
         @return: None
         """
-        async def recycle(item: 'Recyclable') -> None:
-            # mark as deleted
-            self.is_deleted += 1
-            await context.txn.upsert(item)
-            # TODO: check consistency requirements
-            # if item.is_collection:
-            #     children = await item.get_children()
-            #     await gather(*[recycle(child) for child in children])
-
         user = context.user
         user_role = await permissions.resolve(self, user)
         can_delete = (
@@ -263,12 +249,15 @@ class Recyclable(TYPING.ITEM_TYPE):
             raise exceptions.Forbidden('Forbidden')
 
         from .recycle import DeletedItem, RecycleBin
-        if not(isinstance(recycle_bin, RecycleBin)):
+        if not isinstance(recycle_bin, RecycleBin):
             raise TypeError("'{0}' is not instance of RecycleBin"
                             .format(type(recycle_bin).__name__))
         with system_override():
             utils.remove_uniques(self)
-            await recycle(self)
+            # mark as deleted
+            self.is_deleted += 1
+            await context.txn.upsert(self)
+            await context.txn.recycle(self)
             deleted = DeletedItem(deleted_item=self)
             deleted.location = await self.full_path(include_self=False)
             await deleted.append_to(recycle_bin)

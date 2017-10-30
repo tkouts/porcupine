@@ -100,21 +100,27 @@ class DataType:
                              'Got {1!r}.'.format(self.name, value))
 
     def clone(self, instance, memo):
-        pass
+        ...
 
     # event handlers
 
     def on_create(self, instance, value):
         self.validate(value)
 
-    async def on_change(self, instance, value, old_value):
+    def on_change(self, instance, value, old_value):
         self.validate(value)
         if self.storage == '__storage__' and not instance.__is_new__:
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 
     def on_delete(self, instance, value):
-        pass
+        ...
+
+    def on_recycle(self, instance, value):
+        ...
+
+    def on_restore(self, instance, value):
+        ...
 
     # HTTP views
 
