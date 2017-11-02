@@ -6,7 +6,6 @@ from sanic import Blueprint
 from porcupine import db, config
 from porcupine.apps.schema.users import SystemUser
 from porcupine.core import utils
-from porcupine.db import transactional
 from porcupine.core.context import with_context, system_override
 
 
@@ -27,7 +26,7 @@ class App(Blueprint):
             await self.__initialize_db(db_blueprint)
 
     @with_context(SystemUser())
-    @transactional()
+    @db.transactional()
     async def __initialize_db(self, blueprint):
         for item in blueprint:
             await self.__process_item(item, None)

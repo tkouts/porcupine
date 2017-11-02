@@ -46,13 +46,9 @@ def with_context(identity=None, debug=False):
             with Context(locals=(context, )):
                 context.prepare()
                 user = identity
-                if user is None:
-                    session = args[0].session
-                    if session is not None and session['uid'] is not None:
-                        user = session['uid']
                 if isinstance(user, str):
                     user = await connector.get(user)
-                    if user.is_deleted:
+                    if user is not None and user.is_deleted:
                         user = None
                 context.user = user
                 try:

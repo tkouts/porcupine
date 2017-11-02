@@ -62,7 +62,7 @@ class SchemaSignature(String):
         super().__init__(required=True, readonly=True, protected=True)
 
     async def on_change(self, instance, value, old_value):
-        await super().on_change(instance, value, old_value)
+        super().on_change(instance, value, old_value)
         await SchemaMaintenance.clean_schema(instance.id)
 
 

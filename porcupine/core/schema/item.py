@@ -1,3 +1,4 @@
+import time
 from typing import List, Optional
 from collections import ChainMap
 
@@ -7,7 +8,7 @@ from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Acl
 from porcupine.core.utils import permissions, date
-from porcupine.datatypes import String, Boolean, RelatorN, DateTime
+from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
 
@@ -36,6 +37,8 @@ class GenericItem(Removable, Elastic):
     parent_id = String(readonly=True, allow_none=True,
                        default=None, store_as='pid')
     created = DateTime(readonly=True, store_as='cr')
+    expires_at = Integer(None, readonly=True, allow_none=True,
+                         protected=True, store_as='exp')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
     modified = DateTime(required=True, readonly=True, store_as='md')
@@ -211,6 +214,12 @@ class GenericItem(Removable, Elastic):
                 if parent is not None:
                     await parent.touch()
             await context.txn.upsert(self)
+
+    def expires(self, at=None, after_seconds=None):
+        with system_override():
+            if at is None:
+                at = int(time.time())
+            self.expires_at = at + after_seconds
 
     # HTTP views
     def get(self, _):

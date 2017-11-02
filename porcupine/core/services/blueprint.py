@@ -6,7 +6,7 @@ from .schema import SchemaMaintenance
 from .sessionmgr import SessionManager
 
 
-services = (SchemaMaintenance, Db, SessionManager)
+services = (Db, SchemaMaintenance, SessionManager)
 services_blueprint = Blueprint('services')
 
 

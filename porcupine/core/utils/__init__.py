@@ -1,6 +1,7 @@
 """
 Porcupine utilities package
 """
+import time
 import cbor
 import functools
 import hashlib
@@ -11,6 +12,7 @@ import mmh3
 
 from porcupine.hinting import TYPING
 from porcupine import db, context
+from porcupine.core.services.schema import SchemaMaintenance
 from porcupine.core.utils.collections import WriteOnceDict
 from .permissions import resolve_acl
 
@@ -127,6 +129,12 @@ async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
     got_acl = False
     while True:
         if not item.is_composite:
+            # check expiration
+            if item.expires_at is not None:
+                if time.time() > item.expires_at:
+                    # expired - remove from DB
+                    await SchemaMaintenance.remove_stale(item.id)
+                    return None
             if item.is_deleted:
                 return None
             acl = item.acl
@@ -141,7 +149,8 @@ async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
         else:
             item = await connector.get(item.parent_id)
             if item is None:
-                # TODO: stale remove from DB
+                # stale - remove from DB
+                await SchemaMaintenance.remove_stale(item.id)
                 return None
 
     acl_chain = ChainMap(*acl_list)

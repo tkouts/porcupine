@@ -9,6 +9,7 @@ class JsonArrow(Arrow):
             return '"{0}"'.format(self.date().isoformat())
         return '"{0}"'.format(self.isoformat())
 
+
 _factory = api.factory(JsonArrow)
 
 

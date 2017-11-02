@@ -1,3 +1,6 @@
+# log
+from porcupine.core.log import porcupine_log as log
+
 # context
 from porcupine.core.server import server
 from porcupine.core.context import context, context_user
@@ -6,9 +9,6 @@ from porcupine.core.context import context, context_user
 from porcupine.core.utils import date, permissions
 from porcupine.view import view
 from porcupine.core.aiolocals.local import wrap_gather as gather
-
-# log
-from porcupine.core.log import porcupine_log as log
 
 # app
 from porcupine.core.app import App
