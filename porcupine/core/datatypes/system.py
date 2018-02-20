@@ -1,53 +1,36 @@
-from porcupine import context, exceptions, db
+from porcupine import context, db
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.core.utils import permissions, collections
+from porcupine.core.utils import permissions
 from .common import String
 from .counter import Counter
-from .mutable import Dictionary
+from .atomicmap import AtomicMap, AtomicMapValue
 from .reference import ReferenceN
-from .asyncsetter import AsyncSetter, AsyncSetterValue
 
 Shortcut = None
 
 
-class AclValue(AsyncSetterValue, collections.FrozenDict):
-    __slots__ = ('_desc', '_inst')
-
-    def __init__(self, descriptor: Dictionary, instance, acl):
-        super().__init__(acl)
-        self._desc = descriptor
-        self._inst = instance
-
+class AclValue(AtomicMapValue):
     def is_set(self) -> bool:
         return self._dct is not None
 
     def is_partial(self) -> bool:
         return self._dct is not None and '__partial__' in self._dct
 
-    def to_dict(self):
-        if self._dct is None:
-            return None
-        return super().to_dict()
-
-    toDict = to_dict
-
     async def reset(self, acl, partial=False):
-        # check user permissions
         if partial:
             acl['__partial__'] = True
-        instance = self._inst
-        user_role = await permissions.resolve(instance, context.user)
-        if user_role < permissions.COORDINATOR:
-            raise exceptions.Forbidden('Forbidden')
         # set acl
-        super(Dictionary, self._desc).__set__(instance, acl)
+        await super().reset(acl)
 
 
-class Acl(AsyncSetter, Dictionary):
+class Acl(AtomicMap):
+    write_permission = permissions.COORDINATOR
+
     def __init__(self):
-        super().__init__(default=None, protected=True, allow_none=True)
+        super().__init__(default=None, accepts=(int, ),
+                         protected=True, allow_none=True)
 
     def getter(self, instance, value=None):
         return AclValue(self, instance, value)

@@ -20,6 +20,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     SUB_DOC_UPSERT_MUT = 0
     SUB_DOC_COUNTER = 1
     SUB_DOC_INSERT = 2
+    SUB_DOC_REMOVE = 4
 
     @staticmethod
     def raise_exists(key):

@@ -10,13 +10,6 @@ from .external import Text
 
 
 class ItemCollection(AsyncSetterValue, AsyncIterable):
-    __slots__ = ('_desc', '_inst')
-
-    def __init__(self,
-                 descriptor: TYPING.DT_MULTI_REFERENCE_CO,
-                 instance: TYPING.ANY_ITEM_CO):
-        self._desc = descriptor
-        self._inst = instance
 
     @property
     def is_fetched(self) -> bool:
@@ -156,7 +149,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
             descriptor, instance = self._desc, self._inst
-            is_set = descriptor.storage_key in instance.__snapshot__
+            await descriptor.touch(instance)
             collection_key = descriptor.key_for(instance)
             for item in items:
                 if not await descriptor.accepts_item(item):
@@ -164,19 +157,15 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                                                       descriptor.name, item)
                 item_id = item.__storage__.id
                 context.txn.append(collection_key, ' {0}'.format(item_id))
-            if not instance.__is_new__ and not is_set:
-                await instance.touch()
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
             descriptor, instance = self._desc, self._inst
-            is_set = descriptor.storage_key in instance.__snapshot__
+            await descriptor.touch(instance)
             collection_key = descriptor.key_for(instance)
             for item in items:
                 item_id = item.__storage__.id
                 context.txn.append(collection_key, ' -{0}'.format(item_id))
-            if not instance.__is_new__ and not is_set:
-                await instance.touch()
 
     async def reset(self, value: TYPING.ID_LIST) -> None:
         descriptor, instance = self._desc, self._inst

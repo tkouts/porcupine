@@ -169,7 +169,7 @@ class Composition(ReferenceN):
 
 
 class EmbeddedItem(CompositeFactory):
-    __slots__ = ('_desc', '_inst')
+    __slots__ = '_desc', '_inst'
 
     def __init__(self, descriptor: 'Embedded', instance):
         self._desc = descriptor

@@ -2,9 +2,7 @@ import collections
 
 
 class FrozenDict(collections.Mapping):
-    __slots__ = ('_dct', )
-
-    def __init__(self, dct):
+    def __init__(self, dct: dict):
         self._dct = dct
 
     def __getitem__(self, item):

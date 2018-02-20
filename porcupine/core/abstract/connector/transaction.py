@@ -60,6 +60,13 @@ class Transaction:
         if key in self._appends:
             del self._appends[key]
 
+    def reset_mutations(self, item, key):
+        if item.id in self._sd:
+            mutations = self._sd[item.id]
+            for path in mutations:
+                if path.startswith(key):
+                    del mutations[path]
+
     async def insert(self, item):
         if item.id in self._items:
             self.connector.raise_exists(item.id)

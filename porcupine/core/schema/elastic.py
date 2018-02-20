@@ -56,7 +56,7 @@ class ElasticMeta(type):
 
 
 class ElasticSlotsBase:
-    __slots__ = ('__storage__', '_ext', '_snap', '__is_new__')
+    __slots__ = '__storage__', '_ext', '_snap', '__is_new__'
 
 
 class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
