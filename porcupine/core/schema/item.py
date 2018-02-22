@@ -256,7 +256,7 @@ class Item(Cloneable, Movable, Recyclable, GenericItem):
     to create custom containers.
     """
     shortcuts = RelatorN(
-        accepts=('porcupine.schema.Shortcut', ),
+        accepts=('Shortcut', ),
         rel_attr='target',
         cascade_delete=True,
     )
