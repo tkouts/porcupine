@@ -2,7 +2,7 @@ import itertools
 
 from sanic.response import json
 
-from porcupine import db, view, gather, exceptions, server
+from porcupine import db, view, gather, exceptions
 from porcupine.core.datatypes.system import Items, Containers
 from porcupine.core import utils
 from .item import Item
@@ -53,7 +53,7 @@ class Container(Item):
         if child_id:
             item = await db.get_item(child_id)
             if resolve_shortcuts and isinstance(item, Shortcut):
-                item = item.get_target()
+                item = await item.get_target()
             return item
 
     async def get_child_by_id(self, oid):
@@ -69,8 +69,9 @@ class Container(Item):
 
         @rtype: L{ObjectSet<porcupine.core.objectset.ObjectSet>}
         """
-        return itertools.chain(*await gather(self.get_containers(),
-                                             self.get_items()))
+        return itertools.chain(
+            *await gather(self.get_containers(),
+                          self.get_items(resolve_shortcuts)))
 
     async def get_items(self, resolve_shortcuts=False):
         """
@@ -78,9 +79,17 @@ class Container(Item):
 
         @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
         """
+        if resolve_shortcuts:
+            items = []
+            async for item in self.items.items():
+                if isinstance(item, Shortcut):
+                    item = await item.get_target()
+                if item:
+                    items.append(item)
+            return items
         return [i async for i in self.items.items()]
 
-    async def get_containers(self, resolve_shortcuts=False):
+    async def get_containers(self):
         """
         This method returns the children that are containers.
 
