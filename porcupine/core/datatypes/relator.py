@@ -100,9 +100,9 @@ class Relator1(Reference1, RelatorBase):
                 await self.remove_reference(instance, old_ref_item)
 
     async def on_delete(self, instance, value):
-        super().on_delete(instance, value)
+        await super().on_delete(instance, value)
         if value and not self.cascade_delete:
-            ref_item = db.connector.get_item(value)
+            ref_item = await db.connector.get(value)
             if ref_item:
                 await self.remove_reference(instance, ref_item)
 
