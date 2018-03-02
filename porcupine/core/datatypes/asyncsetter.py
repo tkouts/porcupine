@@ -14,8 +14,8 @@ class AsyncSetterValue:
 
     async def reset(self, value):
         descriptor, instance = self._desc, self._inst
-        if self._desc.write_permission > permissions.AUTHOR:
-            await self._desc.check_permissions(instance)
+        if descriptor.write_permission > permissions.AUTHOR:
+            await descriptor.check_permissions(instance)
         context.txn.reset_mutations(instance,
                                     '{0}.'.format(descriptor.storage_key))
         super(AsyncSetter, descriptor).__set__(instance, value)
