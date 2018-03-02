@@ -8,6 +8,7 @@ from .core.datatypes.common import String, Integer, Float, Password, Boolean, \
     Email
 from .core.datatypes.datetime import Date, DateTime
 from .core.datatypes.mutable import List, Dictionary
+from .core.datatypes.atomicmap import AtomicMap
 from .core.datatypes.counter import Counter
 from .core.datatypes.external import Blob, Text, File, ExternalFile
 from .core.datatypes.reference import ReferenceN, Reference1
@@ -19,7 +20,7 @@ __all__ = [
     'String', 'Integer', 'Float', 'Password', 'Boolean', 'Email',
     'Date', 'DateTime',
     'List', 'Dictionary',
-    'Counter',
+    'AtomicMap', 'Counter',
     'Blob', 'Text', 'File', 'ExternalFile',
     'ReferenceN', 'Reference1',
     'Relator1', 'RelatorN',
