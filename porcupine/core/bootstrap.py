@@ -13,7 +13,7 @@ from .services.blueprint import services_blueprint, services
 from .daemon import Daemon
 
 
-def run_server(scan_dir, log_config, debug=False):
+def run_server(scan_dir, debug=False):
     # register services blueprint
     server.blueprint(services_blueprint)
     porcupine_log.info('Starting Porcupine {0}'.format(__version__))
@@ -34,8 +34,6 @@ def run_server(scan_dir, log_config, debug=False):
         if os.path.isdir(static_dir_path):
             server.static('/', static_dir_path)
 
-    logging.config.dictConfig(log_config)
-
     server.run(host=server.config.HOST,
                port=int(server.config.PORT),
                workers=int(server.config.WORKERS),
@@ -45,14 +43,13 @@ def run_server(scan_dir, log_config, debug=False):
 
 
 class PorcupineDaemon(Daemon):
-    def __init__(self, scan_dir, log_config, debug=False):
+    def __init__(self, scan_dir, debug=False):
         super().__init__(server.config.PID_FILE)
         self.debug = debug
         self.scan_dir = scan_dir
-        self.log_config = log_config
 
     def run(self):
-        run_server(self.scan_dir, self.log_config, debug=self.debug)
+        run_server(self.scan_dir, debug=self.debug)
 
 
 def start(args):
@@ -67,7 +64,7 @@ def start(args):
 
     if args.daemon or args.stop or args.graceful:
         # daemon commands
-        daemon = PorcupineDaemon(current_dir, log_config, debug=args.debug)
+        daemon = PorcupineDaemon(current_dir, debug=args.debug)
         if args.daemon:
             daemon.start()
         elif args.stop:
@@ -76,7 +73,7 @@ def start(args):
             daemon.restart()
         sys.exit()
     else:
-        run_server(current_dir, log_config, debug=args.debug)
+        run_server(current_dir, debug=args.debug)
 
 
 def run():
