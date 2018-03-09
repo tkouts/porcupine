@@ -34,12 +34,14 @@ def run_server(scan_dir, log_config, debug=False):
         if os.path.isdir(static_dir_path):
             server.static('/', static_dir_path)
 
+    logging.config.dictConfig(log_config)
+
     server.run(host=server.config.HOST,
                port=int(server.config.PORT),
                workers=int(server.config.WORKERS),
                debug=debug,
                backlog=150,
-               log_config=log_config)
+               access_log=server.config.LOG_ACCESS)
 
 
 class PorcupineDaemon(Daemon):

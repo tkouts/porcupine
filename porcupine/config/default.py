@@ -51,7 +51,7 @@ DEFAULTS = {
     'LOG_FORMAT': '%(asctime)s [%(levelname)s][%(processName)s]: %(message)s',
 
     # access log
-    'LOG_ACCESS_LOG': False,
+    'LOG_ACCESS': False,
     'LOG_ACCESS_FORMAT': '%(asctime)s [%(levelname)s][%(host)s]: ' +
                          '%(request)s %(message)s %(status)d %(byte)d'
 }

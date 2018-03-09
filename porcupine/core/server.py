@@ -3,12 +3,6 @@ import sys
 
 from sanic import Sanic
 from sanic.request import Request
-try:
-    from sanic.log import DefaultFilter
-except ImportError:
-    # sanic < 0.6.0
-    from sanic.defaultFilter import DefaultFilter
-
 
 from porcupine.config.default import DEFAULTS
 from porcupine.core.router import ContextRouter
@@ -45,18 +39,8 @@ class PorcupineServer(Sanic):
         log_level = int(config.LOG_LEVEL)
         log_config = {
             'version': 1,
-            'filters': {
-                'accessFilter': {
-                    '()': DefaultFilter,
-                    'param': [0, 10, 20]
-                },
-                'errorFilter': {
-                    '()': DefaultFilter,
-                    'param': [30, 40, 50]
-                }
-            },
             'formatters': {
-                'simple': {
+                'generic': {
                     'format': config.LOG_FORMAT,
                     'datefmt': config.LOG_DATE_FORMAT
                 },
@@ -66,46 +50,50 @@ class PorcupineServer(Sanic):
                 }
             },
             'handlers': {
-                'internal': {
+                'console': {
                     'class': 'logging.StreamHandler',
-                    'filters': ['accessFilter'],
-                    'formatter': 'simple',
+                    'formatter': 'generic',
+                    'stream': sys.stdout
+                },
+                'error_console': {
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'generic',
                     'stream': sys.stderr
                 },
-                'accessStream': {
+                'access_console': {
                     'class': 'logging.StreamHandler',
-                    'filters': ['accessFilter'],
                     'formatter': 'access',
-                    'stream': sys.stderr
-                },
-                'errorStream': {
-                    'class': 'logging.StreamHandler',
-                    'filters': ['errorFilter'],
-                    'formatter': 'simple',
-                    'stream': sys.stderr
+                    'stream': sys.stdout
                 },
             },
             'loggers': {
+                'root': {
+                    'level': log_level,
+                    'handlers': ['console']
+                },
                 'porcupine': {
                     'level': log_level,
-                    'handlers': ['internal', 'errorStream']
+                    'handlers': ['console'],
+                    'propagate': True,
+                    'qualname': 'porcupine'
                 },
-                'sanic': {
+                'sanic.error': {
                     'level': log_level,
-                    'handlers': ['internal', 'errorStream']
+                    'handlers': ['error_console'],
+                    'propagate': True,
+                    'qualname': 'sanic.error'
+                },
+                'sanic.access': {
+                    'level': log_level,
+                    'handlers': ['access_console'],
+                    'propagate': True,
+                    'qualname': 'sanic.access'
                 }
             }
         }
 
         handlers = log_config['handlers']
         loggers = log_config['loggers']
-
-        if config.LOG_ACCESS_LOG:
-            # add access logger
-            loggers['network'] = {
-                'level': log_level,
-                'handlers': ['accessStream', 'errorStream']
-            }
 
         if log_to_files:
             rotate_settings = {
@@ -117,24 +105,25 @@ class PorcupineServer(Sanic):
             handlers['timedRotatingFile'] = {
                 'class': 'logging.handlers.TimedRotatingFileHandler',
                 'filename': os.path.abspath('porcupine.log'),
-                'formatter': 'simple',
+                'formatter': 'generic',
                 **rotate_settings
             }
-            for log in ('porcupine', 'sanic'):
+            for log in ('root', 'porcupine', 'sanic.error'):
                 loggers[log]['handlers'] = ['timedRotatingFile']
-            if 'network' in loggers:
+            if config.LOG_ACCESS:
                 handlers['accessTimedRotatingFile'] = {
                     'class': 'logging.handlers.TimedRotatingFileHandler',
-                    'filters': ['accessFilter'],
+                    # 'filters': ['accessFilter'],
                     'filename': os.path.abspath('access.log'),
                     'formatter': 'access',
                     **rotate_settings
                 }
-                loggers['network']['handlers'] = ['accessTimedRotatingFile']
+                loggers['sanic.access']['handlers'] = \
+                    ['accessTimedRotatingFile']
 
         return log_config
 
 
 server = PorcupineServer(router=ContextRouter(),
                          request_class=RequestWithSession,
-                         log_config=None)
+                         configure_logging=False)
