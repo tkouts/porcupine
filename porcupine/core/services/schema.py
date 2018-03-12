@@ -52,20 +52,24 @@ class SchemaMaintenance(AbstractService):
 
     @classmethod
     async def compact_collection(cls, key):
-        task = CollectionCompacter(key)
-        await cls.queue.put(task)
+        if cls.queue is not None:
+            task = CollectionCompacter(key)
+            await cls.queue.put(task)
 
     @classmethod
     async def rebuild_collection(cls, key):
-        task = CollectionReBuilder(key)
-        await cls.queue.put(task)
+        if cls.queue is not None:
+            task = CollectionReBuilder(key)
+            await cls.queue.put(task)
 
     @classmethod
     async def clean_schema(cls, key):
-        task = SchemaCleaner(key)
-        await cls.queue.put(task)
+        if cls.queue is not None:
+            task = SchemaCleaner(key)
+            await cls.queue.put(task)
 
     @classmethod
     async def remove_stale(cls, key):
-        task = StaleRemover(key)
-        await cls.queue.put(task)
+        if cls.queue is not None:
+            task = StaleRemover(key)
+            await cls.queue.put(task)

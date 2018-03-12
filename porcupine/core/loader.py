@@ -27,3 +27,9 @@ def install_apps(path: list, prefix: str='') -> None:
         porcupine_log.info(
             'Installing application {0}'.format(app_name))
         server.blueprint(app, url_prefix=app_name)
+
+
+def import_all(path):
+    for loader, name, is_pkg in pkgutil.walk_packages([path]):
+        if name not in sys.modules:
+            loader.find_module(name).load_module(name)
