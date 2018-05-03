@@ -6,7 +6,8 @@ from porcupine.core.server import server
 from porcupine.core.context import context, context_user
 
 # utils
-from porcupine.core.utils import date, permissions, get_content_class
+from porcupine.core.utils import date, permissions, get_content_class, \
+    generate_oid
 from porcupine.view import view
 from porcupine.core.aiolocals.local import wrap_gather as gather
 

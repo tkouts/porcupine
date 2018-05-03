@@ -74,6 +74,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     __record__: TYPING.STORAGE = None
     __ext_record__: TYPING.STORAGE = None
 
+    _id_size_: ClassVar[int] = 8
     is_collection: ClassVar[bool] = False
     is_composite: ClassVar[bool] = False
     is_deleted: ClassVar[bool] = False
@@ -118,7 +119,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             self.__storage__ = self.__record__(**dict_storage)
             # initialize storage with default values
             self.__add_defaults(list(self.__schema__.values()))
-            self.__storage__.id = utils.generate_oid()
+            self.__storage__.id = utils.generate_oid(self._id_size_)
             self.__storage__.sig = type(self).__sig__
         elif dict_storage['sig'] == type(self).__sig__:
             self.__storage__ = self.__record__(**dict_storage)
