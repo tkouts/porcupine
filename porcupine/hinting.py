@@ -66,4 +66,5 @@ class _Hinter:
             return object
         return Any
 
+
 TYPING = _Hinter()
