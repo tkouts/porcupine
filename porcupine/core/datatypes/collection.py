@@ -167,7 +167,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 item_id = item.__storage__.id
                 context.txn.append(collection_key, ' -{0}'.format(item_id))
 
-    async def reset(self, value: TYPING.ID_LIST) -> None:
+    async def reset(self, value: list) -> None:
         descriptor, instance = self._desc, self._inst
         # remove collection appends
         context.txn.reset_key_append(descriptor.key_for(instance))

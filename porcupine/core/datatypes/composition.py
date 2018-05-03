@@ -10,25 +10,17 @@ from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
 from porcupine.core import utils
+from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
 from .reference import ReferenceN, ItemCollection, Reference1
 from .external import Text
 
 
-class CompositeFactory(TYPING.COMPOSITION_TYPE):
-    __slots__ = ()
-
-    def factory(self,
-                clazz: Type[TYPING.COMPOSITE_CO]=None) -> TYPING.COMPOSITE_CO:
-        composite_type = clazz or self._desc.allowed_types[0]
-        with system_override():
-            composite = composite_type()
-            parent_path = getattr(self._inst, 'path', self._inst.id)
-            composite.path = utils.get_composite_path(parent_path,
-                                                      self._desc.name)
-        return composite
+def get_path(desc, instance):
+    path = getattr(instance, 'path', instance.id)
+    return utils.get_composite_path(path, desc.name)
 
 
-class EmbeddedCollection(ItemCollection, CompositeFactory):
+class EmbeddedCollection(ItemCollection):
     __slots__ = ()
 
     async def get_item_by_id(self, item_id: TYPING.ITEM_ID, quiet=True):
@@ -43,9 +35,12 @@ class EmbeddedCollection(ItemCollection, CompositeFactory):
     async def add(self, *composites: TYPING.COMPOSITE_CO):
         with system_override():
             await super().add(*composites)
+            composite_path = get_path(self._desc, self._inst)
             for composite in composites:
                 if not composite.__is_new__:
                     raise TypeError('Can only add new items to composition')
+                # set composite path
+                composite.path = composite_path
                 await context.txn.insert(composite)
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
@@ -82,33 +77,32 @@ class Composition(ReferenceN):
                 raise TypeError('Can only add new items to composition')
             await context.txn.insert(composite)
         with system_override():
-            await super().on_create(instance,
-                                    [c.__storage__.id for c in value])
+            await super().on_create(instance, [c.__storage__.id for c in value])
 
     async def on_change(self,
                         instance: TYPING.ANY_ITEM_CO,
-                        value: List[TYPING.COMPOSITE_CO],
+                        composites: List[TYPING.COMPOSITE_CO],
                         old_value: TYPING.ID_LIST):
         collection = getattr(instance, self.name)
         old_ids = frozenset(old_value)
-        new_ids = frozenset([c.__storage__.id for c in value])
+        new_ids = frozenset([c.__storage__.id for c in composites])
         removed_ids = old_ids.difference(new_ids)
-        added = []
         with system_override():
+            added = []
+            removed = []
             if removed_ids:
-                removed = []
                 get_multi = utils.multi_with_stale_resolution
                 async for composite in get_multi(removed_ids):
                     removed.append(composite)
-                    await context.txn.delete(composite)
-                await super(EmbeddedCollection, collection).remove(*removed)
-            for composite in value:
+            for composite in composites:
                 if composite.__is_new__:
-                    await context.txn.insert(composite)
                     added.append(composite)
                 else:
                     await context.txn.upsert(composite)
-            await super(EmbeddedCollection, collection).add(*added)
+            if removed:
+                await collection.remove(*removed)
+            if added:
+                await collection.add(*added)
 
     async def on_delete(self, instance, value):
         collection = self.__get__(instance, None)
@@ -133,8 +127,9 @@ class Composition(ReferenceN):
         collection = getattr(instance, self.name)
         item_dict = request.json
         try:
-            composite = collection.factory()
-            await composite.apply_patch(item_dict)
+            if 'type' not in item_dict:
+                item_dict['type'] = self.allowed_types[0].__name__
+            composite = await instance.new_from_dict(item_dict)
             await collection.add(composite)
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
@@ -157,9 +152,11 @@ class Composition(ReferenceN):
                 if composite_id:
                     composite = await collection.get_item_by_id(composite_id)
                     composite.reset()
+                    await composite.apply_patch(item_dict)
                 else:
-                    composite = collection.factory()
-                await composite.apply_patch(item_dict)
+                    if 'type' not in item_dict:
+                        item_dict['type'] = self.allowed_types[0].__name__
+                    composite = await instance.new_from_dict(item_dict)
                 composites.append(composite)
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
@@ -168,27 +165,31 @@ class Composition(ReferenceN):
         return composites
 
 
-class EmbeddedItem(CompositeFactory):
-    __slots__ = '_desc', '_inst'
-
-    def __init__(self, descriptor: 'Embedded', instance):
-        self._desc = descriptor
-        self._inst = instance
-
-    def factory(self,
-                clazz: Type[TYPING.COMPOSITE_CO]=None) -> TYPING.COMPOSITE_CO:
-        composite = super().factory(clazz)
+class EmbeddedItem(AsyncSetterValue):
+    async def reset(self, composite):
+        await super().reset(composite)
+        if composite and not composite.__is_new__:
+            # TODO: revisit
+            raise TypeError('Can only set new composite items to '
+                            '{0}'.format(self._desc.name))
+        # set composite path
         with system_override():
-            composite.id = self._desc.key_for(self._inst)
-        return composite
+            composite.path = get_path(self._desc, self._inst)
 
     async def item(self, quiet=True) -> TYPING.COMPOSITE_CO:
-        with system_override():
-            composite_id = self._desc.key_for(self._inst)
-            return await db.get_item(composite_id, quiet=quiet)
+        composite = None
+        value = self._desc.get_value(self._inst)
+        if value is not None:
+            if isinstance(value, str):
+                _, composite_id = value.split(':')
+                with system_override():
+                    composite = await db.get_item(composite_id, quiet=quiet)
+            else:
+                composite = value
+        return composite
 
 
-class Embedded(Reference1):
+class Embedded(AsyncSetter, Reference1):
     """
     This data type is used for embedding a composite object to
     another item.
@@ -196,29 +197,10 @@ class Embedded(Reference1):
     @see: L{porcupine.schema.Composite}
     """
     safe_type = Composite
-    storage_info = '_comp1_'
-    storage = '__externals__'
     # TODO: disallow unique
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
+    def getter(self, instance, value=None):
         return EmbeddedItem(self, instance)
-
-    def __set__(self, instance, composite):
-        if composite and not composite.__is_new__:
-            # TODO: revisit
-            raise TypeError(
-                'Can only set new composite items to {0}'.format(self.name))
-        super().__set__(instance, composite)
-
-    def set_default(self, instance, value=None):
-        super().set_default(instance, value)
-        # add external info
-        setattr(instance.__storage__, self.name, self.storage_info)
-
-    def key_for(self, instance):
-        return utils.get_composite_path(instance.id, self.name)
 
     def snapshot(self, instance, composite, previous_value):
         # unconditional snapshot
@@ -234,11 +216,17 @@ class Embedded(Reference1):
         if composite is not None:
             await context.txn.insert(composite)
             with system_override():
+                # validate value
                 await super().on_create(instance, composite.__storage__.id)
+            # keep composite id in snapshot
+            super().snapshot(instance, '_comp1_:{0}'.format(composite.id), None)
         else:
+            # None validation
             await super().on_create(instance, None)
 
-    async def on_change(self, instance, composite, old_value):
+    async def on_change(self, instance,
+                        composite: TYPING.COMPOSITE_CO,
+                        old_composite_id: str):
         if composite is None:
             self.validate(None)
             await self.on_delete(instance, None)

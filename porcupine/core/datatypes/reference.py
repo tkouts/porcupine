@@ -62,7 +62,7 @@ class Reference1(String, Acceptable):
         if instance is None:
             return self
         value = super().__get__(instance, owner)
-        if value:
+        if value is not None:
             return ItemReference(value)
 
     async def on_create(self, instance, value):

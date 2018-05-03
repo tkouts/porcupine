@@ -1,6 +1,6 @@
 from porcupine import db, context, exceptions
 from porcupine.contract import contract
-from porcupine.datatypes import String
+from porcupine.datatypes import String, ReferenceN
 from porcupine.core.context import system_override
 from .elastic import Elastic
 
@@ -25,11 +25,6 @@ class Composite(Elastic):
     path = String(required=True, readonly=True, protected=True,
                   immutable=True)  # type: str
 
-    def __init__(self, dict_storage=None):
-        super().__init__(dict_storage)
-        if self.__is_new__ and not context.system_override:
-            raise TypeError('Composite objects cannot be instantiated')
-
     @property
     async def effective_acl(self):
         item = await self.item
@@ -42,6 +37,10 @@ class Composite(Elastic):
     @property
     def parent_id(self):
         return self.path.split('.')[-2]
+
+    @property
+    def property_name(self):
+        return self.path.split('.')[-1]
 
     @property
     async def item(self):
@@ -64,9 +63,16 @@ class Composite(Elastic):
         await item.touch()
 
     async def update(self):
-        if self.__snapshot__:
-            await context.txn.upsert(self)
         item = await self.item
+        if self.__snapshot__:
+            prop_name = self.property_name
+            data_type = item.__schema__[prop_name]
+            if isinstance(data_type, ReferenceN):
+                # composition
+                await context.txn.upsert(self)
+            else:
+                # embedded
+                setattr(item, prop_name, self)
         await item.update()
 
     async def remove(self):

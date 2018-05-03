@@ -7,7 +7,7 @@ from porcupine.hinting import TYPING
 
 class AsyncSetterValue:
     def __init__(self,
-                 descriptor: TYPING.DT_MULTI_REFERENCE_CO,
+                 descriptor: TYPING.DT_CO,
                  instance: TYPING.ANY_ITEM_CO):
         self._desc = descriptor
         self._inst = instance

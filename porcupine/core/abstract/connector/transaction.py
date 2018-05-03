@@ -72,18 +72,18 @@ class Transaction:
             self.connector.raise_exists(item.id)
 
         await item.on_create()
-        item.__reset__()
-        self._items[item.id] = item
 
         # execute data types on_create handlers
         for data_type in item.__schema__.values():
             try:
-                _ = data_type.on_create(item,
-                                        data_type.get_value(item))
+                _ = data_type.on_create(item, data_type.get_value(item))
                 if isawaitable(_):
                     await _
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
+
+        item.__reset__()
+        self._items[item.id] = item
 
         # unique handling
         if not item.is_composite:
@@ -94,7 +94,9 @@ class Transaction:
             # print(item.id, item.__snapshot__)
             uniques = [dt for dt in item.__schema__.values() if dt.unique]
             uniques_changed = []
+
             await item.on_change()
+
             # execute data types on_change handlers
             for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
@@ -132,6 +134,7 @@ class Transaction:
                         uniques.get_value(item)
                     )
                     self.insert_external(new_unique, item.__storage__.id)
+
         item.__reset__()
         self._items[item.id] = item
 
@@ -180,7 +183,7 @@ class Transaction:
             await gather(*[self.restore(child) for child in children])
 
     def mutate(self, item, path, mutation_type, value):
-        self._sd[item.id][path] = (mutation_type, value)
+        self._sd[item.id][path] = mutation_type, value
 
     def append(self, key, value):
         if key in self._ext_insertions:
