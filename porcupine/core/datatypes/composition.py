@@ -2,7 +2,7 @@
 Porcupine composition data types
 ================================
 """
-from typing import Type, AsyncIterator, List
+from typing import Optional, AsyncIterator, List
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions, context
@@ -11,6 +11,7 @@ from porcupine.core.context import system_override
 from porcupine.core.schema.composite import Composite
 from porcupine.core import utils
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
+from .datatype import DataType
 from .reference import ReferenceN, ItemCollection, Reference1
 from .external import Text
 
@@ -168,13 +169,14 @@ class Composition(ReferenceN):
 class EmbeddedItem(AsyncSetterValue):
     async def reset(self, composite):
         await super().reset(composite)
-        if composite and not composite.__is_new__:
-            # TODO: revisit
-            raise TypeError('Can only set new composite items to '
-                            '{0}'.format(self._desc.name))
-        # set composite path
-        with system_override():
-            composite.path = get_path(self._desc, self._inst)
+        if composite is not None:
+            if not composite.__is_new__:
+                # TODO: revisit
+                raise TypeError('Can only set new composite items to '
+                                '{0}'.format(self._desc.name))
+            # set composite path
+            with system_override():
+                composite.path = get_path(self._desc, self._inst)
 
     async def item(self, quiet=True) -> TYPING.COMPOSITE_CO:
         composite = None
@@ -212,32 +214,38 @@ class Embedded(AsyncSetter, Reference1):
         if composite:
             self.__set__(instance, await composite.clone(memo))
 
-    async def on_create(self, instance, composite):
+    async def on_create(self, instance, composite: TYPING.COMPOSITE_CO):
         if composite is not None:
+            composite_id = composite.id
             await context.txn.insert(composite)
             with system_override():
                 # validate value
-                await super().on_create(instance, composite.__storage__.id)
+                await super().on_create(instance, composite_id)
             # keep composite id in snapshot
-            super().snapshot(instance, '_comp1_:{0}'.format(composite.id), None)
+            super().snapshot(instance, '_comp1_:{0}'.format(composite_id), None)
         else:
             # None validation
             await super().on_create(instance, None)
 
     async def on_change(self, instance,
                         composite: TYPING.COMPOSITE_CO,
-                        old_composite_id: str):
-        if composite is None:
-            self.validate(None)
-            await self.on_delete(instance, None)
-        else:
+                        old_composite_id: Optional[str]):
+        if composite is not None:
             await self.on_create(instance, composite)
+        DataType.on_change(self,
+                           instance,
+                           '_comp1_:{0}'.format(composite.id),
+                           old_composite_id)
+        if old_composite_id is not None:
+            await self.on_delete(instance, old_composite_id)
 
-    async def on_delete(self, instance, value):
-        embedded = self.__get__(instance, type(instance))
-        composite = await embedded.item()
-        if composite:
-            await context.txn.delete(composite)
+    async def on_delete(self, instance, value: Optional[str]):
+        if value is not None:
+            _, composite_id = value.split(':')
+            with system_override():
+                composite = await db.get_item(composite_id)
+            if composite is not None:
+                await context.txn.delete(composite)
 
     # HTTP views
     # These are called when there is no embedded item
