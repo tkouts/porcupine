@@ -5,7 +5,7 @@ from porcupine import db, context, exceptions, gather
 from porcupine.core.context import system_override
 from porcupine.core.datatypes.system import Deleted, ParentId
 from porcupine.core import utils
-from porcupine.core.utils import permissions, date
+from porcupine.core.utils import date
 from porcupine.datatypes import Embedded, Composition
 
 
@@ -96,9 +96,7 @@ class Cloneable(TYPING.ITEM_TYPE):
                 'The destination is contained in the source.')
 
         # check permissions on target folder
-        user = context.user
-        user_role = await permissions.resolve(target, user)
-        if user_role < permissions.AUTHOR:
+        if not await target.can_update(context.user):
             raise exceptions.Forbidden('Forbidden')
         with system_override():
             return await self._copy(target,
@@ -125,39 +123,25 @@ class Movable(TYPING.ITEM_TYPE):
         @type target: L{Container}
         @return: None
         """
-        if self.is_system:
-            raise exceptions.Forbidden('Forbidden')
-
-        user = context.user
-        user_role = await permissions.resolve(self, user)
-        can_move = (
-            (user_role > permissions.AUTHOR) or
-            (user_role == permissions.AUTHOR and self.owner == user.id)
-        )
-        user_role2 = await permissions.resolve(target, user)
-
         if self.is_collection and await target.is_contained_in(self):
             raise exceptions.InvalidUsage(
                 'Cannot move item to destination. '
                 'The destination is contained in the source.')
 
-        if not can_move or user_role2 < permissions.AUTHOR:
-            raise exceptions.Forbidden('Forbidden')
+        parent = await db.connector.get(self.parent_id)
 
         with system_override():
-            parent_id = self.parent_id
             self.parent_id = target.id
             self.modified = date.utcnow()
-            parent = await db.connector.get(parent_id)
 
-            if self.is_collection:
-                await target.containers.add(self)
-                await parent.containers.remove(self)
-            else:
-                await target.items.add(self)
-                await parent.items.remove(self)
+        if self.is_collection:
+            await super(type(parent.containers), parent.containers).remove(self)
+            await super(type(target.containers), target.containers).add(self)
+        else:
+            await super(type(parent.items), parent.items).remove(self)
+            await super(type(target.items), target.items).add(self)
 
-            await context.txn.upsert(self)
+        await context.txn.upsert(self)
 
 
 class Removable(TYPING.ITEM_TYPE):
@@ -178,28 +162,18 @@ class Removable(TYPING.ITEM_TYPE):
 
         @return: None
         """
-        if not context.system_override:
-            user = context.user
-            user_role = await permissions.resolve(self, user)
-            can_delete = (
-                (user_role > permissions.AUTHOR) or
-                (user_role == permissions.AUTHOR and self.owner == user.id)
-            )
+        if self.parent_id is not None:
+            parent = await db.connector.get(self.parent_id)
+            if parent is not None:
+                if self.is_collection:
+                    await parent.containers.remove(self)
+                else:
+                    await parent.items.remove(self)
         else:
-            can_delete = True
-
-        if not can_delete or self.is_system:
-            raise exceptions.Forbidden('Forbidden')
-
-        with system_override():
-            if self.parent_id is not None:
-                parent = await db.connector.get(self.parent_id)
-                if parent is not None:
-                    # update parent
-                    if self.is_collection:
-                        await parent.containers.remove(self)
-                    else:
-                        await parent.items.remove(self)
+            # root item
+            can_delete = await self.can_delete(context.user)
+            if not can_delete:
+                raise exceptions.Forbidden('Forbidden')
             await context.txn.delete(self)
 
     @db.transactional()
@@ -214,20 +188,15 @@ class Recyclable(TYPING.ITEM_TYPE):
     is_deleted = Deleted()
 
     async def restore(self) -> None:
-        user = context.user
-        user_role = await permissions.resolve(self, user)
-        can_restore = (
-            (user_role > permissions.AUTHOR) or
-            (user_role == permissions.AUTHOR and self.owner == user.id)
-        )
+        can_restore = await self.can_delete(context.user)
         if not can_restore:
             raise exceptions.Forbidden('Forbidden')
 
+        utils.add_uniques(self)
         with system_override():
-            utils.add_uniques(self)
             self.is_deleted -= 1
-            await context.txn.upsert(self)
-            await context.txn.restore(self)
+        await context.txn.upsert(self)
+        await context.txn.restore(self)
 
     async def recycle_to(self, recycle_bin: TYPING.RECYCLE_BIN_CO) -> None:
         """
@@ -239,25 +208,21 @@ class Recyclable(TYPING.ITEM_TYPE):
         @type recycle_bin: RecycleBin
         @return: None
         """
-        user = context.user
-        user_role = await permissions.resolve(self, user)
-        can_delete = (
-            (user_role > permissions.AUTHOR) or
-            (user_role == permissions.AUTHOR and self.owner == user.id)
-        )
-        if not can_delete or self.is_system:
+        can_delete = await self.can_delete(context.user)
+        if not can_delete:
             raise exceptions.Forbidden('Forbidden')
 
         from .recycle import DeletedItem, RecycleBin
         if not isinstance(recycle_bin, RecycleBin):
             raise TypeError("'{0}' is not instance of RecycleBin"
                             .format(type(recycle_bin).__name__))
+
+        deleted = DeletedItem(deleted_item=self)
+        deleted.location = await self.full_path(include_self=False)
+        utils.remove_uniques(self)
         with system_override():
-            utils.remove_uniques(self)
             # mark as deleted
             self.is_deleted += 1
-            await context.txn.upsert(self)
-            await context.txn.recycle(self)
-            deleted = DeletedItem(deleted_item=self)
-            deleted.location = await self.full_path(include_self=False)
             await deleted.append_to(recycle_bin)
+        await context.txn.upsert(self)
+        await context.txn.recycle(self)

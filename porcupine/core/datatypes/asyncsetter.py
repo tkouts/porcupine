@@ -14,16 +14,14 @@ class AsyncSetterValue:
 
     async def reset(self, value):
         descriptor, instance = self._desc, self._inst
-        if descriptor.write_permission > permissions.AUTHOR:
-            await descriptor.check_permissions(instance)
+        if not await descriptor.can_modify(instance):
+            raise exceptions.Forbidden('Forbidden')
         context.txn.reset_mutations(instance,
                                     '{0}.'.format(descriptor.storage_key))
         super(AsyncSetter, descriptor).__set__(instance, value)
 
 
 class AsyncSetter(Type[TYPING.DT_CO], metaclass=abc.ABCMeta):
-    write_permission = permissions.AUTHOR
-
     @abc.abstractmethod
     def getter(self, instance, value=None):
         raise NotImplementedError
@@ -42,14 +40,6 @@ class AsyncSetter(Type[TYPING.DT_CO], metaclass=abc.ABCMeta):
         raise AttributeError('Cannot directly set the {0}. '
                              'Use the reset method instead.'.format(self.name))
 
-    async def check_permissions(self, instance):
-        user_role = await permissions.resolve(instance, context.user)
-        if user_role < self.write_permission:
-            raise exceptions.Forbidden('Forbidden')
-
-    async def touch(self, instance):
-        if self.write_permission > permissions.AUTHOR:
-            await self.check_permissions(instance)
-        is_set = self.storage_key in instance.__snapshot__
-        if not instance.__is_new__ and not is_set:
-            await instance.touch()
+    @staticmethod
+    async def can_modify(instance):
+        return await instance.can_update(context.user)

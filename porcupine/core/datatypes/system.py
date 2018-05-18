@@ -1,8 +1,10 @@
-from porcupine import context, db
+from porcupine import context, db, exceptions
+from porcupine.hinting import TYPING
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.core.utils import permissions
+from porcupine.core.utils import permissions, date
+from .collection import ItemCollection
 from .common import String
 from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
@@ -26,14 +28,17 @@ class AclValue(AtomicMapValue):
 
 
 class Acl(AtomicMap):
-    write_permission = permissions.COORDINATOR
-
     def __init__(self):
         super().__init__(default=None, accepts=(int, ),
                          protected=True, allow_none=True)
 
     def getter(self, instance, value=None):
         return AclValue(self, instance, value)
+
+    @staticmethod
+    async def can_modify(instance):
+        user_role = await permissions.resolve(instance, context.user)
+        return user_role == permissions.COORDINATOR
 
     # HTTP views
     async def get(self, instance, _):
@@ -49,11 +54,40 @@ class SchemaSignature(String):
         await SchemaMaintenance.clean_schema(instance.id)
 
 
+class ChildrenCollection(ItemCollection):
+    async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
+        parent = self._inst
+        parent_id = parent.id
+        user = context.user
+
+        await super().add(*items)
+
+        for item in items:
+            if not item.__is_new__:
+                raise exceptions.DBAlreadyExists('Object already exists')
+
+            with system_override():
+                item.owner = user.id
+                item.created = item.modified = date.utcnow()
+                item.modified_by = user.name
+                item.parent_id = parent_id
+            # insert item to DB
+            await context.txn.insert(item)
+
+    async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
+        await super().remove(*items)
+        for item in items:
+            await context.txn.delete(item)
+
+
 class Children(ReferenceN):
     name = None
 
     def __init__(self, **kwargs):
         super().__init__(readonly=True, **kwargs)
+
+    def getter(self, instance, value=None):
+        return ChildrenCollection(self, instance)
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -80,6 +114,15 @@ class Children(ReferenceN):
             if target:
                 await super().accepts_item(target)
         return await super().accepts_item(item)
+
+    # permission providers
+    @staticmethod
+    async def can_add(container, *items):
+        return await container.can_append(context.user)
+
+    @staticmethod
+    async def can_remove(_, *items):
+        return all([await item.can_delete(context.user) for item in items])
 
     # HTTP views
 

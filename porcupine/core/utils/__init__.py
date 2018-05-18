@@ -7,7 +7,6 @@ import functools
 import hashlib
 import random
 from typing import Optional, AsyncIterator, Union
-from collections import ChainMap
 import mmh3
 
 from porcupine.hinting import TYPING
@@ -125,42 +124,30 @@ async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
     if item.__is_new__:
         return 1
     connector = db.connector
-    acl_list = []
-    got_acl = False
+    # check for stale / expired / deleted
+    it = item
     while True:
-        if not item.is_composite:
+        if not it.is_composite:
             # check expiration
-            if item.expires_at is not None:
-                if time.time() > item.expires_at:
+            if it.expires_at is not None:
+                if time.time() > it.expires_at:
                     # expired - remove from DB
-                    await SchemaMaintenance.remove_stale(item.id)
+                    await SchemaMaintenance.remove_stale(it.id)
                     return None
-            if item.is_deleted:
+            if it.is_deleted:
                 return None
-            acl = item.acl
-            if not got_acl and acl.is_set():
-                acl_list.append(acl)
-                if not acl.is_partial():
-                    got_acl = True
-            if item.is_system and got_acl:
+            if it.is_system:
                 break
-        if item.parent_id is None:
+        if it.parent_id is None:
             break
         else:
-            item = await connector.get(item.parent_id)
-            if item is None:
+            it = await connector.get(it.parent_id)
+            if it is None:
                 # stale - remove from DB
-                await SchemaMaintenance.remove_stale(item.id)
+                await SchemaMaintenance.remove_stale(it.id)
                 return None
 
-    acl_chain = ChainMap(*acl_list)
-
-    if acl_chain.get('everyone', 0) > 0:
-        if 0 not in acl_chain.values():
-            return 1
-
-    # return user role
-    return await resolve_acl(acl_chain, user)
+    return 1 if await item.can_read(user) else 0
 
 
 async def multi_with_stale_resolution(

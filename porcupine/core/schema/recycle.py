@@ -8,16 +8,15 @@ from .container import Container
 
 
 class DeletedItem(GenericItem):
-    location = String(readonly=True, required=True)
+    location = String(immutable=True, required=True)
     name = String(required=True, unique=False)
 
     def __init__(self, dict_storage=None, deleted_item=None):
         super().__init__(dict_storage)
         if deleted_item is not None:
             self.name = deleted_item.name
-            with system_override():
-                # make sure each item is recycled once
-                self.id = 'del:{0}'.format(deleted_item.id)
+            # make sure each item is recycled once
+            self.__storage__.id = 'del:{0}'.format(deleted_item.id)
 
     async def deleted_item(self):
         with system_override():

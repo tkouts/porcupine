@@ -163,6 +163,16 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
     # allow regular snapshots
     snapshot = DataType.snapshot
 
+    # permissions providers
+
+    @staticmethod
+    async def can_add(instance, *items):
+        return await instance.can_update(context.user)
+
+    can_remove = can_add
+
+    # Event handlers
+
     async def on_create(self, instance, value):
         if value:
             ref_items = [i async for i in db.get_multi(value)]

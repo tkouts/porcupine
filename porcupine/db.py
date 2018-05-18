@@ -111,7 +111,7 @@ def transactional(auto_commit=True):
                         except exceptions.DBDeadlockError:
                             await txn.abort()
                             retries += 1
-                        except:
+                        except Exception:
                             await txn.abort()
                             raise
                     # maximum retries exceeded

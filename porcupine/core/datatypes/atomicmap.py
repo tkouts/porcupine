@@ -1,4 +1,4 @@
-from porcupine import context, db
+from porcupine import context, db, exceptions
 from porcupine.core.utils import collections
 from porcupine.core.datatypes.mutable import Dictionary
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
@@ -14,21 +14,27 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
 
     async def set(self, key: str, value):
         descriptor, instance = self._desc, self._inst
+        if not await descriptor.can_modify(instance):
+            raise exceptions.Forbidden('Forbidden')
         descriptor.validate_map_value(value)
-        await descriptor.touch(instance)
+        await instance.touch()
         self._dct[key] = value
-        context.txn.mutate(instance,
-                           '{0}.{1}'.format(descriptor.storage_key, key),
-                           db.connector.SUB_DOC_UPSERT_MUT,
-                           value)
+        if not instance.__is_new__:
+            context.txn.mutate(instance,
+                               '{0}.{1}'.format(descriptor.storage_key, key),
+                               db.connector.SUB_DOC_UPSERT_MUT,
+                               value)
 
     async def delete(self, key: str):
         descriptor, instance = self._desc, self._inst
-        await descriptor.touch(instance)
+        if not await descriptor.can_modify(instance):
+            raise exceptions.Forbidden('Forbidden')
+        await instance.touch()
         del self._dct[key]
-        context.txn.mutate(instance,
-                           '{0}.{1}'.format(descriptor.storage_key, key),
-                           db.connector.SUB_DOC_REMOVE, None)
+        if not instance.__is_new__:
+            context.txn.mutate(instance,
+                               '{0}.{1}'.format(descriptor.storage_key, key),
+                               db.connector.SUB_DOC_REMOVE, None)
 
     def to_dict(self):
         if self._dct is None:

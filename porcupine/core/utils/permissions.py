@@ -16,12 +16,12 @@ CONTENT_CO = 4
 COORDINATOR = 8
 
 
-async def resolve(item, user):
+async def resolve(item, user) -> int:
     acl = await item.effective_acl
     return await resolve_acl(acl, user)
 
 
-async def resolve_acl(acl, user_or_group):
+async def resolve_acl(acl, user_or_group) -> int:
     # print(acl, user_or_group)
     member_of = set()
     if user_or_group is not None:

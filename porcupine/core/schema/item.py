@@ -1,5 +1,5 @@
 import time
-from typing import List, Optional
+from typing import List, Optional, Mapping
 from collections import ChainMap
 
 from porcupine.hinting import TYPING
@@ -33,6 +33,8 @@ class GenericItem(Removable, Elastic):
     :cvar description: A short description.
     :type description: str
     """
+    __slots__ = '__effective_acl'
+
     # system attributes
     parent_id = String(readonly=True, allow_none=True,
                        default=None, store_as='pid')
@@ -51,25 +53,28 @@ class GenericItem(Removable, Elastic):
     name = String(required=True, unique=True)
     description = String(store_as='desc')
 
+    def __init__(self, dict_storage=None):
+        super().__init__(dict_storage)
+        self.__effective_acl = None
+
     @property
     def friendly_name(self):
         return '{0}({1})'.format(self.name, self.content_class)
 
     @property
-    async def effective_acl(self) -> ChainMap:
-        get = db.connector.get
-        item = self
-        acl_list = []
-        while True:
-            acl = item.acl
-            if item.parent_id is None:
-                break
-            if acl.is_set():
-                acl_list.append(acl)
-                if not acl.is_partial():
-                    break
-            item = await get(item.parent_id)
-        return ChainMap(*acl_list)
+    async def effective_acl(self) -> Mapping:
+        if self.__effective_acl is None:
+            acl = self.acl
+            if not acl.is_set() or acl.is_partial():
+                parent = await db.connector.get(self.parent_id)
+                parent_acl = await parent.effective_acl
+                if acl.is_partial():
+                    self.__effective_acl = ChainMap(*[acl, parent_acl])
+                else:
+                    self.__effective_acl = parent_acl
+            else:
+                self.__effective_acl = acl
+        return self.__effective_acl
 
     async def clone(self, memo: dict=None) -> 'GenericItem':
         clone: 'GenericItem' = await super().clone(memo)
@@ -156,30 +161,23 @@ class GenericItem(Removable, Elastic):
         @type parent: L{Container}
         @return: None
         """
-        if not self.__is_new__:
-            raise exceptions.DBAlreadyExists('Object already exists')
-
-        user = context.user
-        with system_override():
-            self.owner = user.id
-            self.created = self.modified = date.utcnow()
-            self.modified_by = user.name
-            if parent is not None:
-                self.parent_id = parent.__storage__.id
-
-        await context.txn.insert(self)
         if parent is not None:
             if self.is_collection:
                 await parent.containers.add(self)
             else:
                 await parent.items.add(self)
+        else:
+            # ROOT item
+            if not self.__is_new__:
+                raise exceptions.DBAlreadyExists('Object already exists')
+            user = context.user
+            with system_override():
+                self.owner = user.id
+                self.created = self.modified = date.utcnow()
+                self.modified_by = user.name
+            await context.txn.insert(self)
 
     async def touch(self) -> None:
-        if not (self.__is_new__ or context.system_override):
-            user = context.user
-            user_role = await permissions.resolve(self, user)
-            if user_role < permissions.AUTHOR:
-                raise exceptions.Forbidden('Forbidden')
         # touch has to be fast / no event handlers
         now = date.utcnow().isoformat()
         self.__storage__.md = now
@@ -197,22 +195,18 @@ class GenericItem(Removable, Elastic):
         @return: None
         """
         if self.__snapshot__:
+            user = context.user
+            if not await self.can_update(user):
+                raise exceptions.Forbidden('Forbidden')
+
             if self.parent_id is not None:
                 parent = await db.connector.get(self.parent_id)
-            else:
-                parent = None
-
-            user = context.user
-            if not context.system_override:
-                user_role = await permissions.resolve(self, user)
-                if user_role < permissions.AUTHOR:
-                    raise exceptions.Forbidden('Forbidden')
+                await parent.touch()
 
             with system_override():
                 self.modified_by = user.name
                 self.modified = date.utcnow()
-                if parent is not None:
-                    await parent.touch()
+
             await context.txn.upsert(self)
 
     def expires(self, at=None, after_seconds=None):
@@ -220,6 +214,30 @@ class GenericItem(Removable, Elastic):
             if at is None:
                 at = int(time.time())
             self.expires_at = at + after_seconds
+
+    # permissions providers
+    async def can_read(self, membership):
+        if context.system_override:
+            return True
+        user_role = await permissions.resolve(self, membership)
+        return user_role > permissions.NO_ACCESS
+
+    async def can_update(self, membership) -> bool:
+        if context.system_override:
+            return True
+        user_role = await permissions.resolve(self, membership)
+        return user_role >= permissions.AUTHOR
+
+    async def can_delete(self, membership) -> bool:
+        if self.is_system:
+            return False
+        elif context.system_override:
+            return True
+        user_role = await permissions.resolve(self, membership)
+        return (
+            user_role > permissions.AUTHOR or
+            user_role == permissions.AUTHOR and self.owner == membership.id
+        )
 
     # HTTP views
     def get(self, _):

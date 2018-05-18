@@ -117,6 +117,9 @@ class Container(Item):
             return True
         return False
 
+    # permissions providers
+    can_append = Item.can_update
+
     @view
     async def children(self, _):
         # TODO: add support for resolve_shortcuts

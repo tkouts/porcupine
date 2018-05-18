@@ -23,7 +23,7 @@ class Composite(Elastic):
     """
     is_composite = True
     path = String(required=True, readonly=True, protected=True,
-                  immutable=True)  # type: str
+                  immutable=True)
 
     @property
     async def effective_acl(self):
@@ -87,6 +87,15 @@ class Composite(Elastic):
             # embedded
             setattr(parent, comp_name, None)
             await context.txn.upsert(parent)
+
+    # permissions providers
+    async def can_read(self, membership) -> bool:
+        item = await self.item
+        return await item.can_read(membership)
+
+    async def can_update(self, membership) -> bool:
+        item = await self.item
+        return await item.can_update(membership)
 
     # HTTP views
     def get(self, _):

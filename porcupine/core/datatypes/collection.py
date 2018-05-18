@@ -149,7 +149,9 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
             descriptor, instance = self._desc, self._inst
-            await descriptor.touch(instance)
+            if not await descriptor.can_add(instance, *items):
+                raise exceptions.Forbidden('Forbidden')
+            await instance.touch()
             collection_key = descriptor.key_for(instance)
             for item in items:
                 if not await descriptor.accepts_item(item):
@@ -161,7 +163,9 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
             descriptor, instance = self._desc, self._inst
-            await descriptor.touch(instance)
+            if not await descriptor.can_remove(instance, *items):
+                raise exceptions.Forbidden('Forbidden')
+            await instance.touch()
             collection_key = descriptor.key_for(instance)
             for item in items:
                 item_id = item.__storage__.id

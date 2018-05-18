@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from porcupine import exceptions, log, gather
 from porcupine.core import utils
+from porcupine.core.context import system_override
 
 
 class Transaction:
@@ -140,8 +141,9 @@ class Transaction:
 
     async def delete(self, item):
         if item.is_collection:
-            children = await item.get_children()
-            await gather(*[self.delete(child) for child in children])
+            with system_override():
+                children = await item.get_children()
+                await gather(*[self.delete(child) for child in children])
 
         await item.on_delete()
 
@@ -160,6 +162,7 @@ class Transaction:
 
     async def recycle(self, item):
         data_types = item.__schema__.values()
+
         # execute data types on_recycle handlers
         for dt in data_types:
             _ = dt.on_recycle(item, dt.get_value(item))
@@ -167,11 +170,13 @@ class Transaction:
                 await _
 
         if item.is_collection:
-            children = await item.get_children()
-            await gather(*[self.recycle(child) for child in children])
+            with system_override():
+                children = await item.get_children()
+                await gather(*[self.recycle(child) for child in children])
 
     async def restore(self, item):
         data_types = item.__schema__.values()
+
         # execute data types on_restore handlers
         for dt in data_types:
             _ = dt.on_restore(item, dt.get_value(item))
@@ -179,8 +184,9 @@ class Transaction:
                 await _
 
         if item.is_collection:
-            children = await item.get_children()
-            await gather(*[self.restore(child) for child in children])
+            with system_override():
+                children = await item.get_children()
+                await gather(*[self.restore(child) for child in children])
 
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = mutation_type, value
