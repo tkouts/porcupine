@@ -3,7 +3,7 @@ from porcupine.hinting import TYPING
 from porcupine.contract import contract
 from porcupine.core.context import system_override
 from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.core.utils import permissions, date
+from porcupine.core.utils import permissions, date, add_uniques, remove_uniques
 from .collection import ItemCollection
 from .common import String
 from .counter import Counter
@@ -159,7 +159,17 @@ class Containers(Children):
 class Deleted(Counter):
 
     def __init__(self):
-        super().__init__(readonly=True, protected=True, store_as='dl')
+        super().__init__(readonly=True, protected=True, store_as='dl',
+                         lock_on_update=True)
+
+    def on_change(self, instance, value, old_value):
+        super().on_change(instance, value, old_value)
+        if value and not old_value:
+            # recycled
+            remove_uniques(instance)
+        elif not value and old_value:
+            # restored
+            add_uniques(instance)
 
     @contract(accepts=bool)
     @db.transactional()
@@ -177,6 +187,19 @@ class ParentId(String):
     def __init__(self):
         super().__init__(default=None, readonly=True, allow_none=True,
                          store_as='pid')
+
+    def on_create(self, instance, value):
+        super().on_create(instance, value)
+        add_uniques(instance)
+
+    def on_change(self, instance, value, old_value):
+        super().on_change(instance, value, old_value)
+        remove_uniques(instance)
+        add_uniques(instance)
+
+    def on_delete(self, instance, value):
+        super().on_delete(instance, value)
+        remove_uniques(instance)
 
     @contract(accepts=str)
     @db.transactional()

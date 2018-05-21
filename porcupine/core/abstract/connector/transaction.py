@@ -86,26 +86,17 @@ class Transaction:
         item.__reset__()
         self._items[item.id] = item
 
-        # unique handling
-        if not item.is_composite:
-            utils.add_uniques(item)
-
     async def upsert(self, item):
         if item.__snapshot__:
-            # print(item.id, item.__snapshot__)
-            uniques = [dt for dt in item.__schema__.values() if dt.unique]
-            uniques_changed = []
+            locks = []
 
             await item.on_change()
 
             # execute data types on_change handlers
             for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
-                if data_type.name == 'parent_id':
-                    # we need to handle all uniques
-                    uniques_changed = uniques
-                elif data_type.unique and data_type not in uniques_changed:
-                    uniques_changed.append(data_type)
+                if data_type.should_lock:
+                    locks.append(data_type)
                 try:
                     _ = data_type.on_change(
                         item,
@@ -116,25 +107,11 @@ class Transaction:
                 except exceptions.AttributeSetError as e:
                     raise exceptions.InvalidUsage(str(e))
 
-            # unique handling
-            if uniques_changed and item.__storage__.pid is not None:
-                if not item.__is_new__:
-                    # try to lock attributes
-                    await self.lock_attributes(
-                        item, *[u.name for u in uniques_changed])
-                get_unique_key = utils.get_key_of_unique
-                for uniques in uniques_changed:
-                    old_unique = get_unique_key(
-                        item.get_snapshot_of('parent_id'),
-                        uniques.name,
-                        item.get_snapshot_of(uniques.name))
-                    self.delete_external(old_unique)
-                    new_unique = get_unique_key(
-                        item.parent_id,
-                        uniques.name,
-                        uniques.get_value(item)
-                    )
-                    self.insert_external(new_unique, item.__storage__.id)
+            if not item.__is_new__ and locks and \
+                    item.__storage__.pid is not None:
+                # try to lock attributes
+                # print('LOCKING', locks)
+                await self.lock_attributes(item, *[u.name for u in locks])
 
         item.__reset__()
         self._items[item.id] = item
@@ -153,10 +130,6 @@ class Transaction:
             _ = dt.on_delete(item, dt.get_value(item))
             if isawaitable(_):
                 await _
-
-        # unique handling
-        if not item.is_composite:
-            utils.remove_uniques(item)
 
         self._deletions[item.id] = None
 
@@ -215,9 +188,9 @@ class Transaction:
             del self._ext_upsertions[key]
         self._deletions[key] = None
 
-    async def lock_attributes(self, item, *attrs):
+    async def lock_attributes(self, item, *attributes):
         lock_keys = [utils.get_attribute_lock_key(item.id, attr_name)
-                     for attr_name in attrs]
+                     for attr_name in attributes]
         # filter out the ones already locked
         multi_insert = {key: '' for key in lock_keys
                         if key not in self._attr_locks}
@@ -225,7 +198,7 @@ class Transaction:
             try:
                 await self.connector.insert_multi(multi_insert, ttl=20)
             except exceptions.DBAlreadyExists:
-                raise exceptions.DBDeadlockError('Failed to lock unique')
+                raise exceptions.DBDeadlockError('Failed to lock attributes')
             # add lock key to deletions in order to be released
             self._attr_locks.update(multi_insert)
 

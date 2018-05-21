@@ -94,7 +94,6 @@ class Reference1(String, Acceptable):
             ref_item = await db.connector.get(value)
             if ref_item:
                 with system_override():
-                    utils.remove_uniques(ref_item)
                     # mark as deleted
                     ref_item.is_deleted += 1
                     await context.txn.upsert(ref_item)
@@ -233,7 +232,6 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
         if self.cascade_delete:
             with system_override():
                 async for ref_item in collection.items():
-                    utils.remove_uniques(ref_item)
                     # mark as deleted
                     ref_item.is_deleted += 1
                     await context.txn.upsert(ref_item)

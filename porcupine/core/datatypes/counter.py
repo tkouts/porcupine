@@ -9,7 +9,5 @@ class Counter(Integer):
     def on_change(self, instance, value, old_value):
         delta = value - old_value
         if delta and not instance.__is_new__:
-            context.txn.mutate(instance,
-                               self.storage_key,
-                               db.connector.SUB_DOC_COUNTER,
-                               delta)
+            context.txn.mutate(instance, self.storage_key,
+                               db.connector.SUB_DOC_COUNTER, delta)

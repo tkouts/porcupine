@@ -174,7 +174,7 @@ def locate_descriptor_by_storage_key(cls, key):
 
 
 def add_uniques(item):
-    parent_id = item.__storage__.pid
+    parent_id = item.parent_id
     if parent_id is not None:
         txn = context.txn
         # insert unique keys
@@ -188,7 +188,7 @@ def remove_uniques(item):
     parent_id = item.get_snapshot_of('parent_id')
     if parent_id is not None:
         txn = context.txn
-        # insert unique keys
+        # remove unique keys
         for unique in item.unique_data_types():
             unique_key = get_key_of_unique(
                 parent_id,

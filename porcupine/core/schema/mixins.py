@@ -192,7 +192,6 @@ class Recyclable(TYPING.ITEM_TYPE):
         if not can_restore:
             raise exceptions.Forbidden('Forbidden')
 
-        utils.add_uniques(self)
         with system_override():
             self.is_deleted -= 1
         await context.txn.upsert(self)
@@ -217,12 +216,11 @@ class Recyclable(TYPING.ITEM_TYPE):
             raise TypeError("'{0}' is not instance of RecycleBin"
                             .format(type(recycle_bin).__name__))
 
-        deleted = DeletedItem(deleted_item=self)
-        deleted.location = await self.full_path(include_self=False)
-        utils.remove_uniques(self)
         with system_override():
+            deleted = DeletedItem(deleted_item=self)
+            deleted.location = await self.full_path(include_self=False)
+            await deleted.append_to(recycle_bin)
             # mark as deleted
             self.is_deleted += 1
-            await deleted.append_to(recycle_bin)
         await context.txn.upsert(self)
         await context.txn.recycle(self)

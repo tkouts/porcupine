@@ -1,7 +1,6 @@
 from porcupine import context, db, view
 from porcupine.contract import contract
 from porcupine.datatypes import String
-from porcupine import exceptions
 from porcupine.core.context import system_override
 from .item import GenericItem
 from .container import Container
@@ -13,6 +12,8 @@ class DeletedItem(GenericItem):
 
     def __init__(self, dict_storage=None, deleted_item=None):
         super().__init__(dict_storage)
+        if self.__is_new__ and not context.system_override:
+            raise TypeError('DeletedItem objects cannot be instantiated')
         if deleted_item is not None:
             self.name = deleted_item.name
             # make sure each item is recycled once
@@ -24,7 +25,7 @@ class DeletedItem(GenericItem):
 
     async def append_to(self, recycle_bin):
         if not context.system_override:
-            raise exceptions.InvalidUsage(
+            raise TypeError(
                 'Cannot directly append this item. '
                 'Use the "recycle" method instead.')
         await super().append_to(recycle_bin)

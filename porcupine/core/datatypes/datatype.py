@@ -1,5 +1,5 @@
 from porcupine import context, db, exceptions
-# from porcupine.core.utils import get_key_of_unique
+from porcupine.core.utils import get_key_of_unique
 
 
 class DataType:
@@ -11,7 +11,8 @@ class DataType:
 
     def __init__(self, default=None, required=False, allow_none=False,
                  readonly=False, immutable=False, protected=False,
-                 store_as=None, indexed=False, unique=False, xform=None):
+                 store_as=None, indexed=False, unique=False, xform=None,
+                 lock_on_update=False):
         self.default = default
         self.required = required
         self.allow_none = allow_none
@@ -21,6 +22,7 @@ class DataType:
         self.store_as = store_as
         self.indexed = indexed
         self.unique = unique
+        self.lock_on_update = lock_on_update
         self.xform = xform
         self.name = None
         self.validate_value(None, default)
@@ -28,6 +30,10 @@ class DataType:
     @property
     def storage_key(self):
         return self.store_as or self.name
+
+    @property
+    def should_lock(self):
+        return self.lock_on_update or self.unique
 
     def get_value(self, instance, snapshot=True):
         if snapshot and self.storage_key in instance.__snapshot__:
@@ -110,6 +116,18 @@ class DataType:
     def on_change(self, instance, value, old_value):
         self.validate(value)
         if self.storage == '__storage__' and not instance.__is_new__:
+            if self.unique:
+                old_parent_id = instance.get_snapshot_of('parent_id')
+                if instance.parent_id == old_parent_id:
+                    # item is not moved
+                    old_unique = get_key_of_unique(old_parent_id, self.name,
+                                                   old_value)
+                    context.txn.delete_external(old_unique)
+                    new_unique = get_key_of_unique(old_parent_id, self.name,
+                                                   value)
+                    context.txn.insert_external(new_unique, instance.id)
+                # else:
+                #     # parent_id on_change handler will do the job
             context.txn.mutate(instance, self.storage_key,
                                db.connector.SUB_DOC_UPSERT_MUT, value)
 
