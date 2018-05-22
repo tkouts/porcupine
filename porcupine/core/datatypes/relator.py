@@ -9,12 +9,9 @@ from .collection import ItemCollection
 
 
 class RelatorBase:
-
     def __init__(self, rel_attr, respects_references):
-        # super().__init__(**kwargs)
         self.rel_attr = rel_attr
         self.respects_references = respects_references
-        # self.name = None
 
     async def add_reference(self, instance, *items):
         with system_override():
@@ -109,11 +106,11 @@ class Relator1(Reference1, RelatorBase):
 
 class RelatorCollection(ItemCollection):
     async def items(self):
+        descriptor, inst = self._desc, self._inst
         async for item in super().items():
-            rel_attr = getattr(item, self._desc.rel_attr, None)
+            rel_attr = getattr(item, descriptor.rel_attr, None)
             if rel_attr:
-                if isinstance(rel_attr, RelatorItem) \
-                        and rel_attr != self._inst.id:
+                if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
                     # concurrency safety
                     # TODO: remove stale id
                     continue

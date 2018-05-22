@@ -144,8 +144,7 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
         if not instance.__is_new__ and context.txn:
             # add schema info
             context.txn.mutate(instance, active_chunk_key,
-                               db.connector.SUB_DOC_INSERT,
-                               0)
+                               db.connector.SUB_DOC_INSERT, 0)
 
     def key_for(self, instance, chunk=None):
         if chunk is None:
