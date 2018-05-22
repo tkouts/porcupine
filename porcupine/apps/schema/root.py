@@ -1,10 +1,5 @@
-from porcupine.datatypes import Embedded, String, Composition
-from porcupine.schema import Container, Composite
-
-
-class Test(Composite):
-    name = String(required=True)
+from porcupine.schema import Container
 
 
 class Root(Container):
-    composition = Composition(accepts=(Test, ))
+    ...
