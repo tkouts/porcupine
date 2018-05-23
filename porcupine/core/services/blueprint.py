@@ -1,4 +1,4 @@
-import asyncio
+import inspect
 
 from sanic import Blueprint
 from .db import Db
@@ -10,17 +10,23 @@ services = (SchemaMaintenance, Db, SessionManager)
 services_blueprint = Blueprint('services')
 
 
+def prepare_services(server):
+    for service in services:
+        service.prepare(server)
+    server.blueprint(services_blueprint)
+
+
 @services_blueprint.listener('before_server_start')
-async def start_services(server, loop):
+async def start_services(server, _):
     for service in services:
         starter = service.start(server)
-        if asyncio.iscoroutine(starter):
+        if inspect.isawaitable(starter):
             await starter
 
 
 @services_blueprint.listener('after_server_stop')
-async def shutdown_services(server, loop):
+async def shutdown_services(server, _):
     for service in services:
         stopper = service.stop(server)
-        if asyncio.iscoroutine(stopper):
+        if inspect.isawaitable(stopper):
             await stopper
