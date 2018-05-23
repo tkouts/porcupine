@@ -8,27 +8,26 @@ from porcupine import __version__
 from porcupine.core.server import server
 from porcupine import apps
 from .log import porcupine_log
-from .loader import install_apps
-from .services.blueprint import services_blueprint, services
+from .loader import gather_apps
+from .services.blueprint import prepare_services
 from .daemon import Daemon
 
 
 def run_server(scan_dir, debug=False):
-    # register services blueprint
-    server.blueprint(services_blueprint)
     porcupine_log.info('Starting Porcupine {0}'.format(__version__))
+
     # prepare services
     porcupine_log.info('Preparing services')
-    for service in services:
-        service.prepare(server)
-    # install native apps
-    install_apps(apps.__path__, prefix='porcupine.apps.')
+    prepare_services(server)
+
+    # gather native apps
+    gather_apps(server, apps.__path__, prefix='porcupine.apps.')
     porcupine_path = os.path.dirname(
         os.path.dirname(sys.modules['porcupine'].__file__))
     if not scan_dir.startswith(porcupine_path):
-        # install user apps
+        # gather user apps
         os.chdir(scan_dir)
-        install_apps([scan_dir])
+        gather_apps(server, [scan_dir])
         # check if there is a static directory
         static_dir_path = os.path.join(scan_dir, 'static')
         if os.path.isdir(static_dir_path):
