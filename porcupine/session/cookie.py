@@ -27,9 +27,7 @@ class SessionManager(AbstractSessionManager):
             cookie = request.cookies.get('_s{0}'.format(i))
         if chunks:
             session_bytes = ''.join(chunks).encode('latin-1')
-            session = self.SessionType(
-                cbor.loads(session_bytes)
-            )
+            session = self.SessionType(cbor.loads(session_bytes))
             sig = self.generate_sig(session)
             if session['sig'] != sig:
                 session = None
