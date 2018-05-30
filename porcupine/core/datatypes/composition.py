@@ -34,21 +34,20 @@ class EmbeddedCollection(ItemCollection):
                 yield item
 
     async def add(self, *composites: TYPING.COMPOSITE_CO):
-        with system_override():
-            await super().add(*composites)
-            composite_path = get_path(self._desc, self._inst)
-            for composite in composites:
-                if not composite.__is_new__:
-                    raise TypeError('Can only add new items to composition')
-                # set composite path
+        await super().add(*composites)
+        composite_path = get_path(self._desc, self._inst)
+        for composite in composites:
+            if not composite.__is_new__:
+                raise TypeError('Can only add new items to composition')
+            # set composite path
+            with system_override():
                 composite.path = composite_path
-                await context.txn.insert(composite)
+            await context.txn.insert(composite)
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
-        with system_override():
-            await super().remove(*composites)
-            for composite in composites:
-                await context.txn.delete(composite)
+        await super().remove(*composites)
+        for composite in composites:
+            await context.txn.delete(composite)
 
 
 class Composition(ReferenceN):
@@ -99,6 +98,7 @@ class Composition(ReferenceN):
                 if composite.__is_new__:
                     added.append(composite)
                 else:
+                    # update composite
                     await context.txn.upsert(composite)
             if removed:
                 await collection.remove(*removed)
