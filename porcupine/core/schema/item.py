@@ -179,14 +179,12 @@ class GenericItem(Removable, Elastic):
 
     async def touch(self) -> None:
         # touch has to be fast / no event handlers
-        now = date.utcnow().isoformat()
-        self.__storage__.md = now
-        if 'md' in self.__snapshot__:
-            # clear previous setting
-            del self.__snapshot__['md']
-        if not self.__is_new__:
-            context.txn.mutate(self, 'md',
-                               db.connector.SUB_DOC_UPSERT_MUT, now)
+        if 'md' not in self.__snapshot__:
+            now = date.utcnow().isoformat()
+            self.__snapshot__['md'] = now
+            if not self.__is_new__:
+                context.txn.mutate(self, 'md',
+                                   db.connector.SUB_DOC_UPSERT_MUT, now)
 
     async def update(self) -> None:
         """
@@ -205,8 +203,9 @@ class GenericItem(Removable, Elastic):
 
             with system_override():
                 self.modified_by = user.name
-                self.modified = date.utcnow()
+                # self.modified = date.utcnow()
 
+            await self.touch()
             await context.txn.upsert(self)
 
     def expires(self, at=None, after_seconds=None):
