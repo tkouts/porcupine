@@ -110,7 +110,8 @@ class context_user:
             if should_switch:
                 self.user = await connector.get(self.user, quiet=False)
         else:
-            should_switch = context.user.id != self.user.id
+            should_switch = (context.user and context.user.id) != \
+                            (self.user and self.user.id)
         if should_switch:
             self.original_user = context.user
             context.user = self.user
