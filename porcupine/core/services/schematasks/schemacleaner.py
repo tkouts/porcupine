@@ -31,7 +31,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
                             utils.get_active_chunk_key(attr_name)
                         active_chunk = item_dict.pop(active_chunk_key)
                     except KeyError:
-                        continue
+                        active_chunk = 0
                     externals[attr_name] = (attr_value, active_chunk)
         # update sig
         item_dict['sig'] = clazz.__sig__
@@ -56,11 +56,13 @@ class SchemaCleaner(SchemaMaintenanceTask):
         for ext_name, ext_info in externals.items():
             ext_type, active_chunk = ext_info
             if ext_type == Blob.storage_info:
+                # external blob
                 external_key = utils.get_blob_key(self.key, ext_name)
                 if db.connector.exists(external_key):
                     external_keys.append(external_key)
             elif ext_type == ReferenceN.storage_info \
                     or ext_type.startswith(RelatorN.storage_info_prefix):
+                # item collection
                 external_key = utils.get_collection_key(self.key, ext_name,
                                                         active_chunk)
                 while (await db.connector.exists(external_key))[1]:

@@ -16,8 +16,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
         return self._desc.get_value(self._inst, snapshot=False) is not None
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
-        instance = self._inst
-        descriptor = self._desc
+        descriptor, instance = self._desc, self._inst
         dirty_count = 0
         total_count = 0
         current_size = 0
@@ -76,8 +75,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             for item_id in resolve_chunk(chunk):
                 yield item_id
 
-        active_chunk_key = utils.get_active_chunk_key(descriptor.name)
-        active_index = getattr(instance.__storage__, active_chunk_key)
+        active_index = descriptor.current_chunk(instance)
         if active_index > 0:
             # collection is split - fetch previous chunks
             is_split = True

@@ -132,25 +132,23 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)
 
+    def current_chunk(self, instance) -> int:
+        active_chunk_key = utils.get_active_chunk_key(self.name)
+        current_chunk = getattr(instance.__storage__, active_chunk_key)
+        if current_chunk is None:
+            return 0
+        return current_chunk
+
     def set_default(self, instance, value=None):
         if value is None:
             value = self.default
         if isinstance(value, tuple):
             value = list(value)
         super().set_default(instance, value)
-        # add active key index
-        active_chunk_key = utils.get_active_chunk_key(self.name)
-        setattr(instance.__storage__, active_chunk_key, 0)
-        if not instance.__is_new__ and context.txn:
-            # add schema info
-            context.txn.mutate(instance, active_chunk_key,
-                               db.connector.SUB_DOC_INSERT, 0)
 
     def key_for(self, instance, chunk=None):
         if chunk is None:
-            # return active chunk
-            active_chunk_key = utils.get_active_chunk_key(self.name)
-            chunk = getattr(instance.__storage__, active_chunk_key)
+            chunk = self.current_chunk(instance)
         return utils.get_collection_key(instance.id, self.name, chunk)
 
     async def clone(self, instance, memo):
@@ -206,24 +204,25 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
         return added, removed
 
     async def on_delete(self, instance, value):
-        super().on_delete(instance, value)
-        collection = self.__get__(instance, None)
         if self.cascade_delete:
+            collection = self.__get__(instance, None)
             with system_override():
                 async for ref_item in collection.items():
                     await ref_item.remove()
-        active_chunk_key = utils.get_active_chunk_key(self.name)
-        active_chunk = getattr(instance.__storage__, active_chunk_key) - 1
-        if active_chunk > -1:
+
+        super().on_delete(instance, value)
+
+        previous_chunk = self.current_chunk(instance) - 1
+        if previous_chunk > -1:
             while True:
                 external_key = utils.get_collection_key(instance.id,
                                                         self.name,
-                                                        active_chunk)
+                                                        previous_chunk)
                 _, key_exists = await db.connector.exists(external_key)
                 if not key_exists:
                     break
                 context.txn.delete_external(external_key)
-                active_chunk -= 1
+                previous_chunk -= 1
 
     async def on_recycle(self, instance, value):
         super().on_recycle(instance, value)
