@@ -2,7 +2,7 @@
 Porcupine reference data types
 ==============================
 """
-from porcupine import db, context
+from porcupine import db, context, exceptions
 from porcupine.core.context import system_override
 from .reference import Reference1, ReferenceN, ItemReference, Acceptable
 from .collection import ItemCollection
@@ -10,6 +10,9 @@ from .collection import ItemCollection
 
 class RelatorBase:
     def __init__(self, rel_attr, respects_references):
+        if not rel_attr:
+            raise exceptions.SchemaError(
+                'Relator must specify its related attribute')
         self.rel_attr = rel_attr
         self.respects_references = respects_references
 
