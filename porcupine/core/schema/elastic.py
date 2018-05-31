@@ -112,6 +112,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         self._ext = None
         self._snap = None
         self.__is_new__ = 'id' not in dict_storage
+        current_sig = type(self).__sig__
 
         if self.__is_new__:
             # new item
@@ -119,8 +120,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             # initialize storage with default values
             self.__add_defaults(list(self.__schema__.values()))
             self.__storage__.id = utils.generate_oid(self._id_size_)
-            self.__storage__.sig = type(self).__sig__
-        elif dict_storage['sig'] == type(self).__sig__:
+            self.__storage__.sig = current_sig
+        elif dict_storage['sig'] == current_sig:
             self.__storage__ = self.__record__(**dict_storage)
         else:
             # construct new record that fits the new schema and the old one
