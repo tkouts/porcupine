@@ -68,7 +68,7 @@ class Reference1(String, Acceptable):
     async def on_create(self, instance, value):
         super().on_create(instance, value)
         if value:
-            ref_item = await db.get_item(value)
+            ref_item = await db.connector.get(value)
             if ref_item is None:
                 # TODO: change wording
                 raise exceptions.InvalidUsage('Invalid item {0}'.format(value))
