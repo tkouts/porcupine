@@ -13,7 +13,6 @@ from porcupine.hinting import TYPING
 from porcupine import db, context
 from porcupine.core.services.schema import SchemaMaintenance
 from porcupine.core.utils.collections import WriteOnceDict
-from .permissions import resolve_acl
 
 VALID_ID_CHARS = [
     chr(x) for x in
