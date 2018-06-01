@@ -16,33 +16,25 @@ CONTENT_CO = 4
 COORDINATOR = 8
 
 
-async def resolve(item, user) -> int:
+async def resolve(item, membership) -> int:
     acl = await item.effective_acl
-    return await resolve_acl(acl, user)
-
-
-async def resolve_acl(acl, user_or_group) -> int:
-    # print(acl, user_or_group)
-    member_of = set()
-    if user_or_group is not None:
-        if await user_or_group.is_admin():
+    member_of = {'everyone'}
+    if membership is not None:
+        if await membership.is_admin():
             return COORDINATOR
-        if user_or_group.id in acl:
-            return acl[user_or_group.id]
+        if membership.id in acl:
+            return acl[membership.id]
 
         # get membership
         member_of.update({group_id
-                          async for group_id in user_or_group.member_of})
+                          async for group_id in membership.member_of})
 
         if member_of:
             # resolve nested groups membership
             member_of.update(await resolve_membership(frozenset(member_of)))
 
-        if hasattr(user_or_group, 'authenticate'):
+        if hasattr(membership, 'authenticate'):
             member_of.add('authusers')
-
-    # add everyone
-    member_of.add('everyone')
 
     perms = [acl.get(group_id, NO_ACCESS) for group_id in member_of]
     if not perms:
