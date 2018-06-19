@@ -144,6 +144,12 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             raise exceptions.NotFound(
                 'The resource {0} does not exist'.format(item_id))
 
+    async def has(self, item_id: TYPING.ITEM_ID):
+        async for oid in self:
+            if oid == item_id:
+                return True
+        return False
+
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
             descriptor, instance = self._desc, self._inst
