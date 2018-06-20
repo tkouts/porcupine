@@ -201,11 +201,13 @@ class ParentId(String):
     def on_create(self, instance, value):
         super().on_create(instance, value)
         add_uniques(instance)
+        instance.reset_effective_acl()
 
     def on_change(self, instance, value, old_value):
         super().on_change(instance, value, old_value)
         remove_uniques(instance)
         add_uniques(instance)
+        instance.reset_effective_acl()
 
     def on_delete(self, instance, value):
         super().on_delete(instance, value)

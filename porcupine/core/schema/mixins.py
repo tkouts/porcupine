@@ -112,8 +112,6 @@ class Movable(TYPING.ITEM_TYPE):
     """
     __slots__ = ()
 
-    parent_id = ParentId()
-
     async def move_to(self, target: TYPING.CONTAINER_CO) -> None:
         """
         Moves the item to the designated target.

@@ -6,7 +6,7 @@ from porcupine.hinting import TYPING
 from porcupine import context, exceptions, db
 from porcupine.contract import contract
 from porcupine.core.context import system_override
-from porcupine.core.datatypes.system import Acl
+from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import permissions, date
 from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
 from .elastic import Elastic
@@ -36,8 +36,7 @@ class GenericItem(Removable, Elastic):
     __slots__ = '__effective_acl'
 
     # system attributes
-    parent_id = String(readonly=True, allow_none=True,
-                       default=None, store_as='pid')
+    parent_id = ParentId()
     created = DateTime(readonly=True, store_as='cr')
     expires_at = Integer(None, readonly=True, allow_none=True,
                          protected=True, store_as='exp')
@@ -47,7 +46,7 @@ class GenericItem(Removable, Elastic):
 
     # security attributes
     is_system = Boolean(readonly=True, protected=True, store_as='sys')
-    acl = Acl()
+    acl: AclValue = Acl()
 
     # common attributes
     name = String(required=True, unique=True)
@@ -65,7 +64,8 @@ class GenericItem(Removable, Elastic):
     async def effective_acl(self) -> Mapping:
         if self.__effective_acl is None:
             acl = self.acl
-            if not acl.is_set() or acl.is_partial():
+            if self.parent_id is not None and \
+                    (not acl.is_set() or acl.is_partial()):
                 parent = await db.connector.get(self.parent_id)
                 parent_acl = await parent.effective_acl
                 if acl.is_partial():
@@ -75,6 +75,9 @@ class GenericItem(Removable, Elastic):
             else:
                 self.__effective_acl = acl
         return self.__effective_acl
+
+    def reset_effective_acl(self):
+        self.__effective_acl = None
 
     async def clone(self, memo: dict=None) -> 'GenericItem':
         clone: 'GenericItem' = await super().clone(memo)
