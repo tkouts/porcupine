@@ -116,6 +116,7 @@ class context_user:
             self.original_user = context.user
             context.user = self.user
             self.user_switched = True
+        return self
 
     async def __aexit__(self, exc_type, exc, tb):
         if self.user_switched:
