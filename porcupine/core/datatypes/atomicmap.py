@@ -36,6 +36,21 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
                                '{0}.{1}'.format(descriptor.storage_key, key),
                                db.connector.SUB_DOC_REMOVE, None)
 
+    def __getitem__(self, item):
+        if self._dct is None:
+            raise KeyError(item)
+        return super().__getitem__(item)
+
+    def __iter__(self):
+        if self._dct is None:
+            raise StopIteration
+        return super().__iter__()
+
+    def __len__(self):
+        if self._dct is None:
+            return 0
+        return super().__len__()
+
     def to_dict(self):
         if self._dct is None:
             return None
