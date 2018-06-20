@@ -18,7 +18,7 @@ COORDINATOR = 8
 
 async def resolve(item, membership) -> int:
     acl = await item.effective_acl
-    member_of = {'everyone'}
+    member_of = set()
     if membership is not None:
         if await membership.is_admin():
             return COORDINATOR
@@ -35,6 +35,9 @@ async def resolve(item, membership) -> int:
 
         if hasattr(membership, 'authenticate'):
             member_of.add('authusers')
+
+    # last add everyone
+    member_of.add('everyone')
 
     perms = [acl.get(group_id, NO_ACCESS) for group_id in member_of]
     if not perms:
