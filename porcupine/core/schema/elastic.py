@@ -197,7 +197,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @property
     def content_class(self) -> str:
         """
-        The fully qualified name of the object's class including the module.
+        The name of the object's class.
 
         @rtype: str
         """
@@ -258,10 +258,19 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     # event handlers
     async def on_create(self):
-        pass
+        ...
 
     async def on_change(self):
-        pass
+        ...
 
     async def on_delete(self):
-        pass
+        ...
+
+    async def on_post_create(self, actor):
+        ...
+
+    async def on_post_change(self, actor):
+        ...
+
+    async def on_post_delete(self, actor):
+        ...

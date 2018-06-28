@@ -2,9 +2,11 @@ import asyncio
 from inspect import isawaitable
 from collections import defaultdict
 
-from porcupine import exceptions, log, gather
+from porcupine import exceptions, log, gather, context
 from porcupine.core import utils
-from porcupine.core.context import system_override
+from porcupine.core.context import system_override, with_context
+from porcupine.core.aiolocals.local import wrap_gather
+from porcupine.core.app import App
 
 
 class Transaction:
@@ -131,7 +133,7 @@ class Transaction:
             if isawaitable(_):
                 await _
 
-        self._deletions[item.id] = None
+        self._deletions[item.id] = item
 
     async def recycle(self, item):
         data_types = item.__schema__.values()
@@ -213,10 +215,17 @@ class Transaction:
                 log.debug('Detected uncommitted changes to {0}'
                           .format(' '.join(modified)))
 
-        # insertions
-        insertions = {key: dumps(item)
-                      for key, item in self._items.items()
-                      if item.__is_new__}
+        inserted_items = []
+        modified_items = []
+        insertions = {}
+
+        for item_id, item in self._items.items():
+            if item.__is_new__:
+                inserted_items.append(item)
+                insertions[item_id] = dumps(item)
+            else:
+                modified_items.append(item)
+
         # update insertions with externals
         insertions.update({key: v for key, v in self._ext_insertions.items()
                            if v})
@@ -224,12 +233,17 @@ class Transaction:
         # upsertions
         upsertions = self._ext_upsertions
 
+        # deletions
+        deleted_items = [item for item in self._deletions.values()
+                         if hasattr(item, 'content_class')]
+
         # update deletions with externals
         deletions = list(self._deletions.keys())
         # remove locks
         deletions.extend(self._attr_locks.keys())
 
-        return insertions, upsertions, deletions
+        return (insertions, upsertions, deletions), \
+               (inserted_items, modified_items, deleted_items)
 
     async def commit(self) -> None:
         """
@@ -237,7 +251,10 @@ class Transaction:
 
         @return: None
         """
-        insertions, upsertions, deletions = self.prepare()
+        # prepare
+        db_ops, affected_items = self.prepare()
+        insertions, upsertions, deletions = db_ops
+
         connector = self.connector
 
         tasks = []
@@ -283,6 +300,41 @@ class Transaction:
                 pass
 
         self.connector.active_txns -= 1
+
+        # execute post txn event handlers
+        actor = context.user
+        inserted_items, modified_items, deleted_items = affected_items
+
+        if inserted_items:
+            asyncio.ensure_future(
+                self._exec_post_handler('on_post_create',
+                                        inserted_items, actor))
+
+        if modified_items:
+            asyncio.ensure_future(
+                self._exec_post_handler('on_post_change',
+                                        modified_items, actor))
+
+        if deleted_items:
+            asyncio.ensure_future(
+                self._exec_post_handler('on_post_delete',
+                                        deleted_items, actor))
+
+    @with_context(App.SYSTEM_USER)
+    async def _exec_post_handler(self, handler: str, items: list, actor):
+        tasks = [getattr(item, handler)(actor) for item in items]
+        results = await wrap_gather(*tasks, return_exceptions=True)
+        errors = [result if isinstance(result, Exception) else None
+                  for result in results]
+        if any(errors):
+            message = 'Uncaught exception in post {0} handler of type {1}\n{2}'
+            for i, error in enumerate(errors):
+                if error is not None:
+                    log.error(message.format(
+                        handler.split('_')[-1],
+                        items[i].content_class,
+                        error
+                    ))
 
     async def abort(self) -> None:
         """

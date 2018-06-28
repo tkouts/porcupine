@@ -12,6 +12,7 @@ from porcupine.core.context import with_context, system_override
 class App(Blueprint):
     name = None
     db_blueprint = None
+    SYSTEM_USER = SystemUser()
 
     def __init__(self):
         super().__init__(self.name)
@@ -25,7 +26,7 @@ class App(Blueprint):
             db_blueprint = config.parse(blueprint_file)
             await self.__initialize_db(db_blueprint)
 
-    @with_context(SystemUser())
+    @with_context(SYSTEM_USER)
     @db.transactional()
     async def __initialize_db(self, blueprint):
         for item in blueprint:
