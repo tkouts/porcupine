@@ -189,7 +189,7 @@ class GenericItem(Removable, Elastic):
                 context.txn.mutate(self, 'md',
                                    db.connector.SUB_DOC_UPSERT_MUT, now)
 
-    async def update(self) -> None:
+    async def update(self) -> bool:
         """
         Updates the item.
 
@@ -210,6 +210,8 @@ class GenericItem(Removable, Elastic):
 
             await self.touch()
             await context.txn.upsert(self)
+            return True
+        return False
 
     def expires(self, at=None, after_seconds=None):
         with system_override():

@@ -62,8 +62,9 @@ class Composite(Elastic):
         item = await self.item
         await item.touch()
 
-    async def update(self):
+    async def update(self) -> bool:
         item = await self.item
+        updated = False
         if self.__snapshot__:
             prop_name = self.property_name
             data_type = item.__schema__[prop_name]
@@ -73,7 +74,9 @@ class Composite(Elastic):
             else:
                 # embedded
                 setattr(item, prop_name, self)
+            updated = True
         await item.update()
+        return updated
 
     async def remove(self):
         exploded_path = self.path.split('.')
