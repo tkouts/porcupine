@@ -1,9 +1,10 @@
 from sanic.exceptions import SanicException, InvalidUsage, \
-    NotFound, ServerError
+    NotFound, ServerError, ServiceUnavailable
 
 
 InvalidUsage = InvalidUsage
 NotFound = NotFound
+ServiceUnavailable = ServiceUnavailable
 
 
 class SchemaError(Exception):
