@@ -60,12 +60,12 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get(self, object_id, quiet=True):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
-        elif object_id in context.db_cache:
-            return context.db_cache[object_id]
-        item = await self.get_raw(object_id, quiet=quiet)
-        if item is not None:
-            item = self.persist.loads(item)
-        context.db_cache[object_id] = item
+        item = context.db_cache.get(object_id)
+        if item is None:
+            item = await self.get_raw(object_id, quiet=quiet)
+            if item is not None:
+                item = self.persist.loads(item)
+            context.db_cache[object_id] = item
         return item
 
     async def get_multi(self, object_ids):
@@ -77,7 +77,8 @@ class AbstractConnector(metaclass=abc.ABCMeta):
                 for item_id in chunk:
                     if context.txn is not None and item_id in context.txn:
                         fetched[item_id] = context.txn[item_id]
-                    elif item_id in context.db_cache:
+                    item = context.db_cache.get(item_id)
+                    if item is not None:
                         fetched[item_id] = context.db_cache[item_id]
                 db_fetch_keys = [item_id for item_id in chunk
                                  if item_id not in fetched]
