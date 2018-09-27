@@ -182,8 +182,11 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             dt.set_default(self)
 
     def get_snapshot_of(self, attr_name: str):
-        storage_key = self.__schema__[attr_name].storage_key
-        return getattr(self.__storage__, storage_key)
+        if attr_name in self.__schema__:
+            storage_key = self.__schema__[attr_name].storage_key
+            return getattr(self.__storage__, storage_key)
+        else:
+            return getattr(self, attr_name)
 
     def to_dict(self) -> dict:
         return {
