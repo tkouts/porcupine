@@ -185,7 +185,8 @@ def add_uniques(item):
 
 def remove_uniques(item):
     parent_id = item.get_snapshot_of('parent_id')
-    if parent_id is not None:
+    is_deleted = item.get_snapshot_of('is_deleted')
+    if parent_id is not None and not is_deleted:
         txn = context.txn
         # remove unique keys
         for unique in item.unique_data_types():
