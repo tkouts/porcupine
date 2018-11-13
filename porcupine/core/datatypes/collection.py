@@ -161,7 +161,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 if not await descriptor.accepts_item(item):
                     raise exceptions.ContainmentError(instance,
                                                       descriptor.name, item)
-                item_id = item.__storage__.id
+                item_id = item.id
                 context.txn.append(collection_key, ' {0}'.format(item_id))
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
@@ -172,7 +172,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             await instance.touch()
             collection_key = descriptor.key_for(instance)
             for item in items:
-                item_id = item.__storage__.id
+                item_id = item.id
                 context.txn.append(collection_key, ' -{0}'.format(item_id))
 
     async def reset(self, value: list) -> None:
