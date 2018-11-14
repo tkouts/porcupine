@@ -177,10 +177,11 @@ def add_uniques(item):
     if parent_id is not None:
         txn = context.txn
         # insert unique keys
+        item_id = item.id
         for unique in item.unique_data_types():
             unique_key = get_key_of_unique(parent_id, unique.name,
                                            unique.get_value(item))
-            txn.insert_external(unique_key, item.__storage__.id)
+            txn.insert_external(unique_key, item_id)
 
 
 def remove_uniques(item):
