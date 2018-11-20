@@ -19,7 +19,7 @@ class DateTime(String):
         if isinstance(value, str):
             # we need to validate
             value = date.get(value)
-        super().__set__(instance, value.isoformat())
+        super().__set__(instance, value and value.isoformat())
 
 
 class Date(DateTime):
