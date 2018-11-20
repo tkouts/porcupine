@@ -1,6 +1,6 @@
 from porcupine import db, context, exceptions
 from porcupine.contract import contract
-from porcupine.datatypes import String, ReferenceN
+from porcupine.datatypes import String
 from porcupine.core.context import system_override
 from .elastic import Elastic
 
@@ -66,14 +66,14 @@ class Composite(Elastic):
         item = await self.item
         updated = False
         if self.__snapshot__:
-            prop_name = self.property_name
-            data_type = item.__schema__[prop_name]
-            if isinstance(data_type, ReferenceN):
-                # composition
-                await context.txn.upsert(self)
-            else:
-                # embedded
-                setattr(item, prop_name, self)
+            # prop_name = self.property_name
+            # data_type = item.__schema__[prop_name]
+            # if isinstance(data_type, ReferenceN):
+            #     # composition
+            await context.txn.upsert(self)
+            # else:
+            #     # embedded
+            #     setattr(item, prop_name, self)
             updated = True
         await item.update()
         return updated
