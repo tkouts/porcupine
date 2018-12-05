@@ -7,11 +7,6 @@ from sanic.request import Request
 from porcupine.config.default import DEFAULTS
 from porcupine.core.router import ContextRouter
 
-# Patch MultiHeader
-from sanic.cookies import MultiHeader
-if not hasattr(MultiHeader, 'casefold'):
-    MultiHeader.casefold = lambda x: x.name.casefold()
-
 
 class RequestWithSession(Request):
     @property

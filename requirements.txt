@@ -1,4 +1,4 @@
-sanic>=0.7.0
+sanic==0.8.3
 couchbase>=2.2.3
 PyYAML>=3.12
 lru-dict>=1.1.6
