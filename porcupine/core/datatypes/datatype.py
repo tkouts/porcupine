@@ -1,4 +1,5 @@
 from porcupine import context, db, exceptions
+from porcupine.response import json
 from porcupine.core.utils import get_key_of_unique
 
 
@@ -152,3 +153,4 @@ class DataType:
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         await instance.update()
+        return json(getattr(instance, self.name))
