@@ -1,7 +1,8 @@
 import abc
 from typing import Type
 
-from porcupine import permissions, context, exceptions
+from porcupine import exceptions
+from porcupine.core.context import context
 from porcupine.hinting import TYPING
 
 

@@ -1,6 +1,8 @@
 import hashlib
 
-from porcupine import db, permissions, context_user
+from porcupine import db
+from porcupine.core.utils import permissions
+from porcupine.core.context import context_user
 from porcupine.schema import Container
 from porcupine.schema import Item
 from porcupine.datatypes import String, RelatorN, Password, Reference1, \

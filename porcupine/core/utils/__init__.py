@@ -1,17 +1,14 @@
 """
 Porcupine utilities package
 """
-import time
 import cbor
 import functools
 import hashlib
 import random
-from typing import Optional, AsyncIterator, Union
+from typing import Union
 import mmh3
 
-from porcupine.hinting import TYPING
-from porcupine import db, context
-from porcupine.core.services.schema import SchemaMaintenance
+from porcupine.core.context import context
 from porcupine.core.utils.collections import WriteOnceDict
 
 VALID_ID_CHARS = [
@@ -29,7 +26,7 @@ def chunks(l, n):
         yield l[i:i + n]
 
 
-def generate_oid(length: int=8) -> str:
+def generate_oid(length: int = 8) -> str:
     """
     Generates a random Object ID string.
 
@@ -117,46 +114,6 @@ def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
 
 def get_composite_path(parent_path: str, comp_name: str) -> str:
     return '{0}.{1}'.format(parent_path, comp_name)
-
-
-async def resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
-    if item.__is_new__:
-        return 1
-    connector = db.connector
-    # check for stale / expired / deleted
-    it = item
-    while True:
-        if not it.is_composite:
-            # check expiration
-            if it.expires_at is not None:
-                if time.time() > it.expires_at:
-                    # expired - remove from DB
-                    await SchemaMaintenance.remove_stale(it.id)
-                    return None
-            if it.is_deleted:
-                return None
-            if it.is_system:
-                break
-        if it.parent_id is None:
-            break
-        else:
-            it = await connector.get(it.parent_id)
-            if it is None:
-                # stale - remove from DB
-                await SchemaMaintenance.remove_stale(it.id)
-                return None
-
-    return 1 if await item.can_read(user) else 0
-
-
-async def multi_with_stale_resolution(
-        ids: TYPING.ID_LIST) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
-    async for i in db.get_multi(ids, return_none=True):
-        if i is None:
-            # TODO: remove stale id
-            pass
-        else:
-            yield i
 
 
 def get_descriptor_by_storage_key(cls, key: str):

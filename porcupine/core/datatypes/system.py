@@ -1,16 +1,16 @@
-from porcupine import context, db, exceptions
+from porcupine import db, exceptions
 from porcupine.hinting import TYPING
 from porcupine.contract import contract
-from porcupine.core.context import system_override
-from porcupine.core.services.schema import SchemaMaintenance
-from porcupine.core.utils import permissions, date, add_uniques, remove_uniques
+from porcupine.core.context import system_override, context
+from porcupine.core.services import get_service
+from porcupine.core.utils import permissions, date, add_uniques, remove_uniques, get_content_class
 from .collection import ItemCollection
 from .common import String
 from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
 from .reference import ReferenceN
 
-Shortcut = None
+# Shortcut = None
 
 
 class AclValue(AtomicMapValue):
@@ -51,7 +51,7 @@ class SchemaSignature(String):
 
     async def on_change(self, instance, value, old_value):
         super().on_change(instance, value, old_value)
-        await SchemaMaintenance.clean_schema(instance.id)
+        await get_service('schema').clean_schema(instance.id)
 
 
 class ChildrenCollection(ItemCollection):
@@ -113,14 +113,12 @@ class Children(ReferenceN):
         return super().__get__(instance, owner)
 
     async def accepts_item(self, item):
-        global Shortcut
-        if Shortcut is None:
-            from porcupine.schema import Shortcut
+        shortcut = get_content_class('Shortcut')
         if context.user.id == 'system':
             # allow for system
             return True
-        if isinstance(item, Shortcut):
-            target = await db.connector.get(item.target)
+        if isinstance(item, shortcut):
+            target = await get_service('db').connector.get(item.target)
             if target:
                 await super().accepts_item(target)
         return await super().accepts_item(item)

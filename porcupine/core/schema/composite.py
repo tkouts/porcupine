@@ -1,7 +1,8 @@
-from porcupine import db, context, exceptions
+from porcupine import db, exceptions
 from porcupine.contract import contract
 from porcupine.datatypes import String
-from porcupine.core.context import system_override
+from porcupine.core.services import get_service
+from porcupine.core.context import system_override, context
 from .elastic import Elastic
 
 
@@ -44,13 +45,13 @@ class Composite(Elastic):
 
     @property
     async def item(self):
-        return await db.connector.get(self.item_id)
+        return await get_service('db').connector.get(self.item_id)
 
     @property
     async def parent(self):
-        return await db.connector.get(self.parent_id)
+        return await get_service('db').connector.get(self.parent_id)
 
-    async def clone(self, memo: dict=None) -> 'Composite':
+    async def clone(self, memo: dict = None) -> 'Composite':
         clone: 'Composite' = await super().clone(memo)
         with system_override():
             id_map = memo['_id_map_']

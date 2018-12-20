@@ -15,20 +15,19 @@ from .service import AbstractService
 
 
 class SchemaMaintenance(AbstractService):
+    service_key = 'schema'
     queue = None
 
-    @classmethod
-    def start(cls, server):
+    def start(self):
         log.info('Starting schema maintenance service')
-        cls.queue = asyncio.Queue()
-        asyncio.ensure_future(cls.worker())
+        type(self).queue = asyncio.Queue()
+        asyncio.ensure_future(self.worker())
 
-    @classmethod
-    async def worker(cls):
+    async def worker(self):
         while True:
-            task = await cls.queue.get()
+            task = await self.queue.get()
             if task is None:
-                cls.queue.task_done()
+                self.queue.task_done()
                 break
             try:
                 await task.execute()
@@ -36,40 +35,34 @@ class SchemaMaintenance(AbstractService):
                 log.error('Task {0} threw error {1}'.format(
                     type(task).__name__, str(e)))
             finally:
-                cls.queue.task_done()
+                self.queue.task_done()
 
-    @classmethod
-    def status(cls):
+    def status(self):
         return {
-            'queue_size': cls.queue.qsize()
+            'queue_size': self.queue.qsize()
         }
 
-    @classmethod
-    async def stop(cls, server):
+    async def stop(self):
         log.info('Stopping schema maintenance service')
-        await cls.queue.put(None)
-        await cls.queue.join()
+        await self.queue.put(None)
+        await self.queue.join()
 
-    @classmethod
-    async def compact_collection(cls, key):
-        if cls.queue is not None:
+    async def compact_collection(self, key):
+        if self.queue is not None:
             task = CollectionCompacter(key)
-            await cls.queue.put(task)
+            await self.queue.put(task)
 
-    @classmethod
-    async def rebuild_collection(cls, key):
-        if cls.queue is not None:
+    async def rebuild_collection(self, key):
+        if self.queue is not None:
             task = CollectionReBuilder(key)
-            await cls.queue.put(task)
+            await self.queue.put(task)
 
-    @classmethod
-    async def clean_schema(cls, key):
-        if cls.queue is not None:
+    async def clean_schema(self, key):
+        if self.queue is not None:
             task = SchemaCleaner(key)
-            await cls.queue.put(task)
+            await self.queue.put(task)
 
-    @classmethod
-    async def remove_stale(cls, key):
-        if cls.queue is not None:
+    async def remove_stale(self, key):
+        if self.queue is not None:
             task = StaleRemover(key)
-            await cls.queue.put(task)
+            await self.queue.put(task)

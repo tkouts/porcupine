@@ -1,7 +1,8 @@
-from porcupine import context, db, view
+from porcupine import db
+from porcupine.view import view
 from porcupine.contract import contract
 from porcupine.datatypes import String
-from porcupine.core.context import system_override
+from porcupine.core.context import system_override, context
 from .item import GenericItem
 from .container import Container
 

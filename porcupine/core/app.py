@@ -4,15 +4,15 @@ import os
 from sanic import Blueprint
 
 from porcupine import db, config
-from porcupine.apps.schema.users import SystemUser
 from porcupine.core import utils
+from porcupine.core.services import get_service
+from porcupine.core.server import server
 from porcupine.core.context import with_context, system_override
 
 
 class App(Blueprint):
     name = None
     db_blueprint = None
-    SYSTEM_USER = SystemUser()
 
     def __init__(self):
         super().__init__(self.name)
@@ -26,13 +26,14 @@ class App(Blueprint):
             db_blueprint = config.parse(blueprint_file)
             await self.__initialize_db(db_blueprint)
 
-    @with_context(SYSTEM_USER)
+    @with_context(server.system_user)
     @db.transactional()
     async def __initialize_db(self, blueprint):
+        connector = get_service('db').connector
         for item in blueprint:
-            await self.__process_item(item, None)
+            await self.__process_item(connector, item, None)
 
-    async def __process_item(self, item_dict, parent):
+    async def __process_item(self, connector, item_dict, parent):
         item_id = item_dict.pop('id', None)
         item_type = item_dict.pop('type', None)
         children = item_dict.pop('children', [])
@@ -42,7 +43,7 @@ class App(Blueprint):
             if parent:
                 item = await parent.get_child_by_id(item_id)
             else:
-                item = await db.connector.get(item_id)
+                item = await connector.get(item_id)
         elif parent:
             item = await parent.get_child_by_name(item_dict['name'])
         else:
@@ -64,4 +65,4 @@ class App(Blueprint):
                 await item.update()
 
         for child_dict in children:
-            await self.__process_item(child_dict, item)
+            await self.__process_item(connector, child_dict, item)

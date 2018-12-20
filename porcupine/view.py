@@ -1,4 +1,4 @@
-class view:
+class _View:
     def __init__(self, get=None, post=None, put=None):
         self.get = get
         self.post = post
@@ -9,3 +9,6 @@ class view:
 
     def http_put(self, handler):
         return type(self)(get=self.get, post=self.post, put=handler)
+
+
+view = _View

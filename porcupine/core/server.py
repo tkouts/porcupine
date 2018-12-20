@@ -6,6 +6,7 @@ from sanic.request import Request
 
 from porcupine.config.default import DEFAULTS
 from porcupine.core.router import ContextRouter
+from porcupine.apps.schema.users import SystemUser
 
 
 class RequestWithSession(Request):
@@ -20,6 +21,11 @@ class PorcupineServer(Sanic):
         self.router.server = self
         self.config.update(DEFAULTS)
         self.load_environment_config('PORCUPINE_', preserve_prefix=False)
+        self.__identity = SystemUser()
+
+    @property
+    def system_user(self):
+        return self.__identity
 
     def load_environment_config(self, prefix, preserve_prefix=True):
         """

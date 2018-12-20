@@ -1,4 +1,6 @@
-from porcupine import context, db, exceptions
+from porcupine import exceptions
+from porcupine.core.services import get_service
+from porcupine.core.context import context
 from porcupine.core.utils import collections
 from porcupine.core.datatypes.mutable import Dictionary
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
@@ -13,6 +15,7 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         AsyncSetterValue.__init__(self, descriptor, instance)
 
     async def set(self, key: str, value):
+        connector = get_service('db').connector
         descriptor, instance = self._desc, self._inst
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
@@ -22,10 +25,11 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         if not instance.__is_new__:
             context.txn.mutate(instance,
                                '{0}.{1}'.format(descriptor.storage_key, key),
-                               db.connector.SUB_DOC_UPSERT_MUT,
+                               connector.SUB_DOC_UPSERT_MUT,
                                value)
 
     async def delete(self, key: str):
+        connector = get_service('db').connector
         descriptor, instance = self._desc, self._inst
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
@@ -34,7 +38,7 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         if not instance.__is_new__:
             context.txn.mutate(instance,
                                '{0}.{1}'.format(descriptor.storage_key, key),
-                               db.connector.SUB_DOC_REMOVE, None)
+                               connector.SUB_DOC_REMOVE, None)
 
     def __getitem__(self, item):
         if self._dct is None:
@@ -98,9 +102,10 @@ class AtomicMap(AsyncSetter, Dictionary):
     def on_change(self, instance, value, old_value):
         self.validate(value)
         if not instance.__is_new__:
+            connector = get_service('db').connector
             if value is None or old_value is None:
                 context.txn.mutate(instance, self.storage_key,
-                                   db.connector.SUB_DOC_UPSERT_MUT, value)
+                                   connector.SUB_DOC_UPSERT_MUT, value)
             else:
                 changed_keys = [
                     key for key in value
@@ -115,10 +120,10 @@ class AtomicMap(AsyncSetter, Dictionary):
                     path = '{0}.{1}'.format(self.storage_key, key)
                     context.txn.mutate(instance,
                                        path,
-                                       db.connector.SUB_DOC_UPSERT_MUT,
+                                       connector.SUB_DOC_UPSERT_MUT,
                                        value[key])
                 for key in removed_keys:
                     path = '{0}.{1}'.format(self.storage_key, key)
                     context.txn.mutate(instance,
                                        path,
-                                       db.connector.SUB_DOC_REMOVE, None)
+                                       connector.SUB_DOC_REMOVE, None)

@@ -1,7 +1,7 @@
 """
 Helper module for resolving object permissions
 """
-from porcupine import db
+from porcupine.core.services import get_service
 from porcupine.core.context import context_cacheable
 
 # 0 - no access
@@ -48,7 +48,8 @@ async def resolve(item, membership) -> int:
 @context_cacheable(1000)
 async def resolve_membership(group_ids: frozenset) -> set:
     extended_membership = set()
-    groups = [g async for g in db.connector.get_multi(group_ids) if g]
+    groups = [g async for g in get_service('db').connector.get_multi(group_ids)
+              if g]
     for group in groups:
         extended_membership.update({
             group_id async for group_id in group.member_of})

@@ -2,9 +2,9 @@ from collections import AsyncIterable, OrderedDict
 from typing import AsyncIterator
 
 from porcupine.hinting import TYPING
-from porcupine import db, exceptions, context
-from porcupine.core import utils
-from porcupine.core.services.schema import SchemaMaintenance
+from porcupine import db, exceptions
+from porcupine.core.context import context
+from porcupine.core.services import get_service
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 
@@ -17,6 +17,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
         descriptor, instance = self._desc, self._inst
+        connector = get_service('db').connector
         dirty_count = 0
         total_count = 0
         current_size = 0
@@ -83,7 +84,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             while True:
                 previous_chunk_key = descriptor.key_for(instance,
                                                         chunk=previous_chunk_no)
-                previous_chunk = await db.connector.get_raw(previous_chunk_key)
+                previous_chunk = await connector.get_raw(previous_chunk_key)
                 if previous_chunk is not None:
                     for item_id in resolve_chunk(previous_chunk):
                         yield item_id
@@ -101,37 +102,38 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             dirtiness = dirty_count / total_count
             # print(dirtiness)
 
-        split_threshold = db.connector.coll_split_threshold
-        compact_threshold = db.connector.coll_compact_threshold
+        split_threshold = connector.coll_split_threshold
+        compact_threshold = connector.coll_compact_threshold
         if current_size > split_threshold or dirtiness > compact_threshold:
             # collection maintenance
             collection_key = descriptor.key_for(instance)
+            schema_service = get_service('schema')
             if current_size > split_threshold:
                 shd_compact = (current_size * (1 - dirtiness)) < split_threshold
                 if not is_split and shd_compact:
-                    await SchemaMaintenance.compact_collection(collection_key)
+                    await schema_service.compact_collection(collection_key)
                 else:
-                    await SchemaMaintenance.rebuild_collection(collection_key)
+                    await schema_service.rebuild_collection(collection_key)
             elif dirtiness > compact_threshold:
                 if is_split:
-                    await SchemaMaintenance.rebuild_collection(collection_key)
+                    await schema_service.rebuild_collection(collection_key)
                 else:
-                    await SchemaMaintenance.compact_collection(collection_key)
+                    await schema_service.compact_collection(collection_key)
 
     async def items(self) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
         chunk_size = 40
         chunk = []
-        get_multi = utils.multi_with_stale_resolution
+        get_multi = db.get_multi
 
         async for item_id in self:
             chunk.append(item_id)
             if len(chunk) > chunk_size:
-                async for i in get_multi(chunk):
+                async for i in get_multi(chunk, remove_stale=True):
                     yield i
                 chunk = []
 
         if chunk:
-            async for i in get_multi(chunk):
+            async for i in get_multi(chunk, remove_stale=True):
                 yield i
 
     async def get_item_by_id(self,

@@ -34,19 +34,20 @@ async def save_session(request, response):
 
 
 class SessionManager(AbstractService):
-    @classmethod
-    def prepare(cls, server):
-        global session_manager
-        log.info('Creating session manager')
-        sm_type = utils.get_rto_by_name(server.config.SM_IF)
-        session_manager = sm_type(server)
-        server.blueprint(session_manager_bp)
+    service_key = 'session_mgr'
 
-    @classmethod
-    async def start(cls, server):
+    def __init__(self, server):
+        global session_manager
+
+        super().__init__(server)
+        log.info('Creating session manager')
+        sm_type = utils.get_rto_by_name(self.server.config.SM_IF)
+        session_manager = sm_type(self.server)
+        self.server.blueprint(session_manager_bp)
+
+    async def start(self):
         await session_manager.initialize()
 
-    @classmethod
-    async def stop(cls, server):
+    async def stop(self):
         log.info('Closing session manager')
         await session_manager.close()

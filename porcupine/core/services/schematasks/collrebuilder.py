@@ -2,7 +2,7 @@ import asyncio
 import math
 from inspect import isawaitable
 
-from porcupine import db, exceptions
+from porcupine import exceptions
 from porcupine.core import utils
 from porcupine.core.services.schematasks.collcompacter import \
     CollectionCompacter
@@ -22,7 +22,7 @@ class CollectionReBuilder(CollectionCompacter):
             previous_chunk_key = utils.get_collection_key(self.item_id,
                                                           self.collection_name,
                                                           previous_chunk_no)
-            previous_chunk = await db.connector.get_raw(previous_chunk_key)
+            previous_chunk = await self.connector.get_raw(previous_chunk_key)
             if previous_chunk is not None:
                 # print(len(previous_chunk))
                 prev_chunks.insert(0, previous_chunk)
@@ -43,7 +43,7 @@ class CollectionReBuilder(CollectionCompacter):
         collection = self.resolve_set(' '.join(raw_chunks))
         if collection:
             parts = math.ceil(len(' '.join(collection)) /
-                              db.connector.coll_split_threshold)
+                              self.connector.coll_split_threshold)
             avg = len(collection) / parts
             chunks = []
             last = 0.0
@@ -75,7 +75,7 @@ class CollectionReBuilder(CollectionCompacter):
         return raw_chunks[-1], (insertions, deletions)
 
     async def bump_up_active_chunk(self):
-        connector = db.connector
+        connector = self.connector
         counter_path = utils.get_active_chunk_key(self.collection_name)
         try:
             await connector.insert_multi({
@@ -91,7 +91,7 @@ class CollectionReBuilder(CollectionCompacter):
 
     async def execute(self):
         # print('splitting collection', self.key)
-        connector = db.connector
+        connector = self.connector
         # bump up active chunk number
         await self.bump_up_active_chunk()
         # replace active chunk

@@ -1,10 +1,10 @@
 from datetime import datetime
 from porcupine.core.utils import date
-from porcupine.core.datatypes.common import String
+from porcupine.datatypes import String
 
 
 class DateTime(String):
-    """Date data type"""
+    """Datetime data type"""
 
     def __init__(self, default=None, **kwargs):
         super().__init__(default, allow_none=True, **kwargs)
@@ -24,7 +24,8 @@ class DateTime(String):
 
 
 class Date(DateTime):
-    """Datetime data type"""
+    """Date data type"""
+
     def __get__(self, instance, owner):
         if instance is None:
             return self

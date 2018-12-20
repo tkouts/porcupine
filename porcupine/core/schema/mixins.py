@@ -1,9 +1,11 @@
 from typing import Dict, List
 
 from porcupine.hinting import TYPING
-from porcupine import db, context, exceptions, gather
-from porcupine.core.context import system_override
-from porcupine.core.datatypes.system import Deleted, ParentId
+from porcupine import db, exceptions
+from porcupine.core.aiolocals.local import wrap_gather as gather
+from porcupine.core.context import system_override, context
+from porcupine.core.services import get_service
+from porcupine.core.datatypes.system import Deleted
 from porcupine.core import utils
 from porcupine.datatypes import Embedded, Composition
 
@@ -125,7 +127,7 @@ class Movable(TYPING.ITEM_TYPE):
                 'Cannot move item to destination. '
                 'The destination is contained in the source.')
 
-        parent = await db.connector.get(self.parent_id)
+        parent = await get_service('db').connector.get(self.parent_id)
 
         if self.is_collection:
             await super(type(parent.containers), parent.containers).remove(self)
@@ -159,7 +161,7 @@ class Removable(TYPING.ITEM_TYPE):
         @return: None
         """
         if self.parent_id is not None:
-            parent = await db.connector.get(self.parent_id)
+            parent = await get_service('db').connector.get(self.parent_id)
             if parent is not None:
                 if self.is_collection:
                     await parent.containers.remove(self)

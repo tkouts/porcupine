@@ -1,19 +1,49 @@
 import asyncio
 import copy
+import time
 from functools import wraps
 from typing import AsyncIterator, Optional
 
 from sanic import Blueprint
 from sanic.request import Request
 
+from porcupine import exceptions
 from porcupine.hinting import TYPING
-from porcupine import context, exceptions
-from porcupine.core import utils
-
-connector = None
+from porcupine.core.context import context
+from porcupine.core.services import get_service
 
 
-async def get_item(item_id: str, quiet: bool=True) -> Optional[
+async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
+    if item.__is_new__:
+        return 1
+    # check for stale / expired / deleted
+    it = item
+    connector = get_service('db').connector
+    while True:
+        if not it.is_composite:
+            # check expiration
+            if it.expires_at is not None:
+                if time.time() > it.expires_at:
+                    # expired - remove from DB
+                    await get_service('schema').remove_stale(it.id)
+                    return None
+            if it.is_deleted:
+                return None
+            if it.is_system:
+                break
+        if it.parent_id is None:
+            break
+        else:
+            it = await connector.get(it.parent_id)
+            if it is None:
+                # stale - remove from DB
+                await get_service('schema').remove_stale(it.id)
+                return None
+
+    return 1 if await item.can_read(user) else 0
+
+
+async def get_item(item_id: str, quiet: bool = True) -> Optional[
         TYPING.ANY_ITEM_CO]:
     """
     Fetches an object from the database.
@@ -29,11 +59,11 @@ async def get_item(item_id: str, quiet: bool=True) -> Optional[
 
     :rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
     """
-    item = await connector.get(item_id, quiet=quiet)
+    item = await get_service('db').connector.get(item_id, quiet=quiet)
     if item is not None:
         if context.system_override:
             return item
-        visibility = await utils.resolve_visibility(item, context.user)
+        visibility = await _resolve_visibility(item, context.user)
         if visibility is not None:
             if visibility:
                 return item
@@ -44,12 +74,13 @@ async def get_item(item_id: str, quiet: bool=True) -> Optional[
                 'The resource {0} does not exist'.format(item_id))
 
 
-async def get_multi(ids: TYPING.ID_LIST, return_none=False) -> AsyncIterator[
+async def get_multi(ids: TYPING.ID_LIST, remove_stale=False) -> AsyncIterator[
         Optional[TYPING.ANY_ITEM_CO]]:
     user = context.user
-    resolve_visibility = utils.resolve_visibility
+    resolve_visibility = _resolve_visibility
     is_override = context.system_override
     if ids:
+        connector = get_service('db').connector
         async for item in connector.get_multi(ids):
             if item is not None:
                 if is_override:
@@ -58,14 +89,15 @@ async def get_multi(ids: TYPING.ID_LIST, return_none=False) -> AsyncIterator[
                 visibility = await resolve_visibility(item, user)
                 if visibility:
                     yield item
-            elif return_none:
-                yield None
+            elif remove_stale:
+                # TODO: remove stale
+                pass
 
 
 def transactional(auto_commit=True):
     min_sleep_time = 0.010
     max_sleep_time = 0.288
-    do_not_copy_types = (Request, Blueprint)
+    do_not_copy_types = (Request, Blueprint, str, int, float, bool, tuple)
 
     def transactional_decorator(func):
         """
@@ -75,6 +107,7 @@ def transactional(auto_commit=True):
         async def transactional_wrapper(*args, **kwargs):
             if context.txn is None:
                 # top level co-routine
+                connector = get_service('db').connector
                 retries = 0
                 sleep_time = min_sleep_time
                 max_retries = connector.txn_max_retries

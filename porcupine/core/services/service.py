@@ -4,18 +4,16 @@ Abstract Service class
 
 
 class AbstractService:
-    @classmethod
-    def prepare(cls, server):
-        pass
+    service_key = None
 
-    @classmethod
-    def start(cls, server):
+    def __init__(self, server):
+        self.server = server
+
+    def start(self):
         raise NotImplementedError
 
-    @classmethod
-    def stop(cls, server):
+    def stop(self):
         raise NotImplementedError
 
-    @classmethod
-    def status(cls):
+    def status(self):
         return {}

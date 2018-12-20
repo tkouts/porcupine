@@ -1,5 +1,7 @@
-from porcupine import context, db, exceptions
+from porcupine import db, exceptions
+from porcupine.core.context import context
 from porcupine.response import json
+from porcupine.core.services import get_service
 from porcupine.core.utils import get_key_of_unique
 
 
@@ -129,8 +131,10 @@ class DataType:
                     context.txn.insert_external(new_unique, instance.id)
                 # else:
                 #     # parent_id on_change handler will do the job
-            context.txn.mutate(instance, self.storage_key,
-                               db.connector.SUB_DOC_UPSERT_MUT, value)
+            context.txn.mutate(instance,
+                               self.storage_key,
+                               get_service('db').connector.SUB_DOC_UPSERT_MUT,
+                               value)
 
     def on_delete(self, instance, value):
         ...

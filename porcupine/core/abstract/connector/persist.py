@@ -4,7 +4,7 @@ Default database object persistence layer
 from porcupine.core import utils
 
 
-class DefaultPersistence(object):
+class DefaultPersistence:
     @staticmethod
     def loads(storage):
         content_class = utils.get_content_class(storage.pop('_cc'))

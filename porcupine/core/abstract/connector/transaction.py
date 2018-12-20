@@ -2,11 +2,10 @@ import asyncio
 from inspect import isawaitable
 from collections import defaultdict
 
-from porcupine import exceptions, log, gather, context
+from porcupine import exceptions, log, server
 from porcupine.core import utils
-from porcupine.core.context import system_override, with_context
-from porcupine.core.aiolocals.local import wrap_gather
-from porcupine.core.app import App
+from porcupine.core.context import system_override, with_context, context
+from porcupine.core.aiolocals.local import wrap_gather as gather
 
 
 class Transaction:
@@ -320,10 +319,10 @@ class Transaction:
                 self._exec_post_handler('on_post_delete',
                                         deleted_items, actor))
 
-    @with_context(App.SYSTEM_USER)
+    @with_context(server.system_user)
     async def _exec_post_handler(self, handler: str, items: list, actor):
         tasks = [getattr(item, handler)(actor) for item in items]
-        results = await wrap_gather(*tasks, return_exceptions=True)
+        results = await gather(*tasks, return_exceptions=True)
         errors = [result if isinstance(result, Exception) else None
                   for result in results]
         if any(errors):

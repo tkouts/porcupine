@@ -9,7 +9,7 @@ from porcupine.core.server import server
 from porcupine import apps
 from .log import porcupine_log
 from .loader import gather_apps
-from .services.blueprint import prepare_services
+from .services import prepare_services
 from .daemon import Daemon
 
 

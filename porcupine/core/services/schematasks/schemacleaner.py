@@ -1,5 +1,6 @@
-from porcupine import db, exceptions, log
+from porcupine import exceptions, log
 from porcupine.core import utils
+from porcupine.datatypes import Blob, ReferenceN, RelatorN
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 
 
@@ -38,10 +39,8 @@ class SchemaCleaner(SchemaMaintenanceTask):
         return item_dict, externals
 
     async def execute(self):
-        from porcupine.datatypes import Blob, ReferenceN, RelatorN
-
         try:
-            success, externals = await db.connector.swap_if_not_modified(
+            success, externals = await self.connector.swap_if_not_modified(
                 self.key,
                 xform=self.schema_updater
             )
@@ -58,14 +57,14 @@ class SchemaCleaner(SchemaMaintenanceTask):
             if ext_type == Blob.storage_info:
                 # external blob
                 external_key = utils.get_blob_key(self.key, ext_name)
-                if db.connector.exists(external_key):
+                if self.connector.exists(external_key):
                     external_keys.append(external_key)
             elif ext_type == ReferenceN.storage_info \
                     or ext_type.startswith(RelatorN.storage_info_prefix):
                 # item collection
                 external_key = utils.get_collection_key(self.key, ext_name,
                                                         active_chunk)
-                while (await db.connector.exists(external_key))[1]:
+                while (await self.connector.exists(external_key))[1]:
                     external_keys.append(external_key)
                     active_chunk -= 1
                     external_key = utils.get_collection_key(
@@ -73,4 +72,4 @@ class SchemaCleaner(SchemaMaintenanceTask):
 
         if external_keys:
             # TODO handle exceptions
-            await db.connector.delete_multi(external_keys)
+            await self.connector.delete_multi(external_keys)

@@ -1,6 +1,7 @@
-from porcupine import db, context, exceptions
+from porcupine import db, exceptions
 from porcupine.contract import contract
-from porcupine.core.context import system_override
+from porcupine.core.context import context, system_override
+from porcupine.core.services import get_service
 from porcupine.core import utils
 from .collection import ItemCollection
 from .datatype import DataType
@@ -68,7 +69,7 @@ class Reference1(String, Acceptable):
     async def on_create(self, instance, value):
         super().on_create(instance, value)
         if value:
-            ref_item = await db.connector.get(value)
+            ref_item = await get_service('db').connector.get(value)
             if ref_item is None:
                 # TODO: change wording
                 raise exceptions.InvalidUsage('Invalid item {0}'.format(value))
@@ -83,7 +84,7 @@ class Reference1(String, Acceptable):
     async def on_delete(self, instance, value):
         super().on_delete(instance, value)
         if value and self.cascade_delete:
-            ref_item = await db.connector.get(value)
+            ref_item = await get_service('db').connector.get(value)
             if ref_item:
                 with system_override():
                     await ref_item.remove()
@@ -91,7 +92,7 @@ class Reference1(String, Acceptable):
     async def on_recycle(self, instance, value):
         super().on_recycle(instance, value)
         if value and self.cascade_delete:
-            ref_item = await db.connector.get(value)
+            ref_item = await get_service('db').connector.get(value)
             if ref_item:
                 with system_override():
                     # mark as deleted
@@ -102,7 +103,7 @@ class Reference1(String, Acceptable):
     async def on_restore(self, instance, value):
         super().on_recycle(instance, value)
         if value and self.cascade_delete:
-            ref_item = await db.connector.get(value)
+            ref_item = await get_service('db').connector.get(value)
             if ref_item:
                 with system_override():
                     await ref_item.restore()
@@ -214,11 +215,12 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
 
         previous_chunk = self.current_chunk(instance) - 1
         if previous_chunk > -1:
+            connector = await get_service('db').connector
             while True:
                 external_key = utils.get_collection_key(instance.id,
                                                         self.name,
                                                         previous_chunk)
-                _, key_exists = await db.connector.exists(external_key)
+                _, key_exists = connector.exists(external_key)
                 if not key_exists:
                     break
                 context.txn.delete_external(external_key)

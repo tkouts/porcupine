@@ -4,11 +4,10 @@ import functools
 from typing import List, ClassVar
 
 from porcupine.hinting import TYPING
-from porcupine import server
 from porcupine.core.context import system_override
-from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.core import utils
 from porcupine.datatypes import DataType, String, ReferenceN
+from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.core.datatypes.asyncsetter import AsyncSetter
 from .storage import storage
 
@@ -43,6 +42,7 @@ class ElasticMeta(type):
                                         "cannot be unique or indexed"
                                         .format(attr.name, cls.__name__))
                     if attr.indexed:
+                        from porcupine.core.server import server
                         server.config.__indices__[attr.name] = attr
             except AttributeError:
                 continue
@@ -233,7 +233,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                     and data_type.storage == '__storage__':
                 setattr(self, data_type.name, data_type.default)
 
-    async def clone(self, memo: dict=None) -> 'Elastic':
+    async def clone(self, memo: dict = None) -> 'Elastic':
         """
         Creates an in-memory clone of the item.
         This is a shallow copy operation meaning that the item's

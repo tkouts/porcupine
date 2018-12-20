@@ -3,48 +3,42 @@ Database service
 """
 from multiprocessing import Lock
 
-from porcupine import log, db
+from porcupine import log
 from porcupine.core import utils
 from porcupine.core.app import App
 from .service import AbstractService
 
-DB_BP_LOCK = Lock()
+_DB_BP_LOCK = Lock()
 
 
 class Db(AbstractService):
-    @staticmethod
-    def get_connector(server):
-        connector_type = utils.get_rto_by_name(server.config.DB_IF)
-        return connector_type(server)
+    service_key = 'db'
 
-    @classmethod
-    def prepare(cls, server):
-        connector = cls.get_connector(server)
-        connector.prepare_indexes()
+    def __init__(self, server):
+        super().__init__(server)
+        connector_type = utils.get_rto_by_name(self.server.config.DB_IF)
+        self.connector = connector_type(self.server)
+        self.connector.prepare_indexes()
 
-    @classmethod
-    async def start(cls, server):
+    async def start(self):
         log.info('Opening database')
-        db.connector = cls.get_connector(server)
-        await db.connector.connect()
+        await self.connector.connect()
         # allow only one process at a time
         # to install the db blueprints
-        lock_acquired = DB_BP_LOCK.acquire(False)
+        lock_acquired = _DB_BP_LOCK.acquire(False)
         if lock_acquired:
             # install apps db blueprints
-            apps = [bp for bp in server.blueprints.values()
+            apps = [bp for bp in self.server.blueprints.values()
                     if isinstance(bp, App) and bp.db_blueprint]
             for app in apps:
                 await app.setup_db_blueprint()
-            DB_BP_LOCK.release()
+            _DB_BP_LOCK.release()
 
-    @classmethod
-    async def stop(cls, server):
+    async def stop(self):
         log.info('Closing database')
-        await db.connector.close()
+        await self.connector.close()
 
-    @classmethod
-    def status(cls):
+    def status(self):
         return {
-            'active_txns': db.connector.active_txns
+            'active_txns': self.connector.active_txns
         }

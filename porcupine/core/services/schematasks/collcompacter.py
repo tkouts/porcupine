@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-from porcupine import db, exceptions, log
+from porcupine import exceptions, log
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 
 
@@ -25,10 +25,10 @@ class CollectionCompacter(SchemaMaintenanceTask):
         return ' '.join(compacted), True
 
     async def execute(self):
-        if db.connector.server.debug:
+        if self.connector.server.debug:
             log.debug('Compacting collection {0}'.format(self.key))
         try:
-            success, _ = await db.connector.swap_if_not_modified(
+            success, _ = await self.connector.swap_if_not_modified(
                 self.key,
                 xform=self.compact_set
             )

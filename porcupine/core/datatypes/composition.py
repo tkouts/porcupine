@@ -5,9 +5,9 @@ Porcupine composition data types
 from typing import Optional, AsyncIterator, List
 
 from porcupine.hinting import TYPING
-from porcupine import db, exceptions, context
+from porcupine import db, exceptions
 from porcupine.contract import contract
-from porcupine.core.context import system_override
+from porcupine.core.context import context, system_override
 from porcupine.core.schema.composite import Composite
 from porcupine.core import utils
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
@@ -91,8 +91,9 @@ class Composition(ReferenceN):
             added = []
             removed = []
             if removed_ids:
-                get_multi = utils.multi_with_stale_resolution
-                async for composite in get_multi(removed_ids):
+                get_multi = db.get_multi
+                async for composite in get_multi(removed_ids,
+                                                 remove_stale=True):
                     removed.append(composite)
             for composite in composites:
                 if composite.__is_new__:
