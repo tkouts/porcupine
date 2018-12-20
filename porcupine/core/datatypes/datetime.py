@@ -1,3 +1,4 @@
+from datetime import datetime
 from porcupine.core.utils import date
 from porcupine.core.datatypes.common import String
 
@@ -28,11 +29,14 @@ class Date(DateTime):
         if instance is None:
             return self
         arrow_obj = super().__get__(instance, owner)
-        arrow_obj.date_only = True
+        if arrow_obj is not None:
+            arrow_obj.date_only = True
         return arrow_obj
 
     def __set__(self, instance, value):
         if isinstance(value, str):
             # we need to validate
             value = date.get(value)
-        String.__set__(self, instance, value.date().isoformat())
+        if isinstance(value, datetime):
+            value = value.date()
+        String.__set__(self, instance, value and value.isoformat())
