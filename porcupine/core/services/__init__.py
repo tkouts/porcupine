@@ -26,8 +26,12 @@ def get_service(key):
     return _services[key]
 
 
+def db_connector():
+    return get_service('db').connector
+
+
 @_services_blueprint.listener('before_server_start')
-async def start_services(server, _):
+async def start_services(*_):
     for service in _services.values():
         starter = service.start()
         if inspect.isawaitable(starter):
@@ -35,7 +39,7 @@ async def start_services(server, _):
 
 
 @_services_blueprint.listener('after_server_stop')
-async def shutdown_services(server, _):
+async def shutdown_services(*_):
     for service in _services.values():
         stopper = service.stop()
         if inspect.isawaitable(stopper):

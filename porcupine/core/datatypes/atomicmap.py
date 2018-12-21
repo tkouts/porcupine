@@ -1,5 +1,5 @@
 from porcupine import exceptions
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from porcupine.core.context import context
 from porcupine.core.utils import collections
 from porcupine.core.datatypes.mutable import Dictionary
@@ -15,7 +15,6 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         AsyncSetterValue.__init__(self, descriptor, instance)
 
     async def set(self, key: str, value):
-        connector = get_service('db').connector
         descriptor, instance = self._desc, self._inst
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
@@ -25,11 +24,10 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         if not instance.__is_new__:
             context.txn.mutate(instance,
                                '{0}.{1}'.format(descriptor.storage_key, key),
-                               connector.SUB_DOC_UPSERT_MUT,
+                               db_connector().SUB_DOC_UPSERT_MUT,
                                value)
 
     async def delete(self, key: str):
-        connector = get_service('db').connector
         descriptor, instance = self._desc, self._inst
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
@@ -38,7 +36,7 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         if not instance.__is_new__:
             context.txn.mutate(instance,
                                '{0}.{1}'.format(descriptor.storage_key, key),
-                               connector.SUB_DOC_REMOVE, None)
+                               db_connector().SUB_DOC_REMOVE, None)
 
     def __getitem__(self, item):
         if self._dct is None:
@@ -102,7 +100,7 @@ class AtomicMap(AsyncSetter, Dictionary):
     def on_change(self, instance, value, old_value):
         self.validate(value)
         if not instance.__is_new__:
-            connector = get_service('db').connector
+            connector = db_connector()
             if value is None or old_value is None:
                 context.txn.mutate(instance, self.storage_key,
                                    connector.SUB_DOC_UPSERT_MUT, value)

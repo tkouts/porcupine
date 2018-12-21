@@ -4,7 +4,7 @@ from typing import AsyncIterator
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 from porcupine.core.context import context
-from porcupine.core.services import get_service
+from porcupine.core.services import get_service, db_connector
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 
@@ -17,7 +17,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
         descriptor, instance = self._desc, self._inst
-        connector = get_service('db').connector
+        connector = db_connector()
         dirty_count = 0
         total_count = 0
         current_size = 0

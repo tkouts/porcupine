@@ -5,7 +5,7 @@ from sanic import Blueprint
 
 from porcupine import db, config
 from porcupine.core import utils
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from porcupine.core.server import server
 from porcupine.core.context import with_context, system_override
 
@@ -29,7 +29,7 @@ class App(Blueprint):
     @with_context(server.system_user)
     @db.transactional()
     async def __initialize_db(self, blueprint):
-        connector = get_service('db').connector
+        connector = db_connector()
         for item in blueprint:
             await self.__process_item(connector, item, None)
 

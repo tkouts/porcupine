@@ -1,5 +1,5 @@
 from porcupine.core.context import context
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from .common import Integer
 
 
@@ -12,5 +12,5 @@ class Counter(Integer):
         if delta and not instance.__is_new__:
             context.txn.mutate(instance,
                                self.storage_key,
-                               get_service('db').connector.SUB_DOC_COUNTER,
+                               db_connector().SUB_DOC_COUNTER,
                                delta)

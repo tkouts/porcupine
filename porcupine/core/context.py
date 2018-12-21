@@ -1,7 +1,7 @@
 from functools import wraps
 from lru import LRU
 
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from .log import porcupine_log
 from .aiolocals.local import Local, Context
 
@@ -12,7 +12,7 @@ class PContext(Local):
         return self.__sys__
 
     def prepare(self):
-        connector = get_service('db').connector
+        connector = db_connector()
         self.__setattr__('__sys__', False)
         self.__setattr__('caches', {})
         self.__setattr__('db_cache', LRU(connector.cache_size))
@@ -42,7 +42,7 @@ def with_context(identity=None, debug=False):
         @wraps(task)
         async def context_wrapper(*args, **kwargs):
             with Context(locals=(context, )):
-                connector = get_service('db').connector
+                connector = db_connector()
                 context.prepare()
                 user = identity
                 if isinstance(user, str):
@@ -104,7 +104,7 @@ class context_user:
 
     async def __aenter__(self):
         if isinstance(self.user, str):
-            connector = get_service('db').connector
+            connector = db_connector()
             should_switch = context.user is None \
                 or context.user.id != self.user
             if should_switch:

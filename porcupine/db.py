@@ -10,7 +10,7 @@ from sanic.request import Request
 from porcupine import exceptions
 from porcupine.hinting import TYPING
 from porcupine.core.context import context
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector, get_service
 
 
 async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
@@ -18,7 +18,7 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
         return 1
     # check for stale / expired / deleted
     it = item
-    connector = get_service('db').connector
+    connector = db_connector()
     while True:
         if not it.is_composite:
             # check expiration
@@ -59,7 +59,7 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
 
     :rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
     """
-    item = await get_service('db').connector.get(item_id, quiet=quiet)
+    item = await db_connector().get(item_id, quiet=quiet)
     if item is not None:
         if context.system_override:
             return item
@@ -80,7 +80,7 @@ async def get_multi(ids: TYPING.ID_LIST, remove_stale=False) -> AsyncIterator[
     resolve_visibility = _resolve_visibility
     is_override = context.system_override
     if ids:
-        connector = get_service('db').connector
+        connector = db_connector()
         async for item in connector.get_multi(ids):
             if item is not None:
                 if is_override:
@@ -107,7 +107,7 @@ def transactional(auto_commit=True):
         async def transactional_wrapper(*args, **kwargs):
             if context.txn is None:
                 # top level co-routine
-                connector = get_service('db').connector
+                connector = db_connector()
                 retries = 0
                 sleep_time = min_sleep_time
                 max_retries = connector.txn_max_retries

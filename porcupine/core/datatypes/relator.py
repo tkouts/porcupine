@@ -4,7 +4,7 @@ Porcupine reference data types
 """
 from porcupine import exceptions
 from porcupine.core.context import system_override, context
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from .reference import Reference1, ReferenceN, ItemReference
 from .collection import ItemCollection
 
@@ -96,14 +96,14 @@ class Relator1(Reference1, RelatorBase):
         if ref_item:
             await self.add_reference(instance, ref_item)
         if old_value:
-            old_ref_item = await get_service('db').connector.get(old_value)
+            old_ref_item = await db_connector().get(old_value)
             if old_ref_item:
                 await self.remove_reference(instance, old_ref_item)
 
     async def on_delete(self, instance, value):
         await super().on_delete(instance, value)
         if value and not self.cascade_delete:
-            ref_item = await get_service('db').connector.get(value)
+            ref_item = await db_connector().get(value)
             if ref_item:
                 await self.remove_reference(instance, ref_item)
 

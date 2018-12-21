@@ -2,8 +2,9 @@ from porcupine import db, exceptions
 from porcupine.hinting import TYPING
 from porcupine.contract import contract
 from porcupine.core.context import system_override, context
-from porcupine.core.services import get_service
-from porcupine.core.utils import permissions, date, add_uniques, remove_uniques, get_content_class
+from porcupine.core.services import db_connector, get_service
+from porcupine.core.utils import permissions, date, add_uniques, \
+    remove_uniques, get_content_class
 from .collection import ItemCollection
 from .common import String
 from .counter import Counter
@@ -118,7 +119,7 @@ class Children(ReferenceN):
             # allow for system
             return True
         if isinstance(item, shortcut):
-            target = await get_service('db').connector.get(item.target)
+            target = await db_connector().get(item.target)
             if target:
                 await super().accepts_item(target)
         return await super().accepts_item(item)

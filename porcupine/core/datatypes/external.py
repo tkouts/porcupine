@@ -10,7 +10,7 @@ import aiofiles
 
 from porcupine.core import utils
 from porcupine.core.context import context
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from .common import String
 from .datatype import DataType
 
@@ -28,7 +28,7 @@ class Blob(DataType):
                          indexed=False, **kwargs)
 
     async def fetch(self, instance, set_storage=True):
-        connector = get_service('db').connector
+        connector = db_connector()
         value = await connector.get_external(self.key_for(instance))
         if set_storage:
             storage = getattr(instance, self.storage)
@@ -52,7 +52,7 @@ class Blob(DataType):
         if not instance.__is_new__ and context.txn:
             # add schema info
             context.txn.mutate(instance, self.name,
-                               get_service('db').connector.SUB_DOC_INSERT,
+                               db_connector().SUB_DOC_INSERT,
                                self.storage_info)
 
     def key_for(self, instance):

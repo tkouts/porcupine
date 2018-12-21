@@ -1,6 +1,6 @@
 from porcupine import exceptions
 from porcupine.datatypes import Relator1
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from .item import Item
 
 
@@ -39,7 +39,7 @@ class Shortcut(Item):
         return shortcut
 
     async def update(self):
-        parent = await get_service('db').connector.get(self.parent_id)
+        parent = await db_connector().get(self.parent_id)
         target = await self.get_target()
         if target.is_collection:
             containment_dt = parent.__class__.containers

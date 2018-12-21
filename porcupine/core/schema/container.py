@@ -6,7 +6,7 @@ from porcupine import db, exceptions
 from porcupine.view import view
 from porcupine.core.datatypes.system import Items, Containers
 from porcupine.core.aiolocals.local import wrap_gather as gather
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from porcupine.core import utils
 from .item import Item
 from .shortcut import Shortcut
@@ -38,7 +38,7 @@ class Container(Item):
         @rtype: bool
         """
         unique_name_key = utils.get_key_of_unique(self.id, 'name', name)
-        _, exists = await get_service('db').connector.exists(unique_name_key)
+        _, exists = await db_connector().exists(unique_name_key)
         return exists
 
     async def get_child_by_name(self, name, resolve_shortcuts=False):
@@ -51,7 +51,7 @@ class Container(Item):
                  else None.
         @rtype: L{GenericItem}
         """
-        child_id = await get_service('db').connector.get_raw(
+        child_id = await db_connector().get_raw(
                 utils.get_key_of_unique(self.id, 'name', name))
         if child_id:
             item = await db.get_item(child_id)

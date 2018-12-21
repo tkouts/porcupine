@@ -1,7 +1,7 @@
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.response import json
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from porcupine.core.utils import get_key_of_unique
 
 
@@ -133,7 +133,7 @@ class DataType:
                 #     # parent_id on_change handler will do the job
             context.txn.mutate(instance,
                                self.storage_key,
-                               get_service('db').connector.SUB_DOC_UPSERT_MUT,
+                               db_connector().SUB_DOC_UPSERT_MUT,
                                value)
 
     def on_delete(self, instance, value):

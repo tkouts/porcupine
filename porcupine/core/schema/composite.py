@@ -1,7 +1,7 @@
 from porcupine import db, exceptions
 from porcupine.contract import contract
 from porcupine.datatypes import String
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from porcupine.core.context import system_override, context
 from .elastic import Elastic
 
@@ -45,11 +45,11 @@ class Composite(Elastic):
 
     @property
     async def item(self):
-        return await get_service('db').connector.get(self.item_id)
+        return await db_connector().get(self.item_id)
 
     @property
     async def parent(self):
-        return await get_service('db').connector.get(self.parent_id)
+        return await db_connector().get(self.parent_id)
 
     async def clone(self, memo: dict = None) -> 'Composite':
         clone: 'Composite' = await super().clone(memo)

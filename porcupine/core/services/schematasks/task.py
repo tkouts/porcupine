@@ -1,4 +1,4 @@
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 
 
 class SchemaMaintenanceTask:
@@ -9,7 +9,7 @@ class SchemaMaintenanceTask:
 
     def __init__(self, key):
         self.key = key
-        self.connector = get_service('db').connector
+        self.connector = db_connector()
 
     async def execute(self):
         ...

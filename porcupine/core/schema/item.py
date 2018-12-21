@@ -6,7 +6,7 @@ from porcupine.hinting import TYPING
 from porcupine import exceptions, db
 from porcupine.contract import contract
 from porcupine.core.context import system_override, context
-from porcupine.core.services import get_service
+from porcupine.core.services import db_connector
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import permissions, date
 from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
@@ -67,7 +67,7 @@ class GenericItem(Removable, Elastic):
             acl = self.acl
             if self.parent_id is not None and \
                     (not acl.is_set() or acl.is_partial()):
-                parent = await get_service('db').connector.get(self.parent_id)
+                parent = await db_connector().get(self.parent_id)
                 parent_acl = await parent.effective_acl
                 if acl.is_partial():
                     self.__effective_acl = ChainMap(*[acl, parent_acl])
@@ -189,7 +189,7 @@ class GenericItem(Removable, Elastic):
             if not self.__is_new__:
                 context.txn.mutate(
                     self, 'md',
-                    get_service('db').connector.SUB_DOC_UPSERT_MUT, now)
+                    db_connector().SUB_DOC_UPSERT_MUT, now)
 
     async def update(self) -> bool:
         """
@@ -203,7 +203,7 @@ class GenericItem(Removable, Elastic):
                 raise exceptions.Forbidden('Forbidden')
 
             if self.parent_id is not None:
-                parent = await get_service('db').connector.get(self.parent_id)
+                parent = await db_connector().get(self.parent_id)
                 await parent.touch()
 
             with system_override():
