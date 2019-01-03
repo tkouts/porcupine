@@ -9,10 +9,10 @@ class AbstractService:
     def __init__(self, server):
         self.server = server
 
-    def start(self):
+    def start(self, loop):
         raise NotImplementedError
 
-    def stop(self):
+    def stop(self, loop):
         raise NotImplementedError
 
     def status(self):

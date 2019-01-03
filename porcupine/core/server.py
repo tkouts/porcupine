@@ -5,6 +5,7 @@ from sanic import Sanic
 from sanic.request import Request
 
 from porcupine.config.default import DEFAULTS
+from porcupine.core.services import get_service
 from porcupine.core.router import ContextRouter
 from porcupine.apps.schema.users import SystemUser
 
@@ -26,6 +27,18 @@ class PorcupineServer(Sanic):
     @property
     def system_user(self):
         return self.__identity
+
+    def cron_tab(self, spec, identity=None):
+        if identity is None:
+            identity = self.system_user
+
+        scheduler = get_service('scheduler')
+
+        def cron_wrapper(f):
+            scheduler.schedule(spec, f, identity)
+            return f
+
+        return cron_wrapper
 
     def load_environment_config(self, prefix, preserve_prefix=True):
         """

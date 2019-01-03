@@ -3,6 +3,7 @@ from collections import OrderedDict
 
 from sanic import Blueprint
 
+from porcupine import log
 
 _services = OrderedDict()
 _services_blueprint = Blueprint('services')
@@ -12,8 +13,9 @@ def prepare_services(server):
     from .db import Db
     from .schema import SchemaMaintenance
     from .sessionmgr import SessionManager
+    from .scheduler import Scheduler
 
-    for service_type in (SchemaMaintenance, Db, SessionManager):
+    for service_type in (Db, SchemaMaintenance, SessionManager, Scheduler):
         service = service_type(server)
         _services[service.service_key] = service
 
@@ -27,20 +29,24 @@ def get_service(key):
 
 
 def db_connector():
-    return get_service('db').connector
+    return _services['db'].connector
 
 
 @_services_blueprint.listener('before_server_start')
-async def start_services(*_):
+async def start_services(_, loop):
     for service in _services.values():
-        starter = service.start()
+        log.info(f'Starting {service.service_key} service')
+        starter = service.start(loop)
         if inspect.isawaitable(starter):
             await starter
 
 
 @_services_blueprint.listener('after_server_stop')
-async def shutdown_services(*_):
-    for service in _services.values():
-        stopper = service.stop()
+async def shutdown_services(_, loop):
+    services = list(_services.values())
+    services.reverse()
+    for service in services:
+        log.info(f'Stopping {service.service_key} service')
+        stopper = service.stop(loop)
         if inspect.isawaitable(stopper):
             await stopper

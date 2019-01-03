@@ -8,6 +8,7 @@ class Auth(App):
     """Handles the users' authentication"""
     name = 'auth'
 
+
 auth = Auth()
 
 

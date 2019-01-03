@@ -5,7 +5,6 @@ import asyncio
 
 from sanic import Blueprint
 
-from porcupine import log
 from porcupine.core import utils
 from .service import AbstractService
 
@@ -40,14 +39,12 @@ class SessionManager(AbstractService):
         global session_manager
 
         super().__init__(server)
-        log.info('Creating session manager')
         sm_type = utils.get_rto_by_name(self.server.config.SM_IF)
         session_manager = sm_type(self.server)
         self.server.blueprint(session_manager_bp)
 
-    async def start(self):
+    async def start(self, loop):
         await session_manager.initialize()
 
-    async def stop(self):
-        log.info('Closing session manager')
+    async def stop(self, loop):
         await session_manager.close()

@@ -18,8 +18,7 @@ class SchemaMaintenance(AbstractService):
     service_key = 'schema'
     queue = None
 
-    def start(self):
-        log.info('Starting schema maintenance service')
+    def start(self, loop):
         type(self).queue = asyncio.Queue()
         asyncio.ensure_future(self.worker())
 
@@ -42,8 +41,7 @@ class SchemaMaintenance(AbstractService):
             'queue_size': self.queue.qsize()
         }
 
-    async def stop(self):
-        log.info('Stopping schema maintenance service')
+    async def stop(self, loop):
         await self.queue.put(None)
         await self.queue.join()
 

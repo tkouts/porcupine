@@ -3,7 +3,6 @@ Database service
 """
 from multiprocessing import Lock
 
-from porcupine import log
 from porcupine.core import utils
 from porcupine.core.app import App
 from .service import AbstractService
@@ -20,8 +19,7 @@ class Db(AbstractService):
         self.connector = connector_type(self.server)
         self.connector.prepare_indexes()
 
-    async def start(self):
-        log.info('Opening database')
+    async def start(self, loop):
         await self.connector.connect()
         # allow only one process at a time
         # to install the db blueprints
@@ -34,8 +32,7 @@ class Db(AbstractService):
                 await app.setup_db_blueprint()
             _DB_BP_LOCK.release()
 
-    async def stop(self):
-        log.info('Closing database')
+    async def stop(self, loop):
         await self.connector.close()
 
     def status(self):
