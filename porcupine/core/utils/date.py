@@ -6,8 +6,8 @@ class JsonArrow(Arrow):
 
     def __json__(self):
         if self.date_only:
-            return '"{0}"'.format(self.date().isoformat())
-        return '"{0}"'.format(self.isoformat())
+            return f'"{self.date().isoformat()}"'
+        return f'"{self.isoformat()}"'
 
 
 _factory = api.factory(JsonArrow)
