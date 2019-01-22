@@ -200,6 +200,7 @@ class Embedded(AsyncSetter, Reference1):
     @see: L{porcupine.schema.Composite}
     """
     safe_type = Composite
+    storage_info = '_comp1_'
     # TODO: disallow unique
 
     def getter(self, instance, value=None):
