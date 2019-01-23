@@ -80,7 +80,7 @@ class GenericItem(Removable, Elastic):
     def reset_effective_acl(self):
         self.__effective_acl = None
 
-    async def clone(self, memo: dict=None) -> 'GenericItem':
+    async def clone(self, memo: dict = None) -> 'GenericItem':
         clone: 'GenericItem' = await super().clone(memo)
         now = date.utcnow()
         user = context.user

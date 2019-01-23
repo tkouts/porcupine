@@ -206,16 +206,21 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         """
         return type(self).__name__
 
-    async def apply_patch(self, patch: dict) -> None:
+    async def apply_patch(self, patch: dict, camel_to_snake=False) -> None:
         for attr, value in patch.items():
+            if camel_to_snake:
+                attr = utils.camel_to_snake(attr)
             if isinstance(self.__schema__.get(attr, None), AsyncSetter):
                 await getattr(self, attr).reset(value)
             else:
                 setattr(self, attr, value)
 
-    def custom_view(self, *args, **kwargs) -> dict:
+    def custom_view(self, *args, snake_to_camel=False, **kwargs) -> dict:
+        if '*' in args:
+            args = [dt.name for dt in self.view_data_types()]
         result = {
-            key: getattr(self, key) for key in args
+            utils.snake_to_camel(key)
+            if snake_to_camel else key: getattr(self, key) for key in args
         }
         if kwargs:
             result.update(kwargs)

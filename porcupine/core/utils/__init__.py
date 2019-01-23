@@ -5,6 +5,7 @@ import cbor
 import functools
 import hashlib
 import random
+import re
 from typing import Union
 import mmh3
 
@@ -153,3 +154,19 @@ def remove_uniques(item):
                 unique.name,
                 item.get_snapshot_of(unique.name))
             txn.delete_external(unique_key)
+
+
+_re1 = re.compile('(.)([A-Z][a-z]+)')
+_re2 = re.compile('([a-z0-9])([A-Z])')
+
+
+def camel_to_snake(s):
+    s1 = re.sub(_re1, r'\1_\2', s)
+    return re.sub(_re2, r'\1_\2', s1).lower()
+
+
+def snake_to_camel(s, init_cap=False):
+    camel = ''.join(char.capitalize() for char in s.split('_'))
+    if not init_cap:
+        camel = camel[:1].lower() + camel[1:]
+    return camel
