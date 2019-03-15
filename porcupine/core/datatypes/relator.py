@@ -105,6 +105,10 @@ class Relator1(Reference1, RelatorBase):
         if value and not self.cascade_delete:
             ref_item = await db_connector().get(value)
             if ref_item:
+                if self.respects_references:
+                    raise exceptions.Forbidden(
+                        f'{instance.friendly_name} can not be '
+                        'removed because is referenced by other items.')
                 await self.remove_reference(instance, ref_item)
 
 
@@ -183,6 +187,10 @@ class RelatorN(ReferenceN, RelatorBase):
         if not self.cascade_delete:
             with system_override():
                 async for ref_item in collection.items():
+                    if self.respects_references:
+                        raise exceptions.Forbidden(
+                            f'{instance.friendly_name} can not be '
+                            'removed because is referenced by other items.')
                     await self.remove_reference(instance, ref_item)
         # remove collection documents
         await super().on_delete(instance, value)
