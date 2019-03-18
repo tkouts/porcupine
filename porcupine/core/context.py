@@ -1,22 +1,42 @@
+import contextvars
 from functools import wraps
 from lru import LRU
 
 from porcupine.core.services import db_connector
 from .log import porcupine_log
-from .aiolocals.local import Local, Context
+
+ctx_user = contextvars.ContextVar('user', default=None)
+ctx_txn = contextvars.ContextVar('txn', default=None)
+ctx_db_cache = contextvars.ContextVar('db_cache', default=None)
+ctx_caches = contextvars.ContextVar('caches', default={})
+ctx_sys = contextvars.ContextVar('__sys__', default=False)
 
 
-class PContext(Local):
+class PContext:
     @property
     def system_override(self):
-        return self.__sys__
+        return ctx_sys.get()
 
-    def prepare(self):
+    @property
+    def user(self):
+        return ctx_user.get()
+
+    @user.setter
+    def user(self, user):
+        ctx_user.set(user)
+
+    @property
+    def txn(self):
+        return ctx_txn.get()
+
+    @property
+    def db_cache(self):
+        return ctx_db_cache.get()
+
+    @staticmethod
+    def prepare():
         connector = db_connector()
-        self.__setattr__('__sys__', False)
-        self.__setattr__('caches', {})
-        self.__setattr__('db_cache', LRU(connector.cache_size))
-        self.__setattr__('txn', None)
+        ctx_db_cache.set(LRU(connector.cache_size))
 
 
 context = PContext()
@@ -24,13 +44,13 @@ context = PContext()
 
 class system_override:
     def __init__(self):
-        self.override = context.__sys__
+        self.token = None
 
     def __enter__(self):
-        context.__sys__ = True
+        self.token = ctx_sys.set(True)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        context.__sys__ = self.override
+        ctx_sys.reset(self.token)
 
 
 def with_context(identity=None, debug=False):
@@ -41,24 +61,24 @@ def with_context(identity=None, debug=False):
         """
         @wraps(task)
         async def context_wrapper(*args, **kwargs):
-            with Context(locals=(context, )):
-                connector = db_connector()
-                context.prepare()
-                user = identity
-                if isinstance(user, str):
-                    user = await connector.get(user)
-                    if user is not None and user.is_deleted:
-                        user = None
-                context.user = user
-                try:
-                    return await task(*args, **kwargs)
-                finally:
-                    if debug:
-                        size = len(context.db_cache)
-                        hits, misses = context.db_cache.get_stats()
-                        porcupine_log.debug(
-                            'Cache Size: {0} Hits: {1} Misses: {2}'
-                            .format(size, hits, misses))
+            # with Context(locals=(context, )):
+            connector = db_connector()
+            context.prepare()
+            user = identity
+            if isinstance(user, str):
+                user = await connector.get(user)
+                if user is not None and user.is_deleted:
+                    user = None
+            ctx_user.set(user)
+            try:
+                return await task(*args, **kwargs)
+            finally:
+                if debug:
+                    size = len(context.db_cache)
+                    hits, misses = context.db_cache.get_stats()
+                    porcupine_log.debug(
+                        'Cache Size: {0} Hits: {1} Misses: {2}'
+                        .format(size, hits, misses))
 
         return context_wrapper
     return decorator
@@ -75,9 +95,10 @@ def context_cacheable(size=100):
             # initialize cache
             cache_name = '{0}.{1}'.format(co_routine.__module__,
                                           co_routine.__qualname__)
-            if cache_name not in context.caches:
-                context.caches[cache_name] = LRU(size)
-            cache = context.caches[cache_name]
+            caches = ctx_caches.get()
+            if cache_name not in caches:
+                caches[cache_name] = LRU(size)
+            cache = caches[cache_name]
             cache_key = args
             # print('CACHE KEY', cache_key)
             if cache_key in cache:
@@ -93,8 +114,12 @@ def context_cacheable(size=100):
 class context_user:
     def __init__(self, user):
         self.user = user
-        self.original_user = None
-        self.user_switched = False
+        self.token = None
+
+    @property
+    def original_user(self):
+        if self.token:
+            return self.token.old_value
 
     def __enter__(self):
         raise AttributeError('__enter__')
@@ -113,11 +138,9 @@ class context_user:
             should_switch = (context.user and context.user.id) != \
                             (self.user and self.user.id)
         if should_switch:
-            self.original_user = context.user
-            context.user = self.user
-            self.user_switched = True
+            self.token = ctx_user.set(self.user)
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        if self.user_switched:
-            context.user = self.original_user
+        if self.token:
+            ctx_user.reset(self.token)

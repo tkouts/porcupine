@@ -58,6 +58,9 @@ class ODict(ObservableDict):
     def on_after_mutate(self):
         self._desc.snapshot(self._inst, self, self._prev)
 
+    def __deepcopy__(self, memo=None):
+        return ODict(self._desc, self._inst, (), **dict(self.items()))
+
 
 class Dictionary(DataType):
     """Dictionary data type"""

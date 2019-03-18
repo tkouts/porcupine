@@ -1,8 +1,8 @@
+from asyncio import gather
 from typing import Dict, List
 
 from porcupine.hinting import TYPING
-from porcupine import db, exceptions
-from porcupine.core.aiolocals.local import wrap_gather as gather
+from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.datatypes.system import Deleted
@@ -22,7 +22,7 @@ class Cloneable(TYPING.ITEM_TYPE):
     @staticmethod
     async def _prepare_id_map(item: 'Cloneable',
                               id_map: Dict[str, str],
-                              is_root: bool=False) -> List['Cloneable']:
+                              is_root: bool = False) -> List['Cloneable']:
         all_items = []
 
         id_map[item.id] = utils.generate_oid()
@@ -52,7 +52,7 @@ class Cloneable(TYPING.ITEM_TYPE):
     @staticmethod
     async def _write_clone(item: 'Cloneable',
                            memo: Dict,
-                           target: TYPING.CONTAINER_CO=None) -> 'Cloneable':
+                           target: TYPING.CONTAINER_CO = None) -> 'Cloneable':
         id_map = memo['_id_map_']
         clone = await item.clone(memo)
 
@@ -173,11 +173,6 @@ class Removable(TYPING.ITEM_TYPE):
             if not can_delete:
                 raise exceptions.Forbidden('Forbidden')
             await context.txn.delete(self)
-
-    @db.transactional()
-    async def delete(self, request):
-        await self.remove()
-        return True
 
 
 class Recyclable(TYPING.ITEM_TYPE):

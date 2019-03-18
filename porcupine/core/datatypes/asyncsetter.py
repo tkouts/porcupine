@@ -1,8 +1,8 @@
 import abc
-from typing import Type
 
 from porcupine import exceptions
 from porcupine.core.context import context
+from porcupine.core.datatypes.datatype import DataType
 from porcupine.hinting import TYPING
 
 
@@ -22,7 +22,7 @@ class AsyncSetterValue:
         super(AsyncSetter, descriptor).__set__(instance, value)
 
 
-class AsyncSetter(Type[TYPING.DT_CO], metaclass=abc.ABCMeta):
+class AsyncSetter(DataType, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def getter(self, instance, value=None):
         raise NotImplementedError

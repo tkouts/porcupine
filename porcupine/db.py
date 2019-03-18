@@ -9,7 +9,7 @@ from sanic.request import Request
 
 from porcupine import exceptions
 from porcupine.hinting import TYPING
-from porcupine.core.context import context
+from porcupine.core.context import context, ctx_txn
 from porcupine.core.services import db_connector, get_service
 
 
@@ -105,7 +105,7 @@ def transactional(auto_commit=True):
         """
         @wraps(func)
         async def transactional_wrapper(*args, **kwargs):
-            if context.txn is None:
+            if ctx_txn.get() is None:
                 # top level co-routine
                 connector = db_connector()
                 retries = 0
@@ -114,7 +114,9 @@ def transactional(auto_commit=True):
                 try:
                     while retries < max_retries:
                         # print('trying.... %d' % retries)
-                        context.txn = txn = connector.get_transaction()
+                        # context.txn = txn = connector.get_transaction()
+                        txn = connector.get_transaction()
+                        ctx_txn.set(txn)
                         try:
                             args_copy = [
                                 copy.deepcopy(arg)
@@ -151,7 +153,7 @@ def transactional(auto_commit=True):
                     raise exceptions.DBDeadlockError(
                         'Maximum transaction retries exceeded')
                 finally:
-                    context.txn = None
+                    ctx_txn.set(None)
             else:
                 # pass through
                 return await func(*args, **kwargs)

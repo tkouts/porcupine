@@ -42,19 +42,19 @@ class Couchbase(AbstractConnector):
     def password(self):
         return self.server.config.DB_PASSWORD
 
-    def connect(self, async=True):
+    def connect(self, _async=True):
         hosts = self.server.config.DB_HOST.split(',')
         random.shuffle(hosts)
         connection_string = '{0}://{1}/{2}'.format(self.protocol,
                                                    ','.join(hosts),
                                                    self.bucket_name)
-        if async:
+        if _async:
             bucket = aBucket
         else:
             bucket = Bucket
         self.bucket = bucket(connection_string,
                              password=self.password)
-        if async:
+        if _async:
             return self.bucket.connect()
 
     def get_query(self, query, ad_hoc=True, **kwargs):
@@ -160,7 +160,7 @@ class Couchbase(AbstractConnector):
     # indexes
     def prepare_indexes(self):
         log.info('Preparing indexes')
-        self.connect(async=False)
+        self.connect(_async=False)
         # get existing indexes
         mgr = self.bucket.bucket_manager()
         existing = [index.name for index in mgr.list_n1ql_indexes()]

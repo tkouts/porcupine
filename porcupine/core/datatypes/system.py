@@ -80,15 +80,8 @@ class ChildrenCollection(ItemCollection):
         for item in items:
             await context.txn.delete(item)
 
-    async def items(self):
-        parent = self._inst
-        parent_id = parent.id
-        async for item in super().items():
-            if item.parent_id != parent_id:
-                # concurrency safety
-                # TODO: remove stale id
-                continue
-            yield item
+    def _is_consistent(self, item):
+        return self._inst.id == item.parent_id
 
 
 class Children(ReferenceN):

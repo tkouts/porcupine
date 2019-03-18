@@ -1,11 +1,11 @@
 import itertools
+from asyncio import gather
 
 from sanic.response import json
 
 from porcupine import db, exceptions
 from porcupine.view import view
 from porcupine.core.datatypes.system import Items, Containers
-from porcupine.core.aiolocals.local import wrap_gather as gather
 from porcupine.core.services import db_connector
 from porcupine.core import utils
 from .item import Item
@@ -76,7 +76,8 @@ class Container(Item):
             *await gather(self.get_containers(),
                           self.get_items(resolve_shortcuts)))
 
-    async def get_items(self, resolve_shortcuts=False):
+    async def get_items(self, start=0, cap=float('inf'),
+                        resolve_shortcuts=False):
         """
         This method returns the children that are not containers.
 
@@ -84,13 +85,13 @@ class Container(Item):
         """
         if resolve_shortcuts:
             items = []
-            async for item in self.items.items():
+            async for item in self.items.items(start, cap):
                 if isinstance(item, Shortcut):
                     item = await item.get_target()
                 if item:
                     items.append(item)
             return items
-        return [i async for i in self.items.items()]
+        return [i async for i in self.items.items(start, cap)]
 
     async def get_containers(self):
         """

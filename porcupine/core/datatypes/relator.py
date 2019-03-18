@@ -113,16 +113,25 @@ class Relator1(Reference1, RelatorBase):
 
 
 class RelatorCollection(ItemCollection):
-    async def items(self):
+    def _is_consistent(self, item):
         descriptor, inst = self._desc, self._inst
-        async for item in super().items():
-            rel_attr = getattr(item, descriptor.rel_attr, None)
-            if rel_attr:
-                if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
-                    # concurrency safety
-                    # TODO: remove stale id
-                    continue
-                yield item
+        rel_attr = getattr(item, descriptor.rel_attr, None)
+        if rel_attr:
+            if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
+                return False
+            return True
+        return False
+
+    # async def items(self):
+    #     descriptor, inst = self._desc, self._inst
+    #     async for item in super().items():
+    #         rel_attr = getattr(item, descriptor.rel_attr, None)
+    #         if rel_attr:
+    #             if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
+    #                 # concurrency safety
+    #                 # TODO: remove stale id
+    #                 continue
+    #             yield item
 
     async def add(self, *items):
         await super().add(*items)

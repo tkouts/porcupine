@@ -114,11 +114,11 @@ class CollectionReBuilder(CollectionCompacter):
             if insertions:
                 task = connector.upsert_multi(insertions)
                 if isawaitable(task):
-                    tasks.append(asyncio.ensure_future(task))
+                    tasks.append(asyncio.create_task(task))
             if deletions:
                 task = connector.delete_multi(deletions)
                 if isawaitable(task):
-                    tasks.append(asyncio.ensure_future(task))
+                    tasks.append(asyncio.create_task(task))
             if tasks:
                 completed, _ = await asyncio.wait(tasks)
                 errors = [task.exception() for task in tasks]

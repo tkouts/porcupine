@@ -5,7 +5,6 @@ from collections import defaultdict
 from porcupine import exceptions, log, server
 from porcupine.core import utils
 from porcupine.core.context import system_override, with_context, context
-from porcupine.core.aiolocals.local import wrap_gather as gather
 
 
 class Transaction:
@@ -121,7 +120,8 @@ class Transaction:
         if item.is_collection:
             with system_override():
                 children = await item.get_children()
-                await gather(*[self.delete(child) for child in children])
+                await asyncio.gather(
+                    *[self.delete(child) for child in children])
 
         await item.on_delete()
 
@@ -146,7 +146,8 @@ class Transaction:
         if item.is_collection:
             with system_override():
                 children = await item.get_children()
-                await gather(*[self.recycle(child) for child in children])
+                await asyncio.gather(
+                    *[self.recycle(child) for child in children])
 
     async def restore(self, item):
         data_types = item.__schema__.values()
@@ -160,7 +161,8 @@ class Transaction:
         if item.is_collection:
             with system_override():
                 children = await item.get_children()
-                await gather(*[self.restore(child) for child in children])
+                await asyncio.gather(
+                    *[self.restore(child) for child in children])
 
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = mutation_type, value
@@ -305,24 +307,21 @@ class Transaction:
         inserted_items, modified_items, deleted_items = affected_items
 
         if inserted_items:
-            asyncio.ensure_future(
-                self._exec_post_handler('on_post_create',
-                                        inserted_items, actor))
+            _ = asyncio.create_task(self._exec_post_handler('on_post_create',
+                                    inserted_items, actor))
 
         if modified_items:
-            asyncio.ensure_future(
-                self._exec_post_handler('on_post_change',
-                                        modified_items, actor))
+            _ = asyncio.create_task(self._exec_post_handler('on_post_change',
+                                    modified_items, actor))
 
         if deleted_items:
-            asyncio.ensure_future(
-                self._exec_post_handler('on_post_delete',
-                                        deleted_items, actor))
+            _ = asyncio.create_task(self._exec_post_handler('on_post_delete',
+                                    deleted_items, actor))
 
     @with_context(server.system_user)
     async def _exec_post_handler(self, handler: str, items: list, actor):
         tasks = [getattr(item, handler)(actor) for item in items]
-        results = await gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         errors = [result if isinstance(result, Exception) else None
                   for result in results]
         if any(errors):

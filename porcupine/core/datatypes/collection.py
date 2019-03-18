@@ -1,5 +1,7 @@
 from collections import AsyncIterable, OrderedDict
 from typing import AsyncIterator
+from functools import partial
+from aiostream import stream, pipe
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions
@@ -92,10 +94,11 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 else:
                     break
 
-        # set storage / no snapshot
-        # mark as fetched
-        storage = getattr(instance, descriptor.storage)
-        setattr(storage, descriptor.storage_key, list(resolved.keys()))
+        if len(resolved) <= 300:
+            # set storage / no snapshot
+            # cache / mark as fetched
+            storage = getattr(instance, descriptor.storage)
+            setattr(storage, descriptor.storage_key, list(resolved.keys()))
 
         # compute dirtiness factor
         if total_count:
@@ -120,21 +123,41 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 else:
                     await schema_service.compact_collection(collection_key)
 
-    async def items(self) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
-        chunk_size = 40
-        chunk = []
-        get_multi = db.get_multi
+    async def count(self):
+        n = 0
+        async for _ in self:
+            n += 1
+        return n
 
-        async for item_id in self:
-            chunk.append(item_id)
-            if len(chunk) > chunk_size:
-                async for i in get_multi(chunk, remove_stale=True):
+    @staticmethod
+    def _is_consistent(_):
+        return True
+
+    async def items(self,
+                    skip=0,
+                    take=None) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
+        inconsistent = []
+        get_multi = partial(db.get_multi, remove_stale=True)
+
+        feeder = (stream.chunks(self, 40) |
+                  pipe.map(get_multi, task_limit=1) |
+                  pipe.flatten())
+
+        if skip > 0:
+            feeder |= pipe.skip(skip)
+        if take is not None:
+            feeder |= pipe.take(take)
+
+        async with feeder.stream() as streamer:
+            async for i in streamer:
+                if self._is_consistent(i):
                     yield i
-                chunk = []
+                else:
+                    inconsistent.append(i.id)
 
-        if chunk:
-            async for i in get_multi(chunk, remove_stale=True):
-                yield i
+        if inconsistent:
+            # TODO: remove stale IDs
+            pass
 
     async def get_item_by_id(self,
                              item_id: TYPING.ITEM_ID,
@@ -181,10 +204,10 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
         descriptor, instance = self._desc, self._inst
         # remove collection appends
         context.txn.reset_key_append(descriptor.key_for(instance))
-        # fetch value from db
         if not self.is_fetched:
-            # fetch collection for snapshot to work
-            async for _ in self:
-                pass
+            # fetch value from db
+            storage = getattr(instance, descriptor.storage)
+            setattr(storage, descriptor.storage_key,
+                    [oid async for oid in self])
         # set collection
         super(Text, descriptor).__set__(instance, value)

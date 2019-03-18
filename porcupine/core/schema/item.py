@@ -270,6 +270,11 @@ class GenericItem(Removable, Elastic):
         await self.update()
         return self
 
+    @db.transactional()
+    async def delete(self, _):
+        await self.remove()
+        return True
+
 
 class Item(Cloneable, Movable, Recyclable, GenericItem):
     """
