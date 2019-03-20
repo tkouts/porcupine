@@ -1,3 +1,6 @@
+import cbor
+from collections import MutableSequence, MutableMapping
+
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.response import json
@@ -158,3 +161,34 @@ class DataType:
             raise exceptions.InvalidUsage(str(e))
         await instance.update()
         return json(getattr(instance, self.name))
+
+
+class MutableDataType(DataType):
+    """
+    Mutable data type.
+    """
+    @staticmethod
+    def clone_value(value):
+        return cbor.loads(cbor.dumps(value))
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        value = super().__get__(instance, owner)
+        if value is not None:
+            if context.txn is not None and \
+                    self.storage_key not in instance.__snapshot__:
+                value = self.clone_value(value)
+                self.snapshot(instance, value, None)
+        return value
+
+    def set_default(self, instance, value=None):
+        if value is None:
+            value = self.default
+        if isinstance(value, (MutableMapping, MutableSequence)):
+            value = self.clone_value(value)
+        super().set_default(instance, value)
+
+    def on_change(self, instance, value, old_value):
+        if value != old_value:
+            super().on_change(instance, value, old_value)

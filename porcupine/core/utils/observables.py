@@ -29,11 +29,6 @@ class Observable(type):
         return mutation_watcher
 
 
-class ObservableList(list, metaclass=Observable):
-    # TODO: add mutating members
-    watch_list = ['__setitem__']
-
-
 class ObservableDict(dict, metaclass=Observable):
     # TODO: add mutating members
-    watch_list = ['__setitem__', '__delitem__']
+    watch_list = ['__setitem__', '__delitem__', 'setdefault']

@@ -1,25 +1,7 @@
-import copy
-from collections import MutableSequence, MutableMapping
-
-from porcupine.core.utils.observables import ObservableList, ObservableDict
-from .datatype import DataType
+from .datatype import MutableDataType
 
 
-class OList(ObservableList):
-    def __init__(self, descriptor: 'List', instance, seq=()):
-        self._desc = descriptor
-        self._inst = instance
-        self._prev = None
-        super().__init__(seq)
-
-    def on_before_mutate(self):
-        self._prev = copy.deepcopy(self)
-
-    def on_after_mutate(self):
-        self._desc.snapshot(self._inst, self, self._prev)
-
-
-class List(DataType):
+class List(MutableDataType):
     """List data type"""
     safe_type = list
 
@@ -28,41 +10,8 @@ class List(DataType):
             default = []
         super().__init__(default, **kwargs)
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        value = super().__get__(instance, owner)
-        if self.readonly:
-            return tuple(value)
-        if value is not None:
-            return OList(self, instance, value)
 
-    def set_default(self, instance, value=None):
-        if value is None:
-            value = self.default
-        if isinstance(value, MutableSequence):
-            value = copy.deepcopy(value)
-        super().set_default(instance, value)
-
-
-class ODict(ObservableDict):
-    def __init__(self, descriptor: 'Dictionary', instance, seq=(), **kwargs):
-        self._desc = descriptor
-        self._inst = instance
-        self._prev = None
-        super().__init__(seq, **kwargs)
-
-    def on_before_mutate(self):
-        self._prev = copy.deepcopy(dict(self.items()))
-
-    def on_after_mutate(self):
-        self._desc.snapshot(self._inst, self, self._prev)
-
-    def __deepcopy__(self, memo=None):
-        return ODict(self._desc, self._inst, (), **dict(self.items()))
-
-
-class Dictionary(DataType):
+class Dictionary(MutableDataType):
     """Dictionary data type"""
     safe_type = dict
 
@@ -70,17 +19,3 @@ class Dictionary(DataType):
         if default is None and not kwargs.get('allow_none'):
             default = {}
         super().__init__(default, **kwargs)
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        value = super().__get__(instance, owner)
-        if value is not None:
-            return ODict(self, instance, value)
-
-    def set_default(self, instance, value=None):
-        if value is None:
-            value = self.default
-        if isinstance(value, MutableMapping):
-            value = copy.deepcopy(value)
-        super().set_default(instance, value)
