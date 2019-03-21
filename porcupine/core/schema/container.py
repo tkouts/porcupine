@@ -74,7 +74,7 @@ class Container(Item):
         """
         return itertools.chain(
             *await gather(self.get_containers(),
-                          self.get_items(resolve_shortcuts)))
+                          self.get_items(resolve_shortcuts=resolve_shortcuts)))
 
     async def get_items(self, start=0, cap=float('inf'),
                         resolve_shortcuts=False):
