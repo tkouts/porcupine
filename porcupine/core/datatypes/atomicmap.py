@@ -38,6 +38,11 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
                                '{0}.{1}'.format(descriptor.storage_key, key),
                                db_connector().SUB_DOC_REMOVE, None)
 
+    async def reset(self, value, replace=False):
+        if replace and value is not None:
+            value['__replace__'] = True
+        await super().reset(value)
+
     def __getitem__(self, item):
         if self._dct is None:
             raise KeyError(item)
@@ -101,7 +106,8 @@ class AtomicMap(AsyncSetter, Dictionary):
         self.validate(value)
         if not instance.__is_new__:
             connector = db_connector()
-            if value is None or old_value is None:
+            replace = value.pop('__replace__', False)
+            if value is None or old_value is None or replace:
                 context.txn.mutate(instance, self.storage_key,
                                    connector.SUB_DOC_UPSERT_MUT, value)
             else:

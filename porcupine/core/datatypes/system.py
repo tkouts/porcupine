@@ -21,11 +21,11 @@ class AclValue(AtomicMapValue):
     def is_partial(self) -> bool:
         return self._dct is not None and '__partial__' in self._dct
 
-    async def reset(self, acl, partial=False):
+    async def reset(self, acl, partial=False, replace=False):
         if partial:
             acl['__partial__'] = True
         # set acl
-        await super().reset(acl)
+        await super().reset(acl, replace=replace)
 
 
 class Acl(AtomicMap):
