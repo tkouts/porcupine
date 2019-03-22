@@ -1,5 +1,4 @@
-import itertools
-from asyncio import gather
+from aiostream import stream, pipe
 
 from sanic.response import json
 
@@ -41,12 +40,15 @@ class Container(Item):
         _, exists = await db_connector().exists(unique_name_key)
         return exists
 
-    async def get_child_by_name(self, name, resolve_shortcuts=False):
+    async def get_child_by_name(self, name, resolve_shortcut=False):
         """
         This method returns the child with the specified name.
 
         @param name: The name of the child
         @type name: str
+        @param resolve_shortcut: Return the shortcut's target if child is
+            shortcut
+        @type resolve_shortcut: bool
         @return: The child object if a child with the given name exists
                  else None.
         @rtype: L{GenericItem}
@@ -55,7 +57,7 @@ class Container(Item):
                 utils.get_key_of_unique(self.id, 'name', name))
         if child_id:
             item = await db.get_item(child_id)
-            if resolve_shortcuts and isinstance(item, Shortcut):
+            if resolve_shortcut and isinstance(item, Shortcut):
                 item = await item.get_target()
             return item
 
@@ -66,40 +68,42 @@ class Container(Item):
                 return None
         return item
 
-    async def get_children(self, resolve_shortcuts=False):
+    async def get_children(self, skip=0, take=None,
+                           resolve_shortcuts=False) -> list:
         """
         This method returns all the children of the container.
 
-        @rtype: L{ObjectSet<porcupine.core.objectset.ObjectSet>}
+        @rtype: list
         """
-        return itertools.chain(
-            *await gather(self.get_containers(),
-                          self.get_items(resolve_shortcuts=resolve_shortcuts)))
+        feeder = stream.chain(
+            self.containers.items(),
+            self.items.items(resolve_shortcuts=resolve_shortcuts)
+        )
+        if skip > 0:
+            feeder |= pipe.skip(skip)
+        if take is not None:
+            feeder |= pipe.take(take)
+        async with feeder.stream() as streamer:
+            return [i async for i in streamer]
 
-    async def get_items(self, start=0, cap=float('inf'),
-                        resolve_shortcuts=False):
+    async def get_items(self, skip=0, take=None,
+                        resolve_shortcuts=False) -> list:
         """
         This method returns the children that are not containers.
 
-        @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
+        @rtype: list
         """
-        if resolve_shortcuts:
-            items = []
-            async for item in self.items.items(start, cap):
-                if isinstance(item, Shortcut):
-                    item = await item.get_target()
-                if item:
-                    items.append(item)
-            return items
-        return [i async for i in self.items.items(start, cap)]
+        items = self.items.items(skip, take,
+                                 resolve_shortcuts=resolve_shortcuts)
+        return [i async for i in items]
 
-    async def get_containers(self):
+    async def get_containers(self, skip=0, take=None) -> list:
         """
         This method returns the children that are containers.
 
-        @rtype: L{ObjectSet<porcupine.core.objectSet.ObjectSet>}
+        @rtype: list
         """
-        return [i async for i in self.containers.items()]
+        return [i async for i in self.containers.items(skip, take)]
 
     async def has_items(self) -> bool:
         """

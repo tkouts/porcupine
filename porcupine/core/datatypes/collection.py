@@ -7,6 +7,7 @@ from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
+from porcupine.core.utils import get_content_class
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 
@@ -135,12 +136,14 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
 
     async def items(self,
                     skip=0,
-                    take=None) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
+                    take=None,
+                    resolve_shortcuts=False) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
+        shortcut = get_content_class('Shortcut')
         inconsistent = []
         get_multi = partial(db.get_multi, remove_stale=True)
 
         feeder = (stream.chunks(self, 40) |
-                  pipe.map(get_multi, task_limit=1) |
+                  pipe.map(get_multi, task_limit=2) |
                   pipe.flatten())
 
         if skip > 0:
@@ -151,7 +154,10 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
         async with feeder.stream() as streamer:
             async for i in streamer:
                 if self._is_consistent(i):
-                    yield i
+                    if resolve_shortcuts and isinstance(i, shortcut):
+                        i = await i.get_target()
+                    if i is not None:
+                        yield i
                 else:
                     inconsistent.append(i.id)
 
