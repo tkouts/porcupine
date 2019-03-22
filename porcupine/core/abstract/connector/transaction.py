@@ -210,11 +210,15 @@ class Transaction:
 
         if self.connector.server.debug:
             # check for any non persisted modifications
-            modified = [i.friendly_name for i in self._items.values()
-                        if i.__snapshot__]
-            if modified:
-                log.debug('Detected uncommitted changes to {0}'
-                          .format(' '.join(modified)))
+            desc_locator = utils.locate_descriptor_by_storage_key
+            for i in self._items.values():
+                if i.__snapshot__:
+                    for storage_key in i.__snapshot__:
+                        desc = desc_locator(type(i), storage_key)
+                        if desc.get_value(i) != desc.get_value(i, False):
+                            log.warn(
+                                'Detected uncommitted '
+                                f'changes to {i.friendly_name}')
 
         inserted_items = []
         modified_items = []
