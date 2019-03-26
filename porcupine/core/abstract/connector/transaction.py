@@ -216,9 +216,8 @@ class Transaction:
                     for storage_key in i.__snapshot__:
                         desc = desc_locator(type(i), storage_key)
                         if desc.get_value(i) != desc.get_value(i, False):
-                            log.warn(
-                                'Detected uncommitted '
-                                f'changes to {i.friendly_name}')
+                            log.warn('Detected uncommitted '
+                                     f'changes to {i.friendly_name}')
 
         inserted_items = []
         modified_items = []
