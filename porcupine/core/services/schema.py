@@ -20,7 +20,7 @@ class SchemaMaintenance(AbstractService):
 
     def start(self, loop):
         type(self).queue = asyncio.Queue()
-        asyncio.ensure_future(self.worker())
+        asyncio.create_task(self.worker())
 
     async def worker(self):
         while True:
