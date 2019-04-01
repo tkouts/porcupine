@@ -142,9 +142,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
         inconsistent = []
         get_multi = partial(db.get_multi, remove_stale=True)
 
-        feeder = (stream.chunks(self, 40) |
-                  pipe.map(get_multi, task_limit=2) |
-                  pipe.flatten())
+        feeder = stream.chunks(self, 40) | pipe.flatmap(get_multi, task_limit=1)
 
         if skip > 0:
             feeder |= pipe.skip(skip)
