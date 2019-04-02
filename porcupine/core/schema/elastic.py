@@ -189,10 +189,12 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             return getattr(self, attr_name)
 
     def to_dict(self) -> dict:
-        return {
+        dct = {
             data_type.name: getattr(self.__storage__, data_type.storage_key)
             for data_type in self.view_data_types()
         }
+        dct['_type'] = self.content_class
+        return dct
 
     # ujson hook
     toDict = to_dict
