@@ -36,6 +36,7 @@ class PContext:
     @staticmethod
     def prepare():
         connector = db_connector()
+        ctx_txn.set(None)
         ctx_db_cache.set(LRU(connector.cache_size))
 
 
