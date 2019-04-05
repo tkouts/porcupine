@@ -46,7 +46,7 @@ class DataType:
             # modified attr
             return instance.__snapshot__[self.storage_key]
         storage = getattr(instance, self.storage)
-        return getattr(storage, self.storage_key)
+        return getattr(storage, self.storage_key, self.default)
 
     def validate_value(self, instance, value):
         if instance is not None:

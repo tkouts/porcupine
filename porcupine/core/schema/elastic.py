@@ -190,7 +190,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     def to_dict(self) -> dict:
         dct = {
-            data_type.name: getattr(self.__storage__, data_type.storage_key)
+            data_type.name: getattr(self.__storage__,
+                                    data_type.storage_key,
+                                    data_type.default)
             for data_type in self.view_data_types()
         }
         dct['_type'] = self.content_class
