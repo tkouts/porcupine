@@ -106,7 +106,7 @@ class AtomicMap(AsyncSetter, Dictionary):
         self.validate(value)
         if not instance.__is_new__:
             connector = db_connector()
-            replace = value.pop('__replace__', False)
+            replace = value and value.pop('__replace__', False)
             if value is None or old_value is None or replace:
                 context.txn.mutate(instance, self.storage_key,
                                    connector.SUB_DOC_UPSERT_MUT, value)
