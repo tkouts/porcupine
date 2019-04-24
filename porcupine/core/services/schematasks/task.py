@@ -5,11 +5,14 @@ class SchemaMaintenanceTask:
     """
     Base schema maintenance task
     """
-    __slots__ = ('key', 'connector')
+    __slots__ = 'key'
 
     def __init__(self, key):
         self.key = key
-        self.connector = db_connector()
+
+    @property
+    def connector(self):
+        return db_connector()
 
     async def execute(self):
         ...
