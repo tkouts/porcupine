@@ -12,6 +12,6 @@ class DefaultPersistence:
 
     @staticmethod
     def dumps(obj):
-        dct = dict(obj.__storage__.as_dict())
+        dct = obj.__storage__.as_dict()
         dct['_cc'] = obj.content_class
         return dct
