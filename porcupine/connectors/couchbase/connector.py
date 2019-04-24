@@ -84,10 +84,10 @@ class Couchbase(AbstractConnector):
         multi = await self.bucket.get_multi(keys, quiet=True)
         return {key: multi[key].value for key in multi}
 
-    async def insert_multi(self, insertions, ttl=0):
+    async def insert_multi(self, insertions: dict, ttl=None) -> list:
         try:
             await self.bucket.insert_multi(insertions,
-                                           ttl=ttl,
+                                           ttl=ttl or 0,
                                            format=couchbase.FMT_AUTO)
         except KeyExistsError as e:
             existing_key = e.key
@@ -97,12 +97,18 @@ class Couchbase(AbstractConnector):
             if inserted:
                 await self.delete_multi(inserted)
             self.raise_exists(existing_key)
+        return list(insertions.keys())
 
-    def upsert_multi(self, upsertions):
-        return self.bucket.upsert_multi(upsertions, format=couchbase.FMT_AUTO)
+    def upsert_multi(self, upsertions, ttl=None):
+        return self.bucket.upsert_multi(upsertions,
+                                        ttl=ttl or 0,
+                                        format=couchbase.FMT_AUTO)
 
     def delete_multi(self, deletions):
         return self.bucket.remove_multi(deletions, quiet=True)
+
+    def touch_multi(self, touches):
+        return self.bucket.touch_multi(touches)
 
     def mutate_in(self, item_id: str, mutations_dict: dict):
         mutations = []

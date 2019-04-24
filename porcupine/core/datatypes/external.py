@@ -65,15 +65,17 @@ class Blob(DataType):
     def clone(self, instance, memo):
         pass
 
-    def on_create(self, instance, value):
+    async def on_create(self, instance, value):
         super().on_create(instance, value)
         if value is not None:
-            context.txn.insert_external(self.key_for(instance), value)
+            context.txn.insert_external(self.key_for(instance), value,
+                                        await instance.ttl)
 
     async def on_change(self, instance, value, old_value):
         await super().on_change(instance, value, old_value)
         if value is not None:
-            context.txn.put_external(self.key_for(instance), value)
+            context.txn.put_external(self.key_for(instance), value,
+                                     await instance.ttl)
         else:
             self.on_delete(instance, value)
 

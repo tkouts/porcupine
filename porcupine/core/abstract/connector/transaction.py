@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from porcupine import exceptions, log, server
 from porcupine.core import utils
+from porcupine.core.utils import date
 from porcupine.core.context import system_override, with_context, context
 
 
@@ -13,7 +14,7 @@ class Transaction:
                  '_ext_insertions', '_ext_upsertions',
                  '_deletions',
                  '_sd', '_appends',
-                 '_attr_locks')
+                 '_attr_locks', '_touches')
 
     def __init__(self, connector, **options):
         self.connector = connector
@@ -25,6 +26,8 @@ class Transaction:
 
         self._deletions = {}
         self._attr_locks = {}
+
+        self._touches = {}
 
         # sub document mutations
         self._sd = defaultdict(dict)
@@ -45,11 +48,11 @@ class Transaction:
         if key in self._deletions:
             return None
         elif key in self._items:
-            return self._items[key]
+            return self._items[key][1]
         elif key in self._ext_upsertions:
-            return self._ext_upsertions[key]
+            return self._ext_upsertions[key][1]
         elif key in self._ext_insertions:
-            return self._ext_insertions[key]
+            return self._ext_insertions[key][1]
         raise KeyError(key)
 
     def get_key_append(self, key):
@@ -84,7 +87,9 @@ class Transaction:
                 raise exceptions.InvalidUsage(str(e))
 
         item.__reset__()
-        self._items[item.id] = item
+
+        ttl = await item.ttl
+        self._items[item.id] = ttl, item
 
     async def upsert(self, item):
         if item.__snapshot__:
@@ -113,15 +118,29 @@ class Transaction:
                 # print('LOCKING', locks)
                 await self.lock_attributes(item, *[u.name for u in locks])
 
+            ttl = await item.ttl
+            if ttl:
+                self._touches[item.id] = ttl
+
         item.__reset__()
-        self._items[item.id] = item
+        self._items[item.id] = None, item
+
+    async def touch(self, item):
+        # touch has to be fast / no event handlers
+        if 'md' not in item.__snapshot__:
+            now = date.utcnow().isoformat()
+            item.__snapshot__['md'] = now
+            if not item.__is_new__:
+                self.mutate(item, 'md', self.connector.SUB_DOC_UPSERT_MUT, now)
+                ttl = await item.ttl
+                if ttl:
+                    self._touches[item.id] = ttl
 
     async def delete(self, item):
         if item.is_collection:
             with system_override():
                 children = await item.get_children()
-                await asyncio.gather(
-                    *[self.delete(child) for child in children])
+                await asyncio.gather(*[self.delete(c) for c in children])
 
         await item.on_delete()
 
@@ -167,22 +186,24 @@ class Transaction:
     def mutate(self, item, path, mutation_type, value):
         self._sd[item.id][path] = mutation_type, value
 
-    def append(self, key, value):
+    def append(self, key, value, ttl=None):
         if key in self._ext_insertions:
             self._ext_insertions[key] += value
         elif value not in self._appends[key]:
             self._appends[key].append(value)
+            if ttl:
+                self._touches[key] = ttl
 
-    def insert_external(self, key, value):
+    def insert_external(self, key, value, ttl=None):
         if key in self._ext_insertions:
             self.connector.raise_exists(key)
-        self._ext_insertions[key] = value
+        self._ext_insertions[key] = ttl, value
 
-    def put_external(self, key, value):
+    def put_external(self, key, value, ttl=None):
         if key in self._ext_insertions:
-            self._ext_insertions[key] = value
+            self._ext_insertions[key] = ttl, value
             return
-        self._ext_upsertions[key] = value
+        self._ext_upsertions[key] = ttl, value
 
     def delete_external(self, key):
         if key in self._ext_insertions:
@@ -211,7 +232,8 @@ class Transaction:
         if self.connector.server.debug:
             # check for any non persisted modifications
             desc_locator = utils.locate_descriptor_by_storage_key
-            for i in self._items.values():
+            for v in self._items.values():
+                _, i = v
                 if i.__snapshot__:
                     for storage_key in i.__snapshot__:
                         desc = desc_locator(type(i), storage_key)
@@ -221,21 +243,29 @@ class Transaction:
 
         inserted_items = []
         modified_items = []
-        insertions = {}
 
-        for item_id, item in self._items.items():
+        # insertions
+        insertions = defaultdict(dict)
+        for item_id, v in self._items.items():
+            ttl, item = v
             if item.__is_new__:
                 inserted_items.append(item)
-                insertions[item_id] = dumps(item)
+                insertions[ttl][item_id] = dumps(item)
             else:
                 modified_items.append(item)
 
         # update insertions with externals
-        insertions.update({key: v for key, v in self._ext_insertions.items()
-                           if v})
+        for key, v in self._ext_insertions.items():
+            ttl, value = v
+            if value:
+                insertions[ttl][key] = value
 
         # upsertions
-        upsertions = self._ext_upsertions
+        upsertions = defaultdict(dict)
+        for key, v in self._ext_upsertions.items():
+            ttl, value = v
+            if value:
+                upsertions[ttl][key] = value
 
         # deletions
         deleted_items = [item for item in self._deletions.values()
@@ -261,17 +291,36 @@ class Transaction:
 
         connector = self.connector
 
-        tasks = []
         # insertions
         if insertions:
             # first transaction phase - make sure all keys are non-existing
-            await connector.insert_multi(insertions)
+            insert_tasks = []
+            for ttl in insertions:
+                task = connector.insert_multi(insertions[ttl], ttl=ttl)
+                if isawaitable(task):
+                    insert_tasks.append(task)
+            if insert_tasks:
+                if len(insert_tasks) == 1:
+                    await insert_tasks[0]
+                else:
+                    results = await asyncio.gather(*insert_tasks,
+                                                   return_exceptions=True)
+                    errors = [r for r in results if isinstance(r, Exception)]
+                    if any(errors):
+                        inserted = [key for keys in results
+                                    if isinstance(keys, list)
+                                    for key in keys]
+                        if inserted:
+                            await connector.delete_multi(inserted)
+                        raise errors[0]
 
+        tasks = []
         # upsertions
         if upsertions:
-            task = connector.upsert_multi(upsertions)
-            if isawaitable(task):
-                tasks.append(task)
+            for ttl in upsertions:
+                task = connector.upsert_multi(upsertions[ttl], ttl=ttl)
+                if isawaitable(task):
+                    tasks.append(task)
 
         # sub document mutations
         # print('SD', self._sd)
@@ -303,6 +352,9 @@ class Transaction:
                 # print(errors)
                 pass
 
+        if self._touches:
+            await connector.touch_multi(self._touches)
+
         self.connector.active_txns -= 1
 
         # execute post txn event handlers
@@ -310,16 +362,16 @@ class Transaction:
         inserted_items, modified_items, deleted_items = affected_items
 
         if inserted_items:
-            _ = asyncio.create_task(self._exec_post_handler('on_post_create',
-                                    inserted_items, actor))
+            asyncio.create_task(self._exec_post_handler('on_post_create',
+                                inserted_items, actor))
 
         if modified_items:
-            _ = asyncio.create_task(self._exec_post_handler('on_post_change',
-                                    modified_items, actor))
+            asyncio.create_task(self._exec_post_handler('on_post_change',
+                                modified_items, actor))
 
         if deleted_items:
-            _ = asyncio.create_task(self._exec_post_handler('on_post_delete',
-                                    deleted_items, actor))
+            asyncio.create_task(self._exec_post_handler('on_post_delete',
+                                deleted_items, actor))
 
     @with_context(server.system_user)
     async def _exec_post_handler(self, handler: str, items: list, actor):

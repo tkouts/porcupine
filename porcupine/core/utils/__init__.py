@@ -130,16 +130,17 @@ def locate_descriptor_by_storage_key(cls, key):
             return desc
 
 
-def add_uniques(item):
+async def add_uniques(item):
     parent_id = item.parent_id
     if parent_id is not None:
         txn = context.txn
         # insert unique keys
         item_id = item.id
+        ttl = await item.ttl
         for unique in item.unique_data_types():
             unique_key = get_key_of_unique(parent_id, unique.name,
                                            unique.get_value(item))
-            txn.insert_external(unique_key, item_id)
+            txn.insert_external(unique_key, item_id, ttl)
 
 
 def remove_uniques(item):

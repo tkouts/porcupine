@@ -119,19 +119,23 @@ class DataType:
     def on_create(self, instance, value):
         self.validate(value)
 
-    def on_change(self, instance, value, old_value):
+    async def on_change(self, instance, value, old_value):
         self.validate(value)
         if self.storage == '__storage__' and not instance.__is_new__:
             if self.unique:
                 old_parent_id = instance.get_snapshot_of('parent_id')
                 if instance.parent_id == old_parent_id:
                     # item is not moved
-                    old_unique = get_key_of_unique(old_parent_id, self.name,
+                    old_unique = get_key_of_unique(old_parent_id,
+                                                   self.name,
                                                    old_value)
                     context.txn.delete_external(old_unique)
-                    new_unique = get_key_of_unique(old_parent_id, self.name,
+                    new_unique = get_key_of_unique(old_parent_id,
+                                                   self.name,
                                                    value)
-                    context.txn.insert_external(new_unique, instance.id)
+                    context.txn.insert_external(new_unique,
+                                                instance.id,
+                                                await instance.ttl)
                 # else:
                 #     # parent_id on_change handler will do the job
             context.txn.mutate(instance,
@@ -189,6 +193,6 @@ class MutableDataType(DataType):
             value = self.clone_value(value)
         super().set_default(instance, value)
 
-    def on_change(self, instance, value, old_value):
+    async def on_change(self, instance, value, old_value):
         if value != old_value:
-            super().on_change(instance, value, old_value)
+            await super().on_change(instance, value, old_value)

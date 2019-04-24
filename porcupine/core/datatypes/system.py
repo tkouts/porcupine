@@ -51,7 +51,7 @@ class SchemaSignature(String):
         super().__init__(required=True, readonly=True, protected=True)
 
     async def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
+        await super().on_change(instance, value, old_value)
         await get_service('schema').clean_schema(instance.id)
 
 
@@ -164,14 +164,14 @@ class Deleted(Counter):
         super().__init__(readonly=True, protected=True, store_as='dl',
                          lock_on_update=True)
 
-    def on_change(self, instance, value, old_value):
+    async def on_change(self, instance, value, old_value):
         super().on_change(instance, value, old_value)
         if value and not old_value:
             # recycled
             remove_uniques(instance)
         elif not value and old_value:
             # restored
-            add_uniques(instance)
+            await add_uniques(instance)
 
     @contract(accepts=bool)
     @db.transactional()
@@ -190,15 +190,15 @@ class ParentId(String):
         super().__init__(default=None, readonly=True, allow_none=True,
                          store_as='pid')
 
-    def on_create(self, instance, value):
+    async def on_create(self, instance, value):
         super().on_create(instance, value)
-        add_uniques(instance)
+        await add_uniques(instance)
         instance.reset_effective_acl()
 
-    def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
+    async def on_change(self, instance, value, old_value):
+        await super().on_change(instance, value, old_value)
         remove_uniques(instance)
-        add_uniques(instance)
+        await add_uniques(instance)
         instance.reset_effective_acl()
 
     def on_delete(self, instance, value):

@@ -78,7 +78,7 @@ class Reference1(String, Acceptable):
             return ref_item
 
     async def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
+        await super().on_change(instance, value, old_value)
         return await self.on_create(instance, value)
 
     async def on_delete(self, instance, value):

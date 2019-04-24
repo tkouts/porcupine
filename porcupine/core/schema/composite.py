@@ -51,6 +51,11 @@ class Composite(Elastic):
     async def parent(self):
         return await db_connector().get(self.parent_id)
 
+    @property
+    async def ttl(self):
+        item = await self.item
+        return item.expires_at
+
     async def clone(self, memo: dict = None) -> 'Composite':
         clone: 'Composite' = await super().clone(memo)
         with system_override():

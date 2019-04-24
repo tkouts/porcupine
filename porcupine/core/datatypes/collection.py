@@ -186,12 +186,13 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
             collection_key = descriptor.key_for(instance)
+            ttl = await instance.ttl
             for item in items:
                 if not await descriptor.accepts_item(item):
                     raise exceptions.ContainmentError(instance,
                                                       descriptor.name, item)
                 item_id = item.id
-                context.txn.append(collection_key, ' {0}'.format(item_id))
+                context.txn.append(collection_key, f' {item_id}', ttl)
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
@@ -200,9 +201,10 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
             collection_key = descriptor.key_for(instance)
+            ttl = await instance.ttl
             for item in items:
                 item_id = item.id
-                context.txn.append(collection_key, ' -{0}'.format(item_id))
+                context.txn.append(collection_key, f' -{item_id}', ttl)
 
     async def reset(self, value: list) -> None:
         descriptor, instance = self._desc, self._inst

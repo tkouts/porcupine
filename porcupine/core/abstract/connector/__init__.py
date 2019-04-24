@@ -127,14 +127,17 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get_multi_raw(self, keys):
         raise NotImplementedError
 
-    def insert_multi(self, insertions, ttl=0):
+    def insert_multi(self, insertions, ttl=0) -> list:
         raise NotImplementedError
 
-    def upsert_multi(self, upsertions):
+    def upsert_multi(self, upsertions, ttl=0):
         raise NotImplementedError
 
     def delete_multi(self, deletions):
         raise NotImplementedError
+
+    def touch_multi(self, touches):
+        pass
 
     def mutate_in(self, item_id, mutations_dict: dict):
         raise NotImplementedError

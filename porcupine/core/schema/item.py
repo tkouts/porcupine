@@ -39,7 +39,7 @@ class GenericItem(Removable, Elastic):
     # system attributes
     parent_id = ParentId()
     created = DateTime(readonly=True, store_as='cr')
-    expires_at = Integer(None, readonly=True, allow_none=True,
+    expires_at = Integer(None, immutable=True, allow_none=True,
                          protected=True, store_as='exp')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
@@ -76,6 +76,10 @@ class GenericItem(Removable, Elastic):
             else:
                 self.__effective_acl = acl
         return self.__effective_acl
+
+    @property
+    async def ttl(self):
+        return self.expires_at
 
     def reset_effective_acl(self):
         self.__effective_acl = None
@@ -182,14 +186,7 @@ class GenericItem(Removable, Elastic):
             await context.txn.insert(self)
 
     async def touch(self) -> None:
-        # touch has to be fast / no event handlers
-        if 'md' not in self.__snapshot__:
-            now = date.utcnow().isoformat()
-            self.__snapshot__['md'] = now
-            if not self.__is_new__:
-                context.txn.mutate(
-                    self, 'md',
-                    db_connector().SUB_DOC_UPSERT_MUT, now)
+        await context.txn.touch(self)
 
     async def update(self) -> bool:
         """
@@ -215,11 +212,9 @@ class GenericItem(Removable, Elastic):
             return True
         return False
 
-    def expires(self, at=None, after_seconds=None):
-        with system_override():
-            if at is None:
-                at = int(time.time())
-            self.expires_at = at + after_seconds
+    def expires(self, after_seconds=None):
+        now = int(time.time())
+        self.expires_at = now + after_seconds
 
     # permissions providers
     async def can_read(self, membership):
