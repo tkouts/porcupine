@@ -72,6 +72,8 @@ class ChildrenCollection(ItemCollection):
                 item.created = item.modified = date.utcnow()
                 item.modified_by = user.name
                 item.parent_id = parent_id
+
+            item.expires_at = item.expires_at or parent.expires_at
             # insert item to DB
             await context.txn.insert(item)
 
