@@ -182,7 +182,7 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
             ref_items = []
         # write external
         raw_value = ' '.join([i.__storage__.id for i in ref_items])
-        super().on_create(instance, raw_value)
+        await super().on_create(instance, raw_value)
         return ref_items, []
 
     async def on_change(self, instance, value, old_value):

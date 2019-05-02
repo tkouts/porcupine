@@ -235,10 +235,10 @@ class Embedded(AsyncSetter, Reference1):
                         old_composite_id: Optional[str]):
         if composite is not None:
             await self.on_create(instance, composite)
-        DataType.on_change(self,
-                           instance,
-                           '_comp1_:{0}'.format(composite.id),
-                           old_composite_id)
+        await DataType.on_change(self,
+                                 instance,
+                                 f'_comp1_:{composite.id}',
+                                 old_composite_id)
         if old_composite_id is not None:
             await self.on_delete(instance, old_composite_id)
 
