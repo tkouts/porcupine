@@ -8,7 +8,7 @@ class StaleRemover(SchemaMaintenanceTask):
     @db.transactional()
     async def execute(self):
         if self.connector.server.debug:
-            log.debug('Removing stale item {0}'.format(self.key))
+            log.debug(f'Removing stale item {self.key}')
         item = await self.connector.get(self.key)
         if item is not None:
             with system_override():
