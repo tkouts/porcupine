@@ -52,7 +52,8 @@ class SchemaSignature(String):
 
     async def on_change(self, instance, value, old_value):
         await super().on_change(instance, value, old_value)
-        await get_service('schema').clean_schema(instance.id)
+        await get_service('schema').clean_schema(instance.id,
+                                                 await instance.ttl)
 
 
 class ChildrenCollection(ItemCollection):

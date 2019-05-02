@@ -112,17 +112,18 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             # collection maintenance
             collection_key = descriptor.key_for(instance)
             schema_service = get_service('schema')
+            ttl = await instance.ttl
             if current_size > split_threshold:
                 shd_compact = (current_size * (1 - dirtiness)) < split_threshold
                 if not is_split and shd_compact:
-                    await schema_service.compact_collection(collection_key)
+                    await schema_service.compact_collection(collection_key, ttl)
                 else:
-                    await schema_service.rebuild_collection(collection_key)
+                    await schema_service.rebuild_collection(collection_key, ttl)
             elif dirtiness > compact_threshold:
                 if is_split:
-                    await schema_service.rebuild_collection(collection_key)
+                    await schema_service.rebuild_collection(collection_key, ttl)
                 else:
-                    await schema_service.compact_collection(collection_key)
+                    await schema_service.compact_collection(collection_key, ttl)
 
     async def count(self):
         n = 0

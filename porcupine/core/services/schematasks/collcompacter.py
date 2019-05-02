@@ -5,6 +5,12 @@ from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 
 
 class CollectionCompacter(SchemaMaintenanceTask):
+    __slots__ = 'ttl'
+
+    def __init__(self, key, ttl):
+        super().__init__(key)
+        self.ttl = ttl
+
     @staticmethod
     def resolve_set(raw_string: str) -> list:
         # build set
@@ -26,14 +32,15 @@ class CollectionCompacter(SchemaMaintenanceTask):
 
     async def execute(self):
         if self.connector.server.debug:
-            log.debug('Compacting collection {0}'.format(self.key))
+            log.debug(f'Compacting collection {self.key}')
         try:
             success, _ = await self.connector.swap_if_not_modified(
                 self.key,
-                xform=self.compact_set
+                xform=self.compact_set,
+                ttl=self.ttl
             )
             if not success:
-                log.info('Failed to compact collection {0}'.format(self.key))
+                log.info(f'Failed to compact collection {self.key}')
         except exceptions.NotFound:
             # the key is removed
             pass

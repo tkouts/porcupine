@@ -31,8 +31,7 @@ class SchemaMaintenance(AbstractService):
             try:
                 await task.execute()
             except Exception as e:
-                log.error('Task {0} threw error {1}'.format(
-                    type(task).__name__, str(e)))
+                log.error(f'Task {type(task).__name__} threw error {str(e)}')
             finally:
                 self.queue.task_done()
 
@@ -45,19 +44,19 @@ class SchemaMaintenance(AbstractService):
         await self.queue.put(None)
         await self.queue.join()
 
-    async def compact_collection(self, key):
+    async def compact_collection(self, key, ttl):
         if self.queue is not None:
-            task = CollectionCompacter(key)
+            task = CollectionCompacter(key, ttl)
             await self.queue.put(task)
 
-    async def rebuild_collection(self, key):
+    async def rebuild_collection(self, key, ttl):
         if self.queue is not None:
-            task = CollectionReBuilder(key)
+            task = CollectionReBuilder(key, ttl)
             await self.queue.put(task)
 
-    async def clean_schema(self, key):
+    async def clean_schema(self, key, ttl):
         if self.queue is not None:
-            task = SchemaCleaner(key)
+            task = SchemaCleaner(key, ttl)
             await self.queue.put(task)
 
     async def remove_stale(self, key):

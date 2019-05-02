@@ -9,8 +9,10 @@ from porcupine.core.services.schematasks.collcompacter import \
 
 
 class CollectionReBuilder(CollectionCompacter):
-    def __init__(self, key):
-        super().__init__(key)
+    __slots__ = 'item_id', 'chunk_no', 'collection_name'
+
+    def __init__(self, key, ttl):
+        super().__init__(key, ttl)
         self.item_id, self.collection_name, chunk_no = self.key.split('/')
         self.chunk_no = int(chunk_no)
 
@@ -78,16 +80,18 @@ class CollectionReBuilder(CollectionCompacter):
         connector = self.connector
         counter_path = utils.get_active_chunk_key(self.collection_name)
         try:
-            await connector.insert_multi({
-                utils.get_collection_key(self.item_id, self.collection_name,
-                                         self.chunk_no + 1): ''
-            })
+            new_chunk_key = utils.get_collection_key(self.item_id,
+                                                     self.collection_name,
+                                                     self.chunk_no + 1)
+            await connector.insert_multi({new_chunk_key: ''}, ttl=self.ttl)
         except exceptions.DBAlreadyExists:
             pass
         await connector.mutate_in(
             self.item_id,
             {counter_path: (connector.SUB_DOC_UPSERT_MUT, self.chunk_no + 1)}
         )
+        if self.ttl:
+            await connector.touch_multi({self.item_id: self.ttl})
 
     async def execute(self):
         # print('splitting collection', self.key)
@@ -112,7 +116,7 @@ class CollectionReBuilder(CollectionCompacter):
             # print(insertions)
             # print(deletions)
             if insertions:
-                task = connector.upsert_multi(insertions)
+                task = connector.upsert_multi(insertions, ttl=self.ttl)
                 if isawaitable(task):
                     tasks.append(asyncio.create_task(task))
             if deletions:

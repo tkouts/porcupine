@@ -143,11 +143,11 @@ class Couchbase(AbstractConnector):
             else:
                 break
 
-    async def swap_if_not_modified(self, key, xform):
+    async def swap_if_not_modified(self, key, xform, ttl=None):
         try:
             result = await self.bucket.get(key)
         except NotFoundError:
-            raise exceptions.NotFound('Key {0} is removed'.format(key))
+            raise exceptions.NotFound(f'Key {key} is removed')
         xform_result = xform(result.value)
         if asyncio.iscoroutine(xform_result):
             xform_result = await xform_result
@@ -156,11 +156,12 @@ class Couchbase(AbstractConnector):
             try:
                 await self.bucket.replace(key, new_value,
                                           cas=result.cas,
+                                          ttl=ttl or 0,
                                           format=couchbase.FMT_AUTO)
             except KeyExistsError:
                 return False, None
             except NotFoundError:
-                raise exceptions.NotFound('Key {0} is removed'.format(key))
+                raise exceptions.NotFound(f'Key {key} is removed')
         return True, return_value
 
     # indexes

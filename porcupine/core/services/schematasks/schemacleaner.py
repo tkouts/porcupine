@@ -5,10 +5,14 @@ from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 
 
 class SchemaCleaner(SchemaMaintenanceTask):
+    __slots__ = 'ttl'
+
+    def __init__(self, key, ttl):
+        super().__init__(key)
+        self.ttl = ttl
+
     @staticmethod
     def schema_updater(item_dict):
-        from porcupine.datatypes import Blob, ReferenceN, RelatorN
-
         clazz = utils.get_content_class(item_dict['_cc'])
         item_schema = frozenset([key for key in item_dict.keys()
                                  if not key.startswith('_')
@@ -39,13 +43,18 @@ class SchemaCleaner(SchemaMaintenanceTask):
         return item_dict, externals
 
     async def execute(self):
+        connector = self.connector
+        if connector.server.debug:
+            log.debug(f'Updating schema of {self.key}')
+
         try:
-            success, externals = await self.connector.swap_if_not_modified(
+            success, externals = await connector.swap_if_not_modified(
                 self.key,
-                xform=self.schema_updater
+                xform=self.schema_updater,
+                ttl=self.ttl
             )
             if not success:
-                log.info('Failed to update schema of {0}'.format(self.key))
+                log.info(f'Failed to update schema of {self.key}')
                 return
         except exceptions.NotFound:
             # the key is removed
@@ -57,19 +66,22 @@ class SchemaCleaner(SchemaMaintenanceTask):
             if ext_type == Blob.storage_info:
                 # external blob
                 external_key = utils.get_blob_key(self.key, ext_name)
-                if self.connector.exists(external_key):
+                _, exists = await connector.exists(external_key)
+                if exists:
                     external_keys.append(external_key)
             elif ext_type == ReferenceN.storage_info \
                     or ext_type.startswith(RelatorN.storage_info_prefix):
                 # item collection
                 external_key = utils.get_collection_key(self.key, ext_name,
                                                         active_chunk)
-                while (await self.connector.exists(external_key))[1]:
+                _, exists = await connector.exists(external_key)
+                while exists:
                     external_keys.append(external_key)
                     active_chunk -= 1
                     external_key = utils.get_collection_key(
                         self.key, ext_name, active_chunk)
+                    _, exists = await connector.exists(external_key)
 
         if external_keys:
             # TODO handle exceptions
-            await self.connector.delete_multi(external_keys)
+            await connector.delete_multi(external_keys)

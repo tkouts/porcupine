@@ -127,10 +127,10 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     async def get_multi_raw(self, keys):
         raise NotImplementedError
 
-    def insert_multi(self, insertions, ttl=0) -> list:
+    def insert_multi(self, insertions, ttl=None) -> list:
         raise NotImplementedError
 
-    def upsert_multi(self, upsertions, ttl=0):
+    def upsert_multi(self, upsertions, ttl=None):
         raise NotImplementedError
 
     def delete_multi(self, deletions):
@@ -145,7 +145,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     def append_multi(self, appends):
         raise NotImplementedError
 
-    async def swap_if_not_modified(self, key, xform):
+    async def swap_if_not_modified(self, key, xform, ttl=None):
         raise NotImplementedError
 
     # atomic operations
