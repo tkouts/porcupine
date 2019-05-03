@@ -102,7 +102,8 @@ class CollectionReBuilder(CollectionCompacter):
         while True:
             success, chunks = await connector.swap_if_not_modified(
                 self.key,
-                xform=self.rebuild_set
+                xform=self.rebuild_set,
+                ttl=self.ttl
             )
             if success:
                 break
