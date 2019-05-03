@@ -59,7 +59,7 @@ class GenericItem(Removable, Elastic):
 
     @property
     def friendly_name(self):
-        return '{0}({1})'.format(self.name, self.content_class)
+        return f'{self.name}({self.content_class})'
 
     @property
     async def effective_acl(self) -> Mapping:
