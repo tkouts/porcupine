@@ -57,7 +57,7 @@ class SchemaSignature(String):
 
 
 class ChildrenCollection(ItemCollection):
-    async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
+    async def add(self, *items: TYPING.ANY_ITEM_CO):
         parent = self._inst
         parent_id = parent.id
         user = context.user
@@ -74,11 +74,12 @@ class ChildrenCollection(ItemCollection):
                 item.modified_by = user.name
                 item.parent_id = parent_id
 
-            item.expires_at = item.expires_at or parent.expires_at
+            item.expires_at = min(item.expires_at or 0,
+                                  parent.expires_at or 0) or None
             # insert item to DB
             await context.txn.insert(item)
 
-    async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
+    async def remove(self, *items: TYPING.ANY_ITEM_CO):
         await super().remove(*items)
         for item in items:
             await context.txn.delete(item)
