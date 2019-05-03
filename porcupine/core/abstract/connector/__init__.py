@@ -87,16 +87,16 @@ class AbstractConnector(metaclass=abc.ABCMeta):
                     db_fetch = await self.get_multi_raw(db_fetch_keys)
                 for item_id in chunk:
                     if item_id in fetched:
-                        yield fetched[item_id]
+                        yield item_id, fetched[item_id]
                     else:
                         raw_item = db_fetch[item_id]
                         if raw_item is None:
                             context.db_cache[item_id] = None
-                            yield None
+                            yield item_id, None
                         else:
                             item = loads(raw_item)
                             context.db_cache[item_id] = item
-                            yield item
+                            yield item_id, item
 
     async def get_external(self, ext_id):
         if context.txn is not None and ext_id in context.txn:

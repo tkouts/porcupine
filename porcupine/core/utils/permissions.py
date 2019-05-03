@@ -48,8 +48,8 @@ async def resolve(item, membership) -> int:
 @context_cacheable(1000)
 async def resolve_membership(group_ids: frozenset) -> set:
     extended_membership = set()
-    groups = [g async for g in db_connector().get_multi(group_ids)
-              if g]
+    groups = [r[1] async for r in db_connector().get_multi(group_ids)
+              if r[1] is not None]
     for group in groups:
         extended_membership.update({
             group_id async for group_id in group.member_of})

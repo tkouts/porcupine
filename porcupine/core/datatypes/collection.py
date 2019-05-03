@@ -61,6 +61,7 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                     yield item_id
 
         if current_value:
+            # collection is small and fetched
             if append:
                 # w/appends: need to recompute
                 for item_id in resolve_chunk(' '.join(current_value),
@@ -138,10 +139,11 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
     async def items(self,
                     skip=0,
                     take=None,
-                    resolve_shortcuts=False) -> AsyncIterator[TYPING.ANY_ITEM_CO]:
+                    resolve_shortcuts=False) -> AsyncIterator[
+                                                TYPING.ANY_ITEM_CO]:
         shortcut = get_content_class('Shortcut')
         inconsistent = []
-        get_multi = partial(db.get_multi, remove_stale=True)
+        get_multi = partial(db.get_multi, _return_none=True)
 
         feeder = stream.chunks(self, 40) | pipe.flatmap(get_multi, task_limit=1)
 
@@ -151,18 +153,21 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
             feeder |= pipe.take(take)
 
         async with feeder.stream() as streamer:
-            async for i in streamer:
-                if self._is_consistent(i):
+            async for oid, i in streamer:
+                if i is not None and self._is_consistent(i):
                     if resolve_shortcuts and isinstance(i, shortcut):
                         i = await i.get_target()
                     if i is not None:
                         yield i
                 else:
-                    inconsistent.append(i.id)
+                    inconsistent.append(oid)
 
         if inconsistent:
-            # TODO: remove stale IDs
-            pass
+            collection_key = self._desc.key_for(self._inst)
+            schema_service = get_service('schema')
+            ttl = await self._inst.ttl
+            await schema_service.clean_collection(collection_key, inconsistent,
+                                                  ttl)
 
     async def get_item_by_id(self,
                              item_id: TYPING.ITEM_ID,

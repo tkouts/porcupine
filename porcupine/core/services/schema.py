@@ -10,6 +10,7 @@ from porcupine.core.services.schematasks.collrebuilder import \
     CollectionReBuilder
 from porcupine.core.services.schematasks.schemacleaner import SchemaCleaner
 from porcupine.core.services.schematasks.staleremover import StaleRemover
+from porcupine.core.services.schematasks.collcleaner import CollectionCleaner
 
 from .service import AbstractService
 
@@ -62,4 +63,9 @@ class SchemaMaintenance(AbstractService):
     async def remove_stale(self, key):
         if self.queue is not None:
             task = StaleRemover(key)
+            await self.queue.put(task)
+
+    async def clean_collection(self, key, stale_ids, ttl):
+        if self.queue is not None:
+            task = CollectionCleaner(key, stale_ids, ttl)
             await self.queue.put(task)

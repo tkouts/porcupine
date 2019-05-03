@@ -29,7 +29,8 @@ class EmbeddedCollection(ItemCollection):
             return await super().get_item_by_id(item_id, quiet=quiet)
 
     async def items(self, skip=0, take=None,
-                    resolve_short=False) -> AsyncIterator[TYPING.COMPOSITE_CO]:
+                    resolve_shortcuts=False) -> AsyncIterator[
+                                                TYPING.COMPOSITE_CO]:
         with system_override():
             async for item in super().items(skip, take):
                 yield item
@@ -92,9 +93,7 @@ class Composition(ReferenceN):
             added = []
             removed = []
             if removed_ids:
-                get_multi = db.get_multi
-                async for composite in get_multi(removed_ids,
-                                                 remove_stale=True):
+                async for composite in db.get_multi(removed_ids):
                     removed.append(composite)
             for composite in composites:
                 if composite.__is_new__:
