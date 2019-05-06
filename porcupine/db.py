@@ -74,26 +74,29 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
                 'The resource {0} does not exist'.format(item_id))
 
 
-async def get_multi(ids: TYPING.ID_LIST, _return_none=False) -> AsyncIterator[
+async def get_multi(ids: TYPING.ID_LIST, _collection=None) -> AsyncIterator[
         Optional[TYPING.ANY_ITEM_CO]]:
-    user = context.user
-    resolve_visibility = _resolve_visibility
-    is_override = context.system_override
     if ids:
+        user = context.user
+        resolve_visibility = _resolve_visibility
+        is_override = context.system_override
+        stale = []
         connector = db_connector()
-        async for result in connector.get_multi(ids):
-            item = result[1]
-            return_value = result if _return_none else item
+        async for item_id, item in connector.get_multi(ids):
             if item is not None:
                 if is_override:
-                    yield return_value
+                    yield item
                 else:
                     visibility = await resolve_visibility(item, user)
                     if visibility:
-                        yield return_value
-            elif _return_none:
-                # pass
-                yield return_value
+                        yield item
+            elif _collection is not None:
+                stale.append(item_id)
+
+        if stale:
+            await get_service('schema').clean_collection(_collection['key'],
+                                                         stale,
+                                                         _collection['ttl'])
 
 
 def transactional(auto_commit=True):

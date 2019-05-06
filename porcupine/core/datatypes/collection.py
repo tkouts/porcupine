@@ -1,19 +1,18 @@
-from collections import AsyncIterable, OrderedDict
+from collections import OrderedDict
 from typing import AsyncIterator
 from functools import partial
-from aiostream import stream, pipe
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
 from porcupine.core.utils import get_content_class
+from porcupine.core.stream.streamer import Streamer
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 
 
-class ItemCollection(AsyncSetterValue, AsyncIterable):
-
+class ItemCollection(AsyncSetterValue, Streamer):
     @property
     def is_fetched(self) -> bool:
         return self._desc.get_value(self._inst, snapshot=False) is not None
@@ -126,12 +125,6 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                 else:
                     await schema_service.compact_collection(collection_key, ttl)
 
-    async def count(self):
-        n = 0
-        async for _ in self:
-            n += 1
-        return n
-
     @staticmethod
     def _is_consistent(_):
         return True
@@ -143,47 +136,27 @@ class ItemCollection(AsyncSetterValue, AsyncIterable):
                                                 TYPING.ANY_ITEM_CO]:
         shortcut = get_content_class('Shortcut')
         inconsistent = []
-        get_multi = partial(db.get_multi, _return_none=True)
 
-        feeder = stream.chunks(self, 40) | pipe.flatmap(get_multi, task_limit=1)
+        collection_key = self._desc.key_for(self._inst)
+        ttl = await self._inst.ttl
+        get_multi = partial(db.get_multi, _collection={
+            'key': collection_key,
+            'ttl': ttl
+        })
 
-        if skip > 0:
-            feeder |= pipe.skip(skip)
-        if take is not None:
-            feeder |= pipe.take(take)
-
-        async with feeder.stream() as streamer:
-            async for oid, i in streamer:
-                if i is not None and self._is_consistent(i):
-                    if resolve_shortcuts and isinstance(i, shortcut):
-                        i = await i.get_target()
-                    if i is not None:
-                        yield i
-                else:
-                    inconsistent.append(oid)
+        async for i in super().items(skip, take, _multi_fetch=get_multi):
+            if self._is_consistent(i):
+                if resolve_shortcuts and isinstance(i, shortcut):
+                    i = await i.get_target()
+                if i is not None:
+                    yield i
+            else:
+                inconsistent.append(i.id)
 
         if inconsistent:
-            collection_key = self._desc.key_for(self._inst)
-            schema_service = get_service('schema')
-            ttl = await self._inst.ttl
-            await schema_service.clean_collection(collection_key, inconsistent,
-                                                  ttl)
-
-    async def get_item_by_id(self,
-                             item_id: TYPING.ITEM_ID,
-                             quiet=True) -> TYPING.ANY_ITEM_CO:
-        async for oid in self:
-            if oid == item_id:
-                return await db.get_item(item_id, quiet=quiet)
-        if not quiet:
-            raise exceptions.NotFound(
-                'The resource {0} does not exist'.format(item_id))
-
-    async def has(self, item_id: TYPING.ITEM_ID):
-        async for oid in self:
-            if oid == item_id:
-                return True
-        return False
+            await get_service('schema').clean_collection(collection_key,
+                                                         inconsistent,
+                                                         ttl)
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
