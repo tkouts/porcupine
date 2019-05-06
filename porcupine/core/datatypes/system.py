@@ -11,8 +11,6 @@ from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
 from .reference import ReferenceN
 
-# Shortcut = None
-
 
 class AclValue(AtomicMapValue):
     def is_set(self) -> bool:
@@ -61,6 +59,7 @@ class ChildrenCollection(ItemCollection):
         parent = self._inst
         parent_id = parent.id
         user = context.user
+        shortcut = get_content_class('Shortcut')
 
         await super().add(*items)
 
@@ -74,13 +73,13 @@ class ChildrenCollection(ItemCollection):
                 item.modified_by = user.name
                 item.parent_id = parent_id
 
-            shortcut = get_content_class('Shortcut')
             expire_times = [item.expires_at, parent.expires_at]
             if isinstance(item, shortcut):
                 target = await item.get_target()
                 expire_times.append(target.expires_at)
             if any(expire_times):
                 item.expires_at = min([t for t in expire_times if t])
+
             # insert item to DB
             await context.txn.insert(item)
 
