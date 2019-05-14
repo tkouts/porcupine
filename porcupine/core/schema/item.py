@@ -212,9 +212,17 @@ class GenericItem(Removable, Elastic):
             return True
         return False
 
-    def expires(self, after_seconds=None):
-        now = int(time.time())
-        self.expires_at = now + after_seconds
+    def expires_after(self, days=0, hours=0, minutes=0, seconds=0):
+        ts = time.time()
+        if days:
+            ts += days * 86400
+        if hours:
+            ts += hours * 3600
+        if minutes:
+            ts += minutes * 60
+        if seconds:
+            ts += seconds
+        self.expires_at = int(ts)
 
     # permissions providers
     async def can_read(self, membership):
