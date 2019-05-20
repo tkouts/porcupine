@@ -75,6 +75,9 @@ class Transaction:
         if item.id in self._items:
             self.connector.raise_exists(item.id)
 
+        ttl = await item.ttl
+        self._items[item.id] = ttl, item
+
         await item.on_create()
 
         # execute data types on_create handlers
@@ -87,9 +90,6 @@ class Transaction:
                 raise exceptions.InvalidUsage(str(e))
 
         item.__reset__()
-
-        ttl = await item.ttl
-        self._items[item.id] = ttl, item
 
     async def upsert(self, item):
         if item.__snapshot__:
