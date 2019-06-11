@@ -197,13 +197,13 @@ class Transaction:
     def insert_external(self, key, value, ttl=None):
         if key in self._ext_insertions:
             self.connector.raise_exists(key)
-        self._ext_insertions[key] = ttl, value
+        self._ext_insertions[key] = [ttl, value]
 
     def put_external(self, key, value, ttl=None):
         if key in self._ext_insertions:
-            self._ext_insertions[key] = ttl, value
+            self._ext_insertions[key] = [ttl, value]
             return
-        self._ext_upsertions[key] = ttl, value
+        self._ext_upsertions[key] = [ttl, value]
 
     def delete_external(self, key):
         if key in self._ext_insertions:
