@@ -188,7 +188,7 @@ class Transaction:
 
     def append(self, key, value, ttl=None):
         if key in self._ext_insertions:
-            self._ext_insertions[key] += value
+            self._ext_insertions[key][1] += value
         elif value not in self._appends[key]:
             self._appends[key].append(value)
             if ttl:
