@@ -5,7 +5,7 @@ from .app import App
 from .log import porcupine_log
 
 
-def gather_apps(server, path: list, prefix: str='') -> None:
+def gather_apps(server, path: list, prefix: str = '') -> None:
     apps = []
 
     # locate apps in path
