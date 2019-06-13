@@ -94,8 +94,10 @@ class Composite(Elastic):
             await comp.remove(self)
         else:
             # embedded
-            setattr(parent, comp_name, None)
-            await context.txn.upsert(parent)
+            await comp.reset(None)
+            await parent.update()
+            # setattr(parent, comp_name, None)
+            # await context.txn.upsert(parent)
 
     # permissions providers
     async def can_read(self, membership) -> bool:

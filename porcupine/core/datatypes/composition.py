@@ -234,10 +234,12 @@ class Embedded(AsyncSetter, Reference1):
                         old_composite_id: Optional[str]):
         if composite is not None:
             await self.on_create(instance, composite)
-        await DataType.on_change(self,
-                                 instance,
-                                 f'_comp1_:{composite.id}',
-                                 old_composite_id)
+        await DataType.on_change(
+            self,
+            instance,
+            f'_comp1_:{composite.id}' if composite else None,
+            old_composite_id
+        )
         if old_composite_id is not None:
             await self.on_delete(instance, old_composite_id)
 
@@ -268,9 +270,10 @@ class Embedded(AsyncSetter, Reference1):
         value = self.__get__(instance, type(instance))
         item_dict = request.json
         try:
-            embedded = value.factory()
+            embedded = utils.get_content_class(item_dict.pop('_type'))
             await embedded.apply_patch(item_dict)
-            setattr(instance, self.name, embedded)
+            # setattr(instance, self.name, embedded)
+            await value.reset(embedded)
             await instance.update()
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
