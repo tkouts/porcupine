@@ -48,9 +48,17 @@ class MigrationManager(AbstractService):
                 await self.__connector.insert_multi({db_key: 'running'})
             except DBAlreadyExists:
                 # already running or run
-                log.info(f'Skipping migration {func_id}')
-                return
-            log.info(f'Running migration {func_id}')
+                # if running wait for migration to complete or fail
+                while True:
+                    status = await self.__connector.get_raw(db_key)
+                    if status == 'running':
+                        await asyncio.sleep(1)
+                    else:
+                        break
+                if status == 'completed':
+                    log.info(f'Skipping migration "{func_id}"')
+                    return
+            log.info(f'Running migration "{func_id}"')
             self.__migrations[func_id].running = True
             try:
                 await wrapped()
