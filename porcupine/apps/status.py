@@ -15,7 +15,7 @@ status = Status()
 async def status_handler(_):
     process_name = multiprocessing.current_process().name
     services = get_service(None)
-    services_status = {key: service.status()
+    services_status = {key: await service.status()
                        for (key, service) in services.items()}
     return json({
         'process_name': process_name,

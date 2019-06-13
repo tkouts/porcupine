@@ -40,6 +40,11 @@ class PorcupineServer(Sanic):
 
         return cron_wrapper
 
+    def migrate(self, f):
+        migration_mgr = get_service('migration_mgr')
+        migration_mgr.add(f, self.system_user)
+        return f
+
     def load_environment_config(self, prefix, preserve_prefix=True):
         """
         Looks for any prefixed environment variables and applies

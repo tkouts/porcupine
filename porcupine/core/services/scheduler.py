@@ -74,7 +74,7 @@ class Scheduler(AbstractService):
 
         return scheduled_task
 
-    def status(self):
+    async def status(self):
         return {
             func_id: task.running
             for func_id, task in self.__cron_tabs.items()

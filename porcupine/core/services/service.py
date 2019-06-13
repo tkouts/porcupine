@@ -15,5 +15,5 @@ class AbstractService:
     def stop(self, loop):
         raise NotImplementedError
 
-    def status(self):
+    async def status(self):
         return {}

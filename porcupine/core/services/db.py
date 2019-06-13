@@ -35,7 +35,7 @@ class Db(AbstractService):
     async def stop(self, loop):
         await self.connector.close()
 
-    def status(self):
+    async def status(self):
         return {
             'active_txns': self.connector.active_txns
         }

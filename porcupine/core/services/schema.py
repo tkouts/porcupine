@@ -36,7 +36,7 @@ class SchemaMaintenance(AbstractService):
             finally:
                 self.queue.task_done()
 
-    def status(self):
+    async def status(self):
         return {
             'queue_size': self.queue.qsize()
         }

@@ -14,8 +14,10 @@ def prepare_services(server):
     from .schema import SchemaMaintenance
     from .sessionmgr import SessionManager
     from .scheduler import Scheduler
+    from .migrationmgr import MigrationManager
 
-    for service_type in (Db, SchemaMaintenance, SessionManager, Scheduler):
+    for service_type in (Db, SchemaMaintenance, MigrationManager,
+                         SessionManager, Scheduler):
         service = service_type(server)
         _services[service.service_key] = service
 
