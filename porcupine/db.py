@@ -18,7 +18,7 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
         return 1
     # check for stale / expired / deleted
     it = item
-    connector = db_connector()
+    _get = db_connector().get
     while True:
         if not it.is_composite:
             # check expiration
@@ -34,7 +34,7 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
         if it.parent_id is None:
             break
         else:
-            it = await connector.get(it.parent_id)
+            it = await _get(it.parent_id)
             if it is None:
                 # stale - remove from DB
                 await get_service('schema').remove_stale(it.id)
