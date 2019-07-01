@@ -14,7 +14,7 @@ class Transaction:
                  '_ext_insertions', '_ext_upsertions',
                  '_deletions',
                  '_sd', '_appends',
-                 '_attr_locks', '_touches')
+                 '_attr_locks', '_touches', '_committed')
 
     def __init__(self, connector, **options):
         self.connector = connector
@@ -32,6 +32,11 @@ class Transaction:
         # sub document mutations
         self._sd = defaultdict(dict)
         self._appends = defaultdict(list)
+        self._committed = False
+
+    @property
+    def committed(self):
+        return self._committed
 
     def __contains__(self, key):
         if key in self._deletions:
@@ -356,6 +361,7 @@ class Transaction:
             await connector.touch_multi(self._touches)
 
         self.connector.active_txns -= 1
+        self._committed = True
 
         # execute post txn event handlers
         actor = context.user
@@ -395,7 +401,8 @@ class Transaction:
 
         @return: None
         """
-        # release attribute locks
-        if self._attr_locks:
-            await self.connector.delete_multi(self._attr_locks.keys())
-        self.connector.active_txns -= 1
+        if not self._committed:
+            # release attribute locks
+            if self._attr_locks:
+                await self.connector.delete_multi(self._attr_locks.keys())
+            self.connector.active_txns -= 1

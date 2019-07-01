@@ -144,7 +144,7 @@ def transactional(auto_commit=True):
                                              **keyword_args_copy)
                             if auto_commit:
                                 await txn.commit()
-                            else:
+                            elif not txn.committed:
                                 # abort if not committed
                                 await txn.abort()
                             return val
