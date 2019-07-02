@@ -23,13 +23,14 @@ async def add_session_to_request(request):
 
 @session_manager_bp.middleware('response')
 async def save_session(request, response):
-    session = request['session']
-    if session.is_terminated:
-        _ = session_manager.remove(request, response)
-        if asyncio.iscoroutine(_):
-            await _
-    elif session.is_dirty:
-        await session_manager.save(request, response)
+    session = request.get('session')
+    if session is not None:
+        if session.is_terminated:
+            _ = session_manager.remove(request, response)
+            if asyncio.iscoroutine(_):
+                await _
+        elif session.is_dirty:
+            await session_manager.save(request, response)
 
 
 class SessionManager(AbstractService):
