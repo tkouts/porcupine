@@ -29,7 +29,7 @@ setup(
     scripts=['bin/porcupine'],
     platforms='any',
     install_requires=[
-        'sanic==0.8.3',
+        'sanic==19.6.0',
         'couchbase>=2.2.3',
         'PyYAML>=5.1',
         'lru-dict>=1.1.6',
