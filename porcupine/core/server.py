@@ -91,7 +91,7 @@ class PorcupineServer(Sanic):
                 },
             },
             'loggers': {
-                'root': {
+                'sanic.root': {
                     'level': log_level,
                     'handlers': ['console']
                 },
@@ -132,7 +132,7 @@ class PorcupineServer(Sanic):
                 'formatter': 'generic',
                 **rotate_settings
             }
-            for log in ('root', 'porcupine', 'sanic.error'):
+            for log in ('sanic.root', 'porcupine', 'sanic.error'):
                 loggers[log]['handlers'] = ['timedRotatingFile']
             if config.LOG_ACCESS:
                 handlers['accessTimedRotatingFile'] = {
