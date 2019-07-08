@@ -6,32 +6,17 @@ import logging.config
 
 from porcupine import __version__
 from porcupine.core.server import server
-from porcupine import apps
 from .log import porcupine_log
-from .loader import gather_apps
 from .services import prepare_services
 from .daemon import Daemon
 
 
-def run_server(scan_dir, debug=False):
+def run_server(debug=False):
     porcupine_log.info('Starting Porcupine {0}'.format(__version__))
 
     # prepare services
     porcupine_log.info('Preparing services')
     prepare_services(server)
-
-    # gather native apps
-    gather_apps(server, apps.__path__, prefix='porcupine.apps.')
-    porcupine_path = os.path.dirname(
-        os.path.dirname(sys.modules['porcupine'].__file__))
-    if not scan_dir.startswith(porcupine_path):
-        # gather user apps
-        os.chdir(scan_dir)
-        gather_apps(server, [scan_dir])
-        # check if there is a static directory
-        static_dir_path = os.path.join(scan_dir, 'static')
-        if os.path.isdir(static_dir_path):
-            server.static('/', static_dir_path)
 
     server.run(host=server.config.HOST,
                port=int(server.config.PORT),
@@ -48,7 +33,8 @@ class PorcupineDaemon(Daemon):
         self.scan_dir = scan_dir
 
     def run(self):
-        run_server(self.scan_dir, debug=self.debug)
+        os.chdir(self.scan_dir)
+        run_server(debug=self.debug)
 
 
 def start(args):
@@ -59,10 +45,10 @@ def start(args):
         log_to_files=args.daemon or args.graceful)
     # load config
     logging.config.dictConfig(log_config)
-    current_dir = os.getcwd()
 
     if args.daemon or args.stop or args.graceful:
         # daemon commands
+        current_dir = os.getcwd()
         daemon = PorcupineDaemon(current_dir, debug=args.debug)
         if args.daemon:
             daemon.start()
@@ -72,7 +58,7 @@ def start(args):
             daemon.restart()
         sys.exit()
     else:
-        run_server(current_dir, debug=args.debug)
+        run_server(debug=args.debug)
 
 
 def run():

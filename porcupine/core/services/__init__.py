@@ -15,9 +15,10 @@ def prepare_services(server):
     from .sessionmgr import SessionManager
     from .scheduler import Scheduler
     from .migrationmgr import MigrationManager
+    from .appinstaller import AppInstaller
 
-    for service_type in (Db, SchemaMaintenance, MigrationManager,
-                         SessionManager, Scheduler):
+    for service_type in (Db, MigrationManager, Scheduler,
+                         SchemaMaintenance, SessionManager, AppInstaller):
         service = service_type(server)
         _services[service.service_key] = service
 
