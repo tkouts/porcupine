@@ -11,6 +11,7 @@ from porcupine import apps
 from porcupine.core.app import App
 from porcupine.core.log import porcupine_log
 from .service import AbstractService
+from . import db_connector
 
 
 class AppInstaller(AbstractService):
@@ -58,6 +59,7 @@ class AppInstaller(AbstractService):
     async def start(self, loop):
         lock_acquired = self._DB_BP_LOCK.acquire(False)
         if lock_acquired:
+            await db_connector().prepare_indexes()
             # install apps db blueprints
             for app in self.apps:
                 await app.setup_db_blueprint()

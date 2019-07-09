@@ -9,8 +9,9 @@ from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
     SubdocPathNotFoundError, KeyExistsError, NotStoredError
 
 from porcupine import exceptions, log
-from porcupine.core.abstract.connector import AbstractConnector
 from porcupine.core.context import context_cacheable
+from porcupine.connectors.base.connector import BaseConnector
+
 from .cursor import Cursor
 from .index import Index
 
@@ -22,7 +23,7 @@ from acouchbase.bucket import Bucket as aBucket
 couchbase.set_json_converters(ujson.dumps, ujson.loads)
 
 
-class Couchbase(AbstractConnector):
+class Couchbase(BaseConnector):
     CursorType = Cursor
     IndexType = Index
 
@@ -31,18 +32,22 @@ class Couchbase(AbstractConnector):
         self.bucket = None
 
     @property
-    def bucket_name(self):
-        return self.server.config.DB_USER
-
-    @property
     def protocol(self):
         return self.server.config.get('DB_PROTOCOL', 'couchbase')
+
+    @property
+    def bucket_name(self):
+        return self.server.config.DB_NAME
+
+    @property
+    def user_name(self):
+        return self.server.config.DB_USER
 
     @property
     def password(self):
         return self.server.config.DB_PASSWORD
 
-    def connect(self, _async=True):
+    def _get_bucket(self, _async=True):
         hosts = self.server.config.DB_HOST.split(',')
         random.shuffle(hosts)
         connection_string = '{0}://{1}/{2}'.format(self.protocol,
@@ -52,10 +57,11 @@ class Couchbase(AbstractConnector):
             bucket = aBucket
         else:
             bucket = Bucket
-        self.bucket = bucket(connection_string,
-                             password=self.password)
-        if _async:
-            return self.bucket.connect()
+        return bucket(connection_string, password=self.password)
+
+    def connect(self):
+        self.bucket = self._get_bucket()
+        return self.bucket.connect()
 
     def get_query(self, query, ad_hoc=True, **kwargs):
         n1query = N1QLQuery(query, **kwargs)
@@ -165,33 +171,39 @@ class Couchbase(AbstractConnector):
         return True, return_value
 
     # indexes
-    def prepare_indexes(self):
+    async def prepare_indexes(self):
+        # return
         log.info('Preparing indexes')
-        self.connect(_async=False)
-        # get existing indexes
-        mgr = self.bucket.bucket_manager()
-        existing = [index.name for index in mgr.list_n1ql_indexes()]
-        new_indexes = [ind for name, ind in self.indexes.items()
-                       if name not in existing]
-        # create new indexes
-        for index in new_indexes:
-            log.info('Creating index {0}'.format(index.name))
-            mgr.create_n1ql_index(index.name,
-                                  fields=[index.key],
-                                  defer=True,
-                                  ignore_exists=True)
-        # build new indexes
-        if new_indexes:
-            new_indexes_names = [index.name for index in new_indexes]
-            log.info('Building indexes {0}'.format(new_indexes_names))
-            mgr.build_n1ql_deferred_indexes()
-            mgr.watch_n1ql_indexes(new_indexes_names, timeout=120)
-        # drop old indexes
-        old_indexes = [ind_name for ind_name in existing
-                       if ind_name not in self.indexes]
-        for index in old_indexes:
-            log.info('Dropping index {0}'.format(index))
-            mgr.drop_n1ql_index(index, ignore_missing=True)
+        bucket = self._get_bucket(_async=False)
+        design_doc = {'views': {}}
+        mgr = bucket.bucket_manager()
+        for index in self.indexes.values():
+            design_doc['views'][f'idx_{index.name}'] = index.get_view()
+        mgr.design_create('indexes', design_doc, use_devmode=False)
+
+        # # get existing indexes
+        # existing = [index.name for index in mgr.list_n1ql_indexes()]
+        # new_indexes = [ind for name, ind in self.indexes.items()
+        #                if name not in existing]
+        # # create new indexes
+        # for index in new_indexes:
+        #     log.info('Creating index {0}'.format(index.name))
+        #     mgr.create_n1ql_index(index.name,
+        #                           fields=[index.key],
+        #                           defer=True,
+        #                           ignore_exists=True)
+        # # build new indexes
+        # if new_indexes:
+        #     new_indexes_names = [index.name for index in new_indexes]
+        #     log.info('Building indexes {0}'.format(new_indexes_names))
+        #     mgr.build_n1ql_deferred_indexes()
+        #     mgr.watch_n1ql_indexes(new_indexes_names, timeout=120)
+        # # drop old indexes
+        # old_indexes = [ind_name for ind_name in existing
+        #                if ind_name not in self.indexes]
+        # for index in old_indexes:
+        #     log.info('Dropping index {0}'.format(index))
+        #     mgr.drop_n1ql_index(index, ignore_missing=True)
 
     async def close(self):
         pass

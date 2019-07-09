@@ -1,4 +1,4 @@
-from .cursor import AbstractCursor
+from porcupine.connectors.base.cursor import AbstractCursor
 
 
 class Join(AbstractCursor):

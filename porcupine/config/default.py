@@ -14,6 +14,7 @@ DEFAULTS = {
     # DATABASE
     'DB_IF': 'porcupine.connectors.Couchbase',
     'DB_HOST': 'localhost',
+    'DB_NAME': 'porcupine',
     'DB_USER': 'porcupine',
     'DB_PASSWORD': '',
     'DB_CACHE_SIZE': 1000,

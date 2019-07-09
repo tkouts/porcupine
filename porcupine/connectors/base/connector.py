@@ -1,15 +1,15 @@
 import abc
 
 from porcupine import context
-from porcupine.core.abstract.connector.join import Join
-from porcupine.core.abstract.connector.persist import DefaultPersistence
 from porcupine.core import utils
 from porcupine.exceptions import DBAlreadyExists
-from .transaction import Transaction
+from porcupine.connectors.base.transaction import Transaction
+from porcupine.connectors.base.persist import DefaultPersistence
+from porcupine.connectors.base.join import Join
 
 
-class AbstractConnector(metaclass=abc.ABCMeta):
-    indexes = {}
+class BaseConnector(metaclass=abc.ABCMeta):
+    # indexes = {}
     active_txns = 0
     TransactionType = Transaction
     CursorType = None
@@ -46,9 +46,11 @@ class AbstractConnector(metaclass=abc.ABCMeta):
         self.txn_max_retries = int(server.config.DB_TXN_MAX_RETRIES)
         self.cache_size = int(server.config.DB_CACHE_SIZE)
 
+    @property
+    def indexes(self):
         # create index map
-        indexed_data_types = server.config.__indices__
-        self.indexes = {
+        indexed_data_types = self.server.config.__indices__
+        return {
             k: self.get_index(v)
             for k, v in indexed_data_types.items()
         }

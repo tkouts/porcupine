@@ -12,7 +12,6 @@ class Db(AbstractService):
         super().__init__(server)
         connector_type = utils.get_rto_by_name(self.server.config.DB_IF)
         self.connector = connector_type(self.server)
-        self.connector.prepare_indexes()
 
     async def start(self, loop):
         await self.connector.connect()

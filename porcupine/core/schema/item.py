@@ -43,7 +43,8 @@ class GenericItem(Removable, Elastic):
                          protected=True, store_as='exp')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
-    modified = DateTime(required=True, readonly=True, store_as='md')
+    modified = DateTime(required=True, readonly=True, store_as='md',
+                        indexed=True)
 
     # security attributes
     is_system = Boolean(readonly=True, protected=True, store_as='sys')

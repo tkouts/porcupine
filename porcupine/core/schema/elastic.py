@@ -4,6 +4,7 @@ import functools
 from typing import List, ClassVar
 
 from porcupine.hinting import TYPING
+from porcupine.config.default import DEFAULTS
 from porcupine.core.context import system_override
 from porcupine.core import utils
 from porcupine.datatypes import DataType, String, ReferenceN
@@ -38,12 +39,11 @@ class ElasticMeta(type):
                             field_spec.append(
                                 utils.get_active_chunk_key(attr.storage_key))
                     if cls.is_composite and (attr.unique or attr.indexed):
-                        raise TypeError("Data type '{0}' of composite '{1}' "
-                                        "cannot be unique or indexed"
-                                        .format(attr.name, cls.__name__))
+                        raise TypeError(f"Data type '{attr.name}' "
+                                        f"of composite '{cls.__name__}' "
+                                        "cannot be unique or indexed")
                     if attr.indexed:
-                        from porcupine.core.server import server
-                        server.config.__indices__[attr.name] = attr
+                        DEFAULTS['__indices__'][attr.name] = attr
             except AttributeError:
                 continue
         cls.__schema__ = schema

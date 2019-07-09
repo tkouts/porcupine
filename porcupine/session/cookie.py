@@ -1,9 +1,10 @@
 import hashlib
 import cbor
-from porcupine.core.abstract.session import AbstractSessionManager
+
+from porcupine.session.base.session import BaseSessionManager
 
 
-class SessionManager(AbstractSessionManager):
+class SessionManager(BaseSessionManager):
     def __init__(self, server):
         super().__init__(server)
         self.secret = server.config.SM_SECRET.encode('utf-8')

@@ -33,7 +33,7 @@ class Session(ObservableDict):
         self._is_dirty = True
 
 
-class AbstractSessionManager(metaclass=abc.ABCMeta):
+class BaseSessionManager(metaclass=abc.ABCMeta):
     revive_threshold = 60.0
     SessionType = Session
 
