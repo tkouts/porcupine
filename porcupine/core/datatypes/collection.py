@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import AsyncIterator
+from typing import AsyncIterator, AsyncIterable
 from functools import partial
 
 from porcupine.hinting import TYPING
@@ -12,10 +12,14 @@ from .asyncsetter import AsyncSetterValue
 from .external import Text
 
 
-class ItemCollection(AsyncSetterValue, Streamer):
-    @property
-    def is_fetched(self) -> bool:
-        return self._desc.get_value(self._inst, snapshot=False) is not None
+class CollectionIterator(AsyncIterable):
+    __slots__ = '_desc', '_inst'
+
+    def __init__(self,
+                 descriptor: TYPING.DT_CO,
+                 instance: TYPING.ANY_ITEM_CO):
+        self._desc = descriptor
+        self._inst = instance
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
         descriptor, instance = self._desc, self._inst
@@ -124,6 +128,18 @@ class ItemCollection(AsyncSetterValue, Streamer):
                     await schema_service.rebuild_collection(collection_key, ttl)
                 else:
                     await schema_service.compact_collection(collection_key, ttl)
+
+
+class ItemCollection(AsyncSetterValue, Streamer):
+    def __init__(self,
+                 descriptor: TYPING.DT_CO,
+                 instance: TYPING.ANY_ITEM_CO):
+        AsyncSetterValue.__init__(self, descriptor, instance)
+        Streamer.__init__(self, CollectionIterator(descriptor, instance))
+
+    @property
+    def is_fetched(self) -> bool:
+        return self._desc.get_value(self._inst, snapshot=False) is not None
 
     @staticmethod
     def _is_consistent(_):

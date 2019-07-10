@@ -1,5 +1,4 @@
-from collections import AsyncIterable, AsyncGenerator
-from typing import AsyncIterator
+from typing import AsyncIterator, AsyncIterable
 from aiostream import stream, pipe
 
 from porcupine.hinting import TYPING
@@ -7,11 +6,11 @@ from porcupine import db, exceptions
 
 
 class Streamer(AsyncIterable):
-    def __init__(self, iterator: AsyncGenerator):
+    def __init__(self, iterator: AsyncIterable):
         self.iterator = iterator
 
     def __aiter__(self) -> TYPING.ITEM_ID:
-        return self.iterator
+        return self.iterator.__aiter__()
 
     async def count(self):
         n = 0
