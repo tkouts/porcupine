@@ -8,6 +8,7 @@ from .log import porcupine_log
 ctx_user = contextvars.ContextVar('user', default=None)
 ctx_txn = contextvars.ContextVar('txn', default=None)
 ctx_db_cache = contextvars.ContextVar('db_cache', default=None)
+ctx_visibility_cache = contextvars.ContextVar('visibility_cache', default=None)
 ctx_caches = contextvars.ContextVar('caches', default={})
 ctx_sys = contextvars.ContextVar('__sys__', default=False)
 
@@ -33,11 +34,16 @@ class PContext:
     def db_cache(self):
         return ctx_db_cache.get()
 
+    @property
+    def visibility_cache(self):
+        return ctx_visibility_cache.get()
+
     @staticmethod
     def prepare():
         connector = db_connector()
         ctx_txn.set(None)
         ctx_db_cache.set(LRU(connector.cache_size))
+        ctx_visibility_cache.set(LRU(100))
 
 
 context = PContext()

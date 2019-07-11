@@ -15,6 +15,7 @@ class AbstractConnector(metaclass=abc.ABCMeta):
     CursorType = None
     IndexType = None
     persist = DefaultPersistence
+    supports_ttl = True
 
     # Sub Document Mutation Codes
     SUB_DOC_UPSERT_MUT = 0
