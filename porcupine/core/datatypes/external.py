@@ -27,12 +27,11 @@ class Blob(DataType):
         super().__init__(default, allow_none=True, store_as=None,
                          indexed=False, **kwargs)
 
-    async def fetch(self, instance, set_storage=True):
+    async def fetch(self, instance):
         connector = db_connector()
         value = await connector.get_external(self.key_for(instance))
-        if set_storage:
-            storage = getattr(instance, self.storage)
-            setattr(storage, self.name, value)
+        storage = getattr(instance, self.storage)
+        setattr(storage, self.name, value)
         return value
 
     def __get__(self, instance, owner):

@@ -17,19 +17,31 @@ class ItemCollection(AsyncSetterValue, Streamer):
     def is_fetched(self) -> bool:
         return self._desc.get_value(self._inst, snapshot=False) is not None
 
+    async def __chunks(self):
+        descriptor, instance = self._desc, self._inst
+        connector = db_connector()
+        chunk_no = descriptor.current_chunk(instance)
+        while True:
+            chunk_key = descriptor.key_for(instance, chunk=chunk_no)
+            chunk = await connector.get_raw(chunk_key)
+            if chunk:
+                yield chunk
+            else:
+                break
+            chunk_no -= 1
+
     async def __aiter__(self) -> TYPING.ITEM_ID:
         descriptor, instance = self._desc, self._inst
         connector = db_connector()
         dirty_count = 0
         total_count = 0
         current_size = 0
-        is_split = False
         removed = {}
         resolved = OrderedDict()
         dirtiness = 0.0
         current_value = descriptor.get_value(instance)
 
-        def resolve_chunk(c: str, add_to_resolved=True):
+        def resolve_chunk(c: str):
             nonlocal total_count, dirty_count, removed, resolved
             ids = reversed([e for e in c.split(' ') if e])
             for oid in ids:
@@ -46,8 +58,6 @@ class ItemCollection(AsyncSetterValue, Streamer):
                         # duplicate
                         dirty_count += 1
                     else:
-                        if add_to_resolved:
-                            resolved[oid] = None
                         yield oid
 
         # compute deltas first without adding to resolved map
@@ -56,15 +66,14 @@ class ItemCollection(AsyncSetterValue, Streamer):
             collection_key = descriptor.key_for(instance)
             append = context.txn.get_key_append(collection_key)
             if append:
-                for item_id in resolve_chunk(append, add_to_resolved=False):
+                for item_id in resolve_chunk(append):
                     yield item_id
 
         if current_value:
             # collection is small and fetched
             if append:
                 # w/appends: need to recompute
-                for item_id in resolve_chunk(' '.join(current_value),
-                                             add_to_resolved=False):
+                for item_id in resolve_chunk(' '.join(current_value)):
                     yield item_id
             else:
                 # no appends: as is
@@ -72,30 +81,22 @@ class ItemCollection(AsyncSetterValue, Streamer):
                     yield item_id
             return
 
-        chunk = await self._desc.fetch(instance, set_storage=False)
-        if chunk:
-            current_size = len(chunk)
-            # print(chunk)
+        chunk_sizes = []
+        total_resolved = 0
+
+        async for chunk in self.__chunks():
+            chunk_sizes.append(len(chunk))
             for item_id in resolve_chunk(chunk):
+                total_resolved += 1
+                if total_resolved <= 300:
+                    resolved[item_id] = None
                 yield item_id
 
-        active_index = descriptor.current_chunk(instance)
-        if active_index > 0:
-            # collection is split - fetch previous chunks
-            is_split = True
-            previous_chunk_no = active_index - 1
-            while True:
-                previous_chunk_key = descriptor.key_for(instance,
-                                                        chunk=previous_chunk_no)
-                previous_chunk = await connector.get_raw(previous_chunk_key)
-                if previous_chunk is not None:
-                    for item_id in resolve_chunk(previous_chunk):
-                        yield item_id
-                    previous_chunk_no -= 1
-                else:
-                    break
+        if chunk_sizes:
+            current_size = chunk_sizes[0]
+        is_split = len(chunk_sizes) > 1
 
-        if len(resolved) <= 300:
+        if total_resolved <= 300:
             # set storage / no snapshot
             # cache / mark as fetched
             storage = getattr(instance, descriptor.storage)
