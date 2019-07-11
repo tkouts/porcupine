@@ -24,7 +24,7 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
         visibility = context.visibility_cache[cache_key]
         if visibility is None:
             return None
-        if not item.acl.is_set():
+        if not item.is_composite and not item.acl.is_set():
             return visibility
 
     it = item
@@ -62,7 +62,7 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
             context.visibility_cache[cache_key] = visibility
     else:
         visibility = 1 if await item.can_read(user) else 0
-        if not item.acl.is_set():
+        if not item.is_composite and not item.acl.is_set():
             context.visibility_cache[cache_key] = visibility
 
     return visibility
