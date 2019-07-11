@@ -15,9 +15,5 @@ class AbstractIndex(object, metaclass=abc.ABCMeta):
         return self.data_type.storage_key
 
     @abc.abstractmethod
-    def exists(self, container_id, value):
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def close(self):
         raise NotImplementedError

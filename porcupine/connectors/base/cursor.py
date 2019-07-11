@@ -1,7 +1,4 @@
 import abc
-from porcupine import context
-from porcupine.core.utils import permissions
-from porcupine.schema import Shortcut
 
 
 class Range:
@@ -12,7 +9,6 @@ class Range:
     inclusive.
     """
     def __init__(self, lower_bound=None, upper_bound=None):
-        # self.use_packed = use_packed
         self._lower_value = None
         self._lower_inclusive = None
         self._upper_value = None
@@ -20,27 +16,17 @@ class Range:
         self.set_lower_bound(lower_bound)
         self.set_upper_bound(upper_bound)
 
-    def set_lower_bound(self, lower_bound):
+    def set_lower_bound(self, lower_bound, inclusive=False):
         if lower_bound is not None:
-            value, inclusive = lower_bound
-            # if self.use_packed:
-            #     self._lower_value = pack_value(value)
-            # else:
-            self._lower_value = value
-            # value.value if isinstance(value, Date) else value
+            self._lower_value = lower_bound
             self._lower_inclusive = inclusive
         else:
             self._lower_value = None
             self._lower_inclusive = False
 
-    def set_upper_bound(self, upper_bound):
+    def set_upper_bound(self, upper_bound, inclusive=False):
         if upper_bound is not None:
-            value, inclusive = upper_bound
-            # if self.use_packed:
-            #     self._upper_value = pack_value(value)
-            # else:
-            self._upper_value = value
-            # value.value if isinstance(value, Date) else value
+            self._upper_value = upper_bound
             self._upper_inclusive = inclusive
         else:
             self._upper_value = None
@@ -67,68 +53,25 @@ class Range:
 
 
 class AbstractCursor(metaclass=abc.ABCMeta):
-    def __init__(self,
-                 connector,
-                 index,
-                 fetch_mode=1,
-                 enforce_permissions=True,
-                 resolve_shortcuts=False):
-        self.connector = connector
+    def __init__(self, index):
         self.index = index
 
-        self.fetch_mode = fetch_mode
-        self.enforce_permissions = enforce_permissions
-        self.resolve_shortcuts = resolve_shortcuts
-
-        self._value = None
-        self._range = None
+        self._bounds = None
         self._reversed = False
         self._scope = None
 
-    async def resolve(self, v):
-        item = self.connector.persist.loads(v)
-        if not self.enforce_permissions:
-            if self.resolve_shortcuts:
-                while item is not None and isinstance(item, Shortcut):
-                    item = await self.connector.get(item.target)
-        else:
-            # check read permissions
-            is_deleted = await item.is_deleted()
-            if is_deleted:
-                return None
-            access = await permissions.resolve(item, context.user)
-            if access == permissions.NO_ACCESS:
-                return None
-            elif self.resolve_shortcuts and isinstance(item, Shortcut):
-                item = await item.get_target()
-        return item
-
-    def eval(self, item):
-        if hasattr(item, self.index.name):
-            attr = getattr(item, self.index.name)
-            # if self.use_packed:
-            #     attr = pack_value(attr)
-            if self._value is not None:
-                return self._value == attr
-            elif self._range is not None:
-                return attr in self._range
-            return True
-        return False
+    @property
+    def is_ranged(self):
+        return isinstance(self._bounds, Range)
 
     def set_scope(self, scope):
         self._scope = scope
 
     def set(self, v):
-        # if self.use_packed:
-        #     self._value = pack_value(v)
-        # else:
-        #     self._value = v.value if isinstance(v, Date) else v
-        self._value = v
-        self._range = None
+        self._bounds = v
 
     def set_range(self, lower_bound, upper_bound):
-        self._range = Range(lower_bound, upper_bound)
-        self._value = None
+        self._bounds = Range(lower_bound, upper_bound)
 
     def reverse(self):
         self._reversed = not self._reversed
@@ -139,7 +82,7 @@ class AbstractCursor(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def __iter__(self):
+    def __aiter__(self):
         raise NotImplementedError
 
     @abc.abstractmethod

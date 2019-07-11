@@ -2,10 +2,11 @@ import abc
 
 from porcupine import context
 from porcupine.core import utils
+from porcupine.core.utils.collections import FrozenDict
 from porcupine.exceptions import DBAlreadyExists
 from porcupine.connectors.base.transaction import Transaction
 from porcupine.connectors.base.persist import DefaultPersistence
-from porcupine.connectors.base.join import Join
+# from porcupine.connectors.base.join import Join
 
 
 class BaseConnector(metaclass=abc.ABCMeta):
@@ -28,12 +29,12 @@ class BaseConnector(metaclass=abc.ABCMeta):
             # unique constraint
             container_id, attr_name, _ = key.split('>')
             raise DBAlreadyExists(
-                'A resource having the same {0} in {1} already exists'
-                .format(attr_name, container_id))
+                f'A resource having the same {attr_name} '
+                f'in {container_id} already exists')
         else:
             # item
             raise DBAlreadyExists(
-                'A resource having an ID of {0} already exists'.format(key))
+                f'A resource having an ID of {key} already exists')
 
     def __init__(self, server):
         # configuration
@@ -45,15 +46,18 @@ class BaseConnector(metaclass=abc.ABCMeta):
             float(server.config.DB_COLLECTION_SPLIT_THRESHOLD)
         self.txn_max_retries = int(server.config.DB_TXN_MAX_RETRIES)
         self.cache_size = int(server.config.DB_CACHE_SIZE)
+        self.__indexes = None
 
     @property
     def indexes(self):
-        # create index map
-        indexed_data_types = self.server.config.__indices__
-        return {
-            k: self.get_index(v)
-            for k, v in indexed_data_types.items()
-        }
+        if self.__indexes is None:
+            # create index map
+            indexed_data_types = self.server.config.__indices__
+            self.__indexes = FrozenDict({
+                k: self.get_index(v)
+                for k, v in indexed_data_types.items()
+            })
+        return self.__indexes
 
     @abc.abstractmethod
     def connect(self):
@@ -179,35 +183,35 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def get_index(self, data_type):
         return self.IndexType(self, data_type)
 
-    def get_cursor(self, index_name, value=None, c_range=None):
-        cursor = self.CursorType(self, self.indexes[index_name])
-        if c_range is None:
-            cursor.set(value)
-        else:
-            cursor.set_range(c_range)
-        return cursor
-
-    def get_cursor_list(self, conditions):
-        cur_list = []
-        for index, value in conditions:
-            cursor = self.CursorType(self, self.indexes[index])
-            if isinstance(value, (list, tuple)):
-                is_reversed = len(value) == 3 and value[2]
-                cursor.set_range(value[0], value[1])
-                if is_reversed:
-                    cursor.reverse()
-            else:
-                cursor.set(value)
-            cur_list.append(cursor)
-        return cur_list
-
-    def query(self, conditions):
-        cur_list = self.get_cursor_list(conditions)
-        if len(cur_list) == 1:
-            return cur_list[0]
-        else:
-            c_join = Join(self, cur_list)
-            return c_join
+    # def get_cursor(self, index_name, value=None, c_range=None):
+    #     cursor = self.CursorType(self, self.indexes[index_name])
+    #     if c_range is None:
+    #         cursor.set(value)
+    #     else:
+    #         cursor.set_range(c_range)
+    #     return cursor
+    #
+    # def get_cursor_list(self, conditions):
+    #     cur_list = []
+    #     for index, value in conditions:
+    #         cursor = self.CursorType(self, self.indexes[index])
+    #         if isinstance(value, (list, tuple)):
+    #             is_reversed = len(value) == 3 and value[2]
+    #             cursor.set_range(value[0], value[1])
+    #             if is_reversed:
+    #                 cursor.reverse()
+    #         else:
+    #             cursor.set(value)
+    #         cur_list.append(cursor)
+    #     return cur_list
+    #
+    # def query(self, conditions):
+    #     cur_list = self.get_cursor_list(conditions)
+    #     if len(cur_list) == 1:
+    #         return cur_list[0]
+    #     else:
+    #         c_join = Join(self, cur_list)
+    #         return c_join
 
     # management
     # @abc.abstractmethod

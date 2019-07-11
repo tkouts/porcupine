@@ -3,28 +3,20 @@ import random
 import ujson
 
 import couchbase.subdocument as sub_doc
-from couchbase.bucket import Bucket
-from couchbase.n1ql import N1QLQuery
+import couchbase.experimental
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
     SubdocPathNotFoundError, KeyExistsError, NotStoredError
-
 from porcupine import exceptions, log
 from porcupine.core.context import context_cacheable
 from porcupine.connectors.base.connector import BaseConnector
 
-from .cursor import Cursor
 from .index import Index
 
-import couchbase.experimental
 couchbase.experimental.enable()
-from acouchbase.bucket import Bucket as aBucket
-
-
 couchbase.set_json_converters(ujson.dumps, ujson.loads)
 
 
 class Couchbase(BaseConnector):
-    CursorType = Cursor
     IndexType = Index
 
     def __init__(self, server):
@@ -54,19 +46,14 @@ class Couchbase(BaseConnector):
                                                    ','.join(hosts),
                                                    self.bucket_name)
         if _async:
-            bucket = aBucket
+            from acouchbase.bucket import Bucket
         else:
-            bucket = Bucket
-        return bucket(connection_string, password=self.password)
+            from couchbase.bucket import Bucket
+        return Bucket(connection_string, password=self.password)
 
     def connect(self):
         self.bucket = self._get_bucket()
         return self.bucket.connect()
-
-    def get_query(self, query, ad_hoc=True, **kwargs):
-        n1query = N1QLQuery(query, **kwargs)
-        n1query.adhoc = ad_hoc
-        return self.bucket.n1ql_query(n1query)
 
     @context_cacheable(size=1000)
     async def key_exists(self, key) -> bool:
@@ -178,7 +165,7 @@ class Couchbase(BaseConnector):
         design_doc = {'views': {}}
         mgr = bucket.bucket_manager()
         for index in self.indexes.values():
-            design_doc['views'][f'idx_{index.name}'] = index.get_view()
+            design_doc['views'][index.name] = index.get_view()
         mgr.design_create('indexes', design_doc, use_devmode=False)
 
         # # get existing indexes

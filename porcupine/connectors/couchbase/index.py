@@ -13,8 +13,5 @@ class Index(AbstractIndex):
             'reduce': '_count'
         }
 
-    def exists(self, container_id, value):
-        pass
-
     def close(self):
         ...

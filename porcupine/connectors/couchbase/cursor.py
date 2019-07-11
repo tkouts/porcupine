@@ -1,4 +1,4 @@
-from couchbase.exceptions import NotFoundError
+# from couchbase.exceptions import NotFoundError
 from couchbase.views.params import *
 
 from porcupine.connectors.base.cursor import AbstractCursor
@@ -8,14 +8,8 @@ class Cursor(AbstractCursor):
     """
     Couchbase cursor
     """
-    def __init__(self,
-                 connector,
-                 index,
-                 fetch_mode=1,
-                 enforce_permissions=True,
-                 resolve_shortcuts=False):
-        super().__init__(connector, index, fetch_mode, enforce_permissions,
-                         resolve_shortcuts)
+    def __init__(self, index):
+        super().__init__(index)
         self.reduce = False
 
     @property
@@ -29,35 +23,34 @@ class Cursor(AbstractCursor):
 
     def __iter__(self):
         # resolve stale value
-        stale = context.data.get('stale', False)
-        if not self._scope.startswith('.'):
-            # it is not a deep query
-            # retrieve stale value from connector
-            try:
-                self.connector.bucket.delete('%s_stale' % self._scope)
-            except NotFoundError:
-                stale = STALE_OK
+        # stale = context.data.get('stale', False)
+        # if not self._scope.startswith('.'):
+        #     # it is not a deep query
+        #     # retrieve stale value from connector
+        #     try:
+        #         self.connector.bucket.delete('%s_stale' % self._scope)
+        #     except NotFoundError:
+        #         stale = STALE_OK
 
-        kwargs = {'stale': True if self.reduce else stale,
+        kwargs = {'stale': True,  # if self.reduce else stale,
                   'streaming': True,
                   'reduce': self.reduce}
 
-        if stale is False:
-            # set stale for next read operations
-            context.data['stale'] = STALE_OK
+        # if stale is False:
+        #     # set stale for next read operations
+        #     context.data['stale'] = STALE_OK
 
-        if self._value is not None:
+        is_ranged = self.is_ranged
+
+        if not is_ranged:
             # equality
-            kwargs['key'] = [self._scope, self._value]
+            kwargs['key'] = [self._scope, self._bounds]
         else:
             # range
-            if self.index.name == '_pid':
-                kwargs['key'] = self._scope
-            else:
-                kwargs['mapkey_range'] = [
-                    [self._scope, self._range._lower_value],
-                    [self._scope, self._range._upper_value or
-                     Query.STRING_RANGE_END]]
+            kwargs['mapkey_range'] = [
+                [self._scope, self._bounds._lower_value],
+                [self._scope, self._bounds._upper_value or
+                 Query.STRING_RANGE_END]]
 
         if self.reduce:
             kwargs['group_level'] = 1
@@ -66,14 +59,14 @@ class Cursor(AbstractCursor):
         if self._reversed:
             kwargs['mapkey_range'].reverse()
             kwargs['descending'] = True
-            if self._range:
-                lower_bound = self._range._upper_value
-                if not self._range._lower_inclusive:
+            if is_ranged:
+                lower_bound = self._bounds._upper_value
+                if not self._bounds._lower_inclusive:
                     kwargs['inclusive_end'] = False
         else:
-            if self._range:
-                lower_bound = self._range._lower_value
-                if not self._range._upper_inclusive:
+            if is_ranged:
+                lower_bound = self._bounds._lower_value
+                if not self._bounds._upper_inclusive:
                     kwargs['inclusive_end'] = False
 
         # print kwargs
