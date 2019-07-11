@@ -24,10 +24,9 @@ class ItemCollection(AsyncSetterValue, Streamer):
         while True:
             chunk_key = descriptor.key_for(instance, chunk=chunk_no)
             chunk = await connector.get_raw(chunk_key)
-            if chunk:
-                yield chunk
-            else:
+            if chunk is None:
                 break
+            yield chunk
             chunk_no -= 1
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
@@ -69,7 +68,7 @@ class ItemCollection(AsyncSetterValue, Streamer):
                 for item_id in resolve_chunk(append):
                     yield item_id
 
-        if current_value:
+        if current_value is not None:
             # collection is small and fetched
             if append:
                 # w/appends: need to recompute
