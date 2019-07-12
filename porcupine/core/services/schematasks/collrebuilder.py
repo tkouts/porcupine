@@ -94,7 +94,7 @@ class CollectionReBuilder(CollectionCompacter):
             await connector.touch_multi({self.item_id: self.ttl})
 
     async def execute(self):
-        # print('splitting collection', self.key)
+        print('splitting collection', self.key)
         connector = self.connector
         # bump up active chunk number
         await self.bump_up_active_chunk()
@@ -109,7 +109,7 @@ class CollectionReBuilder(CollectionCompacter):
                 break
             else:
                 # wait for pending to complete and try again
-                # print('failed to split')
+                print('failed to split')
                 await asyncio.sleep(0.1)
         if chunks is not None:
             tasks = []
