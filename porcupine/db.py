@@ -18,13 +18,19 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
         return 1
 
     # check for stale / expired / deleted
-    cache_key = f'{item.parent_id}|{user.id if user else ""}'
+
+    use_cache = item.is_composite or not item.acl.is_set()
+    if item.is_composite:
+        container = item.item_id
+    else:
+        container = item.parent_id
+    cache_key = f'{container}|{user.id if user else ""}'
 
     if cache_key in context.visibility_cache:
         visibility = context.visibility_cache[cache_key]
         if visibility is None:
             return None
-        if not item.is_composite and not item.acl.is_set():
+        if use_cache:
             return visibility
 
     it = item
@@ -62,7 +68,7 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
             context.visibility_cache[cache_key] = visibility
     else:
         visibility = 1 if await item.can_read(user) else 0
-        if not item.is_composite and not item.acl.is_set():
+        if use_cache:
             context.visibility_cache[cache_key] = visibility
 
     return visibility
