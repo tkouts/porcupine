@@ -13,9 +13,9 @@ from porcupine.core.context import context, ctx_txn
 from porcupine.core.services import db_connector, get_service
 
 
-async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
+async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[bool]:
     if item.__is_new__:
-        return 1
+        return True
 
     # check for stale / expired / deleted
 
@@ -67,7 +67,7 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[int]:
             # add to perms cache
             context.visibility_cache[cache_key] = visibility
     else:
-        visibility = 1 if await item.can_read(user) else 0
+        visibility = await item.can_read(user)
         if use_cache:
             context.visibility_cache[cache_key] = visibility
 
