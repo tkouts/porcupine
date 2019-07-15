@@ -23,8 +23,8 @@ DEFAULTS = {
     'DB_MULTI_FETCH_SIZE': 500,
     # dirtiness threshold
     'DB_COLLECTION_COMPACT_THRESHOLD': 0.3,
-    # split threshold set to 64K
-    'DB_COLLECTION_SPLIT_THRESHOLD': 64 * 1024,
+    # split threshold set to 16K
+    'DB_COLLECTION_SPLIT_THRESHOLD': 16 * 1024,
     # internal indexes map - maintained by the system
     '__indices__': {},
 
