@@ -41,9 +41,9 @@ class AbstractConnector(metaclass=abc.ABCMeta):
         self.server = server
         self.multi_fetch_chunk_size = int(server.config.DB_MULTI_FETCH_SIZE)
         self.coll_compact_threshold = \
-            int(server.config.DB_COLLECTION_COMPACT_THRESHOLD)
+            float(server.config.DB_COLLECTION_COMPACT_THRESHOLD)
         self.coll_split_threshold = \
-            float(server.config.DB_COLLECTION_SPLIT_THRESHOLD)
+            int(server.config.DB_COLLECTION_SPLIT_THRESHOLD)
         self.txn_max_retries = int(server.config.DB_TXN_MAX_RETRIES)
         self.cache_size = int(server.config.DB_CACHE_SIZE)
 
