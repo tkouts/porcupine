@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from lru import LRU
 from typing import AsyncIterator, AsyncIterable
 from functools import partial
 
@@ -6,10 +6,74 @@ from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
-from porcupine.core.utils import get_content_class
+from porcupine.core.utils import get_content_class, get_collection_key
 from porcupine.core.stream.streamer import Streamer
 from .asyncsetter import AsyncSetterValue
 from .external import Text
+
+
+class CollectionResolver:
+    __slots__ = (
+        'item_id', 'collection_name', 'chunk_no', 'total',
+        'dirty', 'removed', 'resolved', 'chunk_sizes'
+    )
+
+    def __init__(self, item_id: str, name: str, chunk_no: int):
+        self.item_id = item_id
+        self.collection_name = name
+        self.chunk_no = chunk_no
+        self.total = 0
+        self.dirty = 0
+        self.resolved = LRU(2730)
+        self.removed = set()
+        self.chunk_sizes = []
+
+    @property
+    def max_chunk_size(self):
+        if self.chunk_sizes:
+            return max(self.chunk_sizes)
+        return 0
+
+    @property
+    def is_split(self):
+        return len(self.chunk_sizes) > 1
+
+    async def __chunks(self):
+        connector = db_connector()
+        chunk_no = self.chunk_no
+        while True:
+            chunk_key = get_collection_key(self.item_id, self.collection_name,
+                                           chunk_no)
+            chunk = await connector.get_raw(chunk_key)
+            if chunk is None:
+                break
+            yield chunk
+            chunk_no -= 1
+
+    def resolve_chunk(self, c: str):
+        ids = reversed([e for e in c.split(' ') if e])
+        for oid in ids:
+            self.total += 1
+            if oid.startswith('-'):
+                key = oid[1:]
+                self.dirty += 1
+                self.removed.add(key)
+            else:
+                if oid in self.removed:
+                    # removed
+                    self.dirty += 1
+                elif oid in self.resolved:
+                    # duplicate
+                    self.dirty += 1
+                else:
+                    self.resolved[oid] = True
+                    yield oid
+
+    async def __aiter__(self) -> TYPING.ITEM_ID:
+        async for chunk in self.__chunks():
+            self.chunk_sizes.append(len(chunk))
+            for item_id in self.resolve_chunk(chunk):
+                yield item_id
 
 
 class CollectionIterator(AsyncIterable):
@@ -23,52 +87,25 @@ class CollectionIterator(AsyncIterable):
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
         descriptor, instance = self._desc, self._inst
-        connector = db_connector()
-        dirty_count = 0
-        total_count = 0
-        current_size = 0
-        is_split = False
-        removed = {}
-        resolved = OrderedDict()
         dirtiness = 0.0
         current_value = descriptor.get_value(instance)
+        chunk_no = descriptor.current_chunk(instance)
+        resolver = CollectionResolver(instance.id, descriptor.name, chunk_no)
 
-        def resolve_chunk(c: str, add_to_resolved=True):
-            nonlocal total_count, dirty_count, removed, resolved
-            ids = reversed([e for e in c.split(' ') if e])
-            for oid in ids:
-                total_count += 1
-                if oid.startswith('-'):
-                    key = oid[1:]
-                    dirty_count += 1
-                    removed[key] = None
-                else:
-                    if oid in removed:
-                        # removed
-                        dirty_count += 1
-                    elif oid in resolved:
-                        # duplicate
-                        dirty_count += 1
-                    else:
-                        if add_to_resolved:
-                            resolved[oid] = None
-                        yield oid
-
-        # compute deltas first without adding to resolved map
+        # compute deltas first
         append = ''
         if context.txn is not None:
             collection_key = descriptor.key_for(instance)
             append = context.txn.get_key_append(collection_key)
             if append:
-                for item_id in resolve_chunk(append, add_to_resolved=False):
+                for item_id in resolver.resolve_chunk(append):
                     yield item_id
 
-        if current_value:
+        if current_value is not None:
             # collection is small and fetched
             if append:
                 # w/appends: need to recompute
-                for item_id in resolve_chunk(' '.join(current_value),
-                                             add_to_resolved=False):
+                for item_id in resolver.resolve_chunk(' '.join(current_value)):
                     yield item_id
             else:
                 # no appends: as is
@@ -76,42 +113,35 @@ class CollectionIterator(AsyncIterable):
                     yield item_id
             return
 
-        chunk = await self._desc.fetch(instance, set_storage=False)
-        if chunk:
-            current_size = len(chunk)
-            # print(chunk)
-            for item_id in resolve_chunk(chunk):
-                yield item_id
+        total_items = 0
+        collection = []
 
-        active_index = descriptor.current_chunk(instance)
-        if active_index > 0:
-            # collection is split - fetch previous chunks
-            is_split = True
-            previous_chunk_no = active_index - 1
-            while True:
-                previous_chunk_key = descriptor.key_for(instance,
-                                                        chunk=previous_chunk_no)
-                previous_chunk = await connector.get_raw(previous_chunk_key)
-                if previous_chunk is not None:
-                    for item_id in resolve_chunk(previous_chunk):
-                        yield item_id
-                    previous_chunk_no -= 1
-                else:
-                    break
+        async for item_id in resolver:
+            total_items += 1
+            if total_items < 301:
+                collection.append(item_id)
+            yield item_id
 
-        if len(resolved) <= 300:
+        current_size = resolver.max_chunk_size
+        is_split = resolver.is_split
+
+        if total_items < 301:
             # set storage / no snapshot
             # cache / mark as fetched
             storage = getattr(instance, descriptor.storage)
-            setattr(storage, descriptor.storage_key, list(resolved.keys()))
+            setattr(storage, descriptor.storage_key, collection)
 
         # compute dirtiness factor
-        if total_count:
-            dirtiness = dirty_count / total_count
-            # print(dirtiness)
+        if resolver.total:
+            dirtiness = resolver.dirty / resolver.total
 
+        connector = db_connector()
         split_threshold = connector.coll_split_threshold
         compact_threshold = connector.coll_compact_threshold
+
+        # print(current_size, split_threshold)
+        # print(dirtiness, compact_threshold)
+
         if current_size > split_threshold or dirtiness > compact_threshold:
             # collection maintenance
             collection_key = descriptor.key_for(instance)

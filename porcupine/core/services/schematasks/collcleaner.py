@@ -36,7 +36,7 @@ class CollectionCleaner(SchemaMaintenanceTask):
         chunk_no = self.chunk_no
         reached_last = False
         while True:
-            _, chunk = await self.fetch_collection_chunk(chunk_no)
+            chunk_key, chunk = await self.fetch_collection_chunk(chunk_no)
             if chunk is None:
                 reached_last = True
                 break
@@ -45,7 +45,7 @@ class CollectionCleaner(SchemaMaintenanceTask):
                 if matches:
                     xform = partial(self.clean_chunk, stale_ids=matches)
                     success, _ = await connector.swap_if_not_modified(
-                        self.key,
+                        chunk_key,
                         xform=xform,
                         ttl=self.ttl
                     )

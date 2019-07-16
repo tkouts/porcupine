@@ -16,6 +16,7 @@ class BaseConnector(metaclass=abc.ABCMeta):
     CursorType = None
     IndexType = None
     persist = DefaultPersistence
+    supports_ttl = True
 
     # Sub Document Mutation Codes
     SUB_DOC_UPSERT_MUT = 0
@@ -41,9 +42,9 @@ class BaseConnector(metaclass=abc.ABCMeta):
         self.server = server
         self.multi_fetch_chunk_size = int(server.config.DB_MULTI_FETCH_SIZE)
         self.coll_compact_threshold = \
-            int(server.config.DB_COLLECTION_COMPACT_THRESHOLD)
+            float(server.config.DB_COLLECTION_COMPACT_THRESHOLD)
         self.coll_split_threshold = \
-            float(server.config.DB_COLLECTION_SPLIT_THRESHOLD)
+            int(server.config.DB_COLLECTION_SPLIT_THRESHOLD)
         self.txn_max_retries = int(server.config.DB_TXN_MAX_RETRIES)
         self.cache_size = int(server.config.DB_CACHE_SIZE)
         self.__indexes = None
