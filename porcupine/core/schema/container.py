@@ -40,6 +40,11 @@ class Container(Item):
         _, exists = await db_connector().exists(unique_name_key)
         return exists
 
+    async def children_count(self):
+        cursor = db_connector().indexes['modified'].get_cursor()
+        cursor.set_scope(self.id)
+        return await cursor.count()
+
     async def get_child_by_name(self, name, resolve_shortcut=False):
         """
         This method returns the child with the specified name.

@@ -10,10 +10,8 @@ from porcupine.connectors.base.persist import DefaultPersistence
 
 
 class BaseConnector(metaclass=abc.ABCMeta):
-    # indexes = {}
     active_txns = 0
     TransactionType = Transaction
-    CursorType = None
     IndexType = None
     persist = DefaultPersistence
     supports_ttl = True

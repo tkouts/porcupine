@@ -29,6 +29,10 @@ DEFAULTS = {
     # internal indexes map - maintained by the system
     '__indices__': {},
 
+    # Couchbase VIEWS update parameters
+    'COUCH_VIEWS_UPDATE_INTERVAL': 3000,
+    'COUCH_VIEWS_UPDATE_MIN_CHANGES': 20,
+    'COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES': 1000,
 
     # SESSION MANAGER
     'SM_IF': 'porcupine.session.cookie.SessionManager',

@@ -1,7 +1,7 @@
-from porcupine.connectors.base.cursor import AbstractCursor
+from porcupine.connectors.base.cursor import BaseCursor
 
 
-class Join(AbstractCursor):
+class Join(BaseCursor):
     """
     Helper cursor for performing joins on indexed attributes
     """

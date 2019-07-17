@@ -161,8 +161,17 @@ class Couchbase(BaseConnector):
     async def prepare_indexes(self):
         # return
         log.info('Preparing indexes')
+        config = self.server.config
         bucket = self._get_bucket(_async=False)
-        design_doc = {'views': {}}
+        design_doc = {
+            'views': {},
+            'options': {
+                'updateInterval': config.COUCH_VIEWS_UPDATE_INTERVAL,
+                'updateMinChanges': config.COUCH_VIEWS_UPDATE_MIN_CHANGES,
+                'replicaUpdateMinChanges':
+                    config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES
+            }
+        }
         mgr = bucket.bucket_manager()
         for index in self.indexes.values():
             design_doc['views'][index.name] = index.get_view()

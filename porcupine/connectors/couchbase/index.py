@@ -1,7 +1,8 @@
-from porcupine.connectors.base.index import AbstractIndex
+from porcupine.connectors.base.index import BaseIndex
+from porcupine.connectors.couchbase.cursor import Cursor
 
 
-class Index(AbstractIndex):
+class Index(BaseIndex):
     """
     Couchbase index
     """
@@ -12,6 +13,9 @@ class Index(AbstractIndex):
             'map': str.format(map_func, self.key),
             'reduce': '_count'
         }
+
+    def get_cursor(self):
+        return Cursor(self)
 
     def close(self):
         ...
