@@ -82,6 +82,9 @@ class Transaction:
 
         await item.on_create()
 
+        ttl = await item.ttl
+        self._items[item.id] = ttl, item
+
         # execute data types on_create handlers
         for data_type in item.__schema__.values():
             try:
@@ -90,9 +93,6 @@ class Transaction:
                     await _
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
-
-        ttl = await item.ttl
-        self._items[item.id] = ttl, item
 
         item.__reset__()
 
