@@ -1,11 +1,10 @@
 import inspect
-from collections import OrderedDict
 
 from sanic import Blueprint
 
 from porcupine import log
 
-_services = OrderedDict()
+_services = {}
 _services_blueprint = Blueprint('services')
 
 
@@ -37,7 +36,10 @@ def db_connector():
 
 @_services_blueprint.listener('before_server_start')
 async def start_services(_, loop):
-    for service in _services.values():
+    services = sorted(_services.values(),
+                      key=lambda s: s.priority,
+                      reverse=True)
+    for service in services:
         log.info(f'Starting {service.service_key} service')
         starter = service.start(loop)
         if inspect.isawaitable(starter):

@@ -5,6 +5,7 @@ Abstract Service class
 
 class AbstractService:
     service_key = None
+    priority = 0
 
     def __init__(self, server):
         self.server = server

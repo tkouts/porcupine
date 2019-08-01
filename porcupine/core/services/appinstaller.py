@@ -16,6 +16,7 @@ from . import db_connector
 
 class AppInstaller(AbstractService):
     service_key = 'app_installer'
+    priority = 10
     _DB_BP_LOCK = Lock()
 
     def __init__(self, server):

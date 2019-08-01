@@ -7,6 +7,7 @@ from .service import AbstractService
 
 class Db(AbstractService):
     service_key = 'db'
+    priority = 1000
 
     def __init__(self, server):
         super().__init__(server)

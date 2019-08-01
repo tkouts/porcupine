@@ -18,6 +18,7 @@ Migration = namedlist('Migration', 'func running')
 
 class MigrationManager(AbstractService):
     service_key = 'migration_mgr'
+    priority = 5
 
     def __init__(self, server):
         super().__init__(server)

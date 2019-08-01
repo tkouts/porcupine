@@ -18,6 +18,7 @@ from .service import AbstractService
 
 class SchemaMaintenance(AbstractService):
     service_key = 'schema'
+    priority = 500
 
     def __init__(self, server):
         super().__init__(server)
