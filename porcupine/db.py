@@ -19,7 +19,8 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[bool]:
 
     # check for stale / expired / deleted
 
-    use_cache = item.is_composite or not item.acl.is_set()
+    use_cache = (not item.is_deleted and
+                 (item.is_composite or not item.acl.is_set()))
     if item.is_composite:
         container = item.item_id
     else:
