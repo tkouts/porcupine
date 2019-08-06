@@ -28,6 +28,10 @@ class PorcupineServer(Sanic):
     def system_user(self):
         return self.__identity
 
+    @property
+    def bus(self):
+        return get_service('bus').bus
+
     def cron_tab(self, spec, identity=None):
         if identity is None:
             identity = self.system_user
