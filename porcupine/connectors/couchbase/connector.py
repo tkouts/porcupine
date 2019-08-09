@@ -5,7 +5,8 @@ import ujson
 import couchbase.subdocument as sub_doc
 import couchbase.experimental
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
-    SubdocPathNotFoundError, KeyExistsError, NotStoredError
+    SubdocPathNotFoundError, KeyExistsError, NotStoredError, \
+    CouchbaseNetworkError
 from porcupine import exceptions, log
 from porcupine.core.context import context_cacheable
 from porcupine.connectors.base.connector import BaseConnector
@@ -68,13 +69,20 @@ class Couchbase(BaseConnector):
     async def get_raw(self, key, quiet=True):
         try:
             result = await self.bucket.get(key, quiet=quiet)
+        except CouchbaseNetworkError:
+            # getting replica
+            result = await self.bucket.get(key, replica=True, quiet=quiet)
         except NotFoundError:
             raise exceptions.NotFound(
                 'The resource {0} does not exist'.format(key))
         return result.value
 
     async def get_multi_raw(self, keys):
-        multi = await self.bucket.get_multi(keys, quiet=True)
+        try:
+            multi = await self.bucket.get_multi(keys, quiet=True)
+        except CouchbaseNetworkError:
+            # getting replica
+            multi = await self.bucket.get_multi(keys, replica=True, quiet=True)
         return {key: multi[key].value for key in multi}
 
     async def insert_multi(self, insertions: dict, ttl=None) -> list:
