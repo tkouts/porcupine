@@ -82,8 +82,8 @@ class Couchbase(BaseConnector):
             multi = await self.bucket.get_multi(keys, quiet=True)
         except CouchbaseNetworkError:
             # getting replicas
-            docs = asyncio.gather(*[self.get_raw(key, quiet=True)
-                                    for key in keys])
+            docs = await asyncio.gather(*[self.get_raw(key, quiet=True)
+                                          for key in keys])
             return {key: doc for key, doc in zip(keys, docs)}
         return {key: multi[key].value for key in multi}
 
