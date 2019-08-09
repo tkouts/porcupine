@@ -35,7 +35,7 @@ setup(
         'lru-dict>=1.1.6',
         'namedlist>=1.7',
         'cbor>=1.0.0',
-        'arrow>=0.10.0',
+        'arrow==0.13.1',
         'aiofiles==0.4.0',
         'aiostream==0.3.1',
         'aiocron',
