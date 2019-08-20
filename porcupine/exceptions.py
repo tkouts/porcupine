@@ -19,6 +19,14 @@ class DBDeadlockError(ServerError):
     pass
 
 
+class OqlSyntaxError(ServerError):
+    pass
+
+
+class OqlError(ServerError):
+    pass
+
+
 class DBAlreadyExists(Conflict):
     pass
 

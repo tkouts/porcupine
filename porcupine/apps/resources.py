@@ -14,6 +14,7 @@ class Resources(App):
     name = 'resources'
     db_blueprint = 'db.yml'
 
+
 resources = Resources()
 
 
