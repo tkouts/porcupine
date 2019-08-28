@@ -1,4 +1,3 @@
-import time
 from porcupine.core.oql.parser import OqlLexer, OqlParser, ParseError
 from porcupine.core.oql.statements import Select
 from porcupine.exceptions import OqlSyntaxError
@@ -37,7 +36,7 @@ def prepare(ast):
 
 
 if __name__ == '__main__':
-    now = time.time()
+    # now = time.time()
     # oql_script.setDebug(True)
     try:
         parsed = parse('select not id_4d + 1 or 1.0 > 2, name + "a", true from ROOT.podsf')
@@ -46,4 +45,4 @@ if __name__ == '__main__':
         print(se.line)
         print(' ' * (se.col - 1) + '^')
 
-    print(time.time() - now)
+    # print(time.time() - now)

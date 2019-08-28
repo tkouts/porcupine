@@ -1,8 +1,6 @@
-from aiostream import stream, pipe
-
 from sanic.response import json
 
-from porcupine import db, exceptions
+from porcupine import db, exceptions, pipe
 from porcupine.view import view
 from porcupine.core.datatypes.system import Items, Containers
 from porcupine.core.services import db_connector
@@ -68,9 +66,8 @@ class Container(Item):
 
     async def get_child_by_id(self, oid):
         item = await db.get_item(oid)
-        if item is not None:
-            if item.parent_id != self.id:
-                return None
+        if item is not None and item.parent_id != self.id:
+            return None
         return item
 
     async def get_children(self, skip=0, take=None,
@@ -80,16 +77,12 @@ class Container(Item):
 
         @rtype: list
         """
-        feeder = stream.chain(
-            self.containers.items(),
+        feeder = self.containers.items() | pipe.chain(
             self.items.items(resolve_shortcuts=resolve_shortcuts)
         )
-        if skip > 0:
-            feeder |= pipe.skip(skip)
-        if take is not None:
-            feeder |= pipe.take(take)
-        async with feeder.stream() as streamer:
-            return [i async for i in streamer]
+        if skip or take:
+            feeder |= pipe.skip_and_take(skip, take)
+        return [i async for i in feeder]
 
     async def get_items(self, skip=0, take=None,
                         resolve_shortcuts=False) -> list:
@@ -98,8 +91,9 @@ class Container(Item):
 
         @rtype: list
         """
-        items = self.items.items(skip, take,
-                                 resolve_shortcuts=resolve_shortcuts)
+        items = self.items.items(resolve_shortcuts=resolve_shortcuts)
+        if skip or take:
+            items |= pipe.skip_and_take(skip, take)
         return [i async for i in items]
 
     async def get_containers(self, skip=0, take=None) -> list:
@@ -108,7 +102,10 @@ class Container(Item):
 
         @rtype: list
         """
-        return [i async for i in self.containers.items(skip, take)]
+        containers = self.containers.items()
+        if skip or take:
+            containers |= pipe.skip_and_take(skip, take)
+        return [i async for i in containers]
 
     async def has_items(self) -> bool:
         """

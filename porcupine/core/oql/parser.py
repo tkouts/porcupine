@@ -16,17 +16,23 @@ class OqlLexer(Lexer):
         FLOAT, INT, BOOLEAN, NULL, STRING,
         VAR,
         NAME,
-        # statements
-        SELECT, AS, FROM, WHERE
+        FUNCTION,
+        # keywords
+        SELECT, AS, FROM, WHERE, ORDER, BY, ASC, DESC, RANGE
     }
+
+    keywords = {
+        'select', 'as', 'from', 'where', 'order', 'by',
+        'asc', 'desc', 'range',
+        # logical operators
+        'and', 'or', 'not'
+    }
+
+    functions = {'len', 'slice', 'hasattr', 'date'}
 
     literals = {'=', '+', '-', '*', '/', '(', ')', '.', ','}
 
     ignore = ' \t\r'
-
-    AND = 'and'
-    OR = 'or'
-    NOT = 'not'
 
     EQ = r'=='
     LE = r'<='
@@ -65,11 +71,15 @@ class OqlLexer(Lexer):
         t.value = t.value[1:]
         return t
 
-    NAME = r'[A-Za-z_][\w]*'
-    NAME['select'] = SELECT
-    NAME['as'] = AS
-    NAME['from'] = FROM
-    NAME['where'] = WHERE
+    @_(r'[A-Za-z_][\w]*')
+    def NAME(self, t):
+        lower = t.value.lower()
+        if lower in self.keywords:
+            t.type = t.value.upper()
+        elif lower in self.functions:
+            t.type = 'FUNCTION'
+            t.value = lower
+        return t
 
     @_(r'\n+')
     def ignore_newline(self, t):
@@ -89,14 +99,14 @@ class OqlParser(Parser):
 
     precedence = (
         # ('left', 'UNION', 'INTERSECTION'),
-        ('left', 'OR', 'AND'),
-        # ('left', 'AND'),
+        ('left', 'OR'),
+        ('left', 'AND'),
+        ('left', 'NOT'),
         # ('left', 'IN', 'BETWEEN'),
         ('nonassoc', 'EQ', 'GT', 'GE', 'LT', 'LE', 'NE'),
         ('left', '+', '-'),
         ('left', '*', '/'),
         # ('left', 'EXP'),
-        ('left', 'NOT'),
         ('right', 'UMINUS'),
     )
 
@@ -130,6 +140,22 @@ class OqlParser(Parser):
     @_('select_statement WHERE expr')
     def select_statement(self, p):
         p.select_statement.where_condition = p.expr
+        return p.select_statement
+
+    @_('select_statement ORDER BY expr')
+    def select_statement(self, p):
+        p.select_statement.order_by = OrderBy(p.expr, 'asc')
+        return p.select_statement
+
+    @_('select_statement ORDER BY expr ASC',
+       'select_statement ORDER BY expr DESC')
+    def select_statement(self, p):
+        p.select_statement.order_by = OrderBy(p.expr, p[3])
+        return p.select_statement
+
+    @_('select_statement RANGE INT "-" INT')
+    def select_statement(self, p):
+        p.select_statement.range = slice(p.INT0 - 1, p.INT1)
         return p.select_statement
 
     # field spec
@@ -202,9 +228,9 @@ class OqlParser(Parser):
     def expr(self, p):
         return UnaryExpression('-', p.expr)
 
-    @_('NAME "(" expression_list ")"')
+    @_('FUNCTION "(" expression_list ")"')
     def expr(self, p):
-        return FunctionCall(p.NAME, p.expression_list)
+        return FunctionCall(p.FUNCTION, p.expression_list)
 
     @_('"(" expr ")"')
     def expr(self, p):
@@ -245,5 +271,7 @@ class OqlParser(Parser):
 if __name__ == '__main__':
     lexer = OqlLexer()
     parser = OqlParser()
-    print(parser.parse(lexer.tokenize(
-        'select x + 1, $y from $x1.items where a==1')))
+    tokens = lexer.tokenize(
+        'select x + 1, $y from $x1.items where x order by x desc')
+    print([x for x in tokens])
+    # print(parser.parse(tokens))

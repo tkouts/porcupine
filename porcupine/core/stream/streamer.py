@@ -1,16 +1,27 @@
-from typing import AsyncIterator, AsyncIterable
-from aiostream import stream, pipe
+from typing import AsyncIterable
+from aiostream import stream
 
+from porcupine import pipe
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 
 
-class Streamer(AsyncIterable):
+class BaseStreamer(AsyncIterable):
     def __init__(self, iterator: AsyncIterable):
         self.iterator = iterator
 
-    def __aiter__(self) -> TYPING.ITEM_ID:
-        return self.iterator.__aiter__()
+    @property
+    def feeder(self):
+        return stream.iterate(self.iterator)
+
+    async def __aiter__(self):
+        async with self.feeder.stream() as streamer:
+            async for x in streamer:
+                yield x
+
+    def __or__(self, p: AsyncIterable):
+        self.iterator = self.feeder | p
+        return self
 
     async def count(self):
         n = 0
@@ -18,24 +29,11 @@ class Streamer(AsyncIterable):
             n += 1
         return n
 
-    async def items(self,
-                    skip=0,
-                    take=None,
-                    _multi_fetch=db.get_multi) -> AsyncIterator[
-                                                  TYPING.ANY_ITEM_CO]:
 
-        feeder = stream.chunks(self, 40) | pipe.flatmap(_multi_fetch,
-                                                        task_limit=1)
+class IdStreamer(BaseStreamer):
 
-        if skip > 0:
-            feeder |= pipe.skip(skip)
-        if take is not None:
-            feeder |= pipe.take(take)
-
-        async with feeder.stream() as streamer:
-            async for i in streamer:
-                if i is not None:
-                    yield i
+    def items(self, _multi_fetch=db.get_multi) -> 'ItemStreamer':
+        return ItemStreamer(self, _multi_fetch)
 
     async def get_item_by_id(self,
                              item_id: TYPING.ITEM_ID,
@@ -46,8 +44,17 @@ class Streamer(AsyncIterable):
         if not quiet:
             raise exceptions.NotFound(f'The resource {item_id} does not exist')
 
-    async def has(self, item_id: TYPING.ITEM_ID):
+    async def has(self, item_id: TYPING.ITEM_ID) -> bool:
         async for oid in self:
             if oid == item_id:
                 return True
         return False
+
+
+class ItemStreamer(BaseStreamer):
+    def __init__(self, id_iterator: IdStreamer, multi_fetch):
+        item_iterator = (
+            id_iterator | pipe.chunks(40) |
+            pipe.flatmap(multi_fetch, task_limit=1)
+        )
+        super().__init__(item_iterator)

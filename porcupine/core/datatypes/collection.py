@@ -2,12 +2,13 @@ from lru import LRU
 from typing import AsyncIterator, AsyncIterable
 from functools import partial
 
+from porcupine import pipe
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
 from porcupine.core.utils import get_content_class, get_collection_key
-from porcupine.core.stream.streamer import Streamer
+from porcupine.core.stream.streamer import IdStreamer
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 
@@ -160,49 +161,42 @@ class CollectionIterator(AsyncIterable):
                     await schema_service.compact_collection(collection_key, ttl)
 
 
-class ItemCollection(AsyncSetterValue, Streamer):
+class ItemCollection(AsyncSetterValue, IdStreamer):
     def __init__(self,
                  descriptor: TYPING.DT_CO,
                  instance: TYPING.ANY_ITEM_CO):
         AsyncSetterValue.__init__(self, descriptor, instance)
-        Streamer.__init__(self, CollectionIterator(descriptor, instance))
+        IdStreamer.__init__(self, CollectionIterator(descriptor, instance))
 
     @property
     def is_fetched(self) -> bool:
         return self._desc.get_value(self._inst, snapshot=False) is not None
 
+    @property
+    def ttl(self):
+        return self._inst.ttl
+
+    @property
+    def key(self):
+        return self._desc.key_for(self._inst)
+
     @staticmethod
-    def _is_consistent(_):
+    def is_consistent(_):
         return True
 
-    async def items(self,
-                    skip=0,
-                    take=None,
-                    resolve_shortcuts=False) -> AsyncIterator[
-                                                TYPING.ANY_ITEM_CO]:
+    @staticmethod
+    async def _shortcut_resolver(i):
         shortcut = get_content_class('Shortcut')
-        inconsistent = []
+        if isinstance(i, shortcut):
+            return await i.get_target()
+        return i
 
-        collection_key = self._desc.key_for(self._inst)
-        ttl = await self._inst.ttl
-        get_multi = partial(db.get_multi, _collection={
-            'key': collection_key,
-            'ttl': ttl
-        })
-
-        async for i in super().items(skip, take, _multi_fetch=get_multi):
-            if self._is_consistent(i):
-                if resolve_shortcuts and isinstance(i, shortcut):
-                    i = await i.get_target()
-                if i is not None:
-                    yield i
-            else:
-                inconsistent.append(i.id)
-
-        if inconsistent:
-            await get_service('schema').clean_collection(collection_key,
-                                                         inconsistent,
-                                                         ttl)
+    def items(self, resolve_shortcuts=False):
+        get_multi = partial(db.get_multi, _coll=self)
+        items = super().items(_multi_fetch=get_multi)
+        if resolve_shortcuts:
+            items = items | pipe.map(self._shortcut_resolver) | pipe.if_not_none
+        return items
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:

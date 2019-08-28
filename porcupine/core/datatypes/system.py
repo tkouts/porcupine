@@ -88,7 +88,7 @@ class ChildrenCollection(ItemCollection):
         for item in items:
             await context.txn.delete(item)
 
-    def _is_consistent(self, item):
+    def is_consistent(self, item):
         return self._inst.id == item.parent_id
 
 

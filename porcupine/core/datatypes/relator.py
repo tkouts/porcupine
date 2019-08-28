@@ -113,7 +113,7 @@ class Relator1(Reference1, RelatorBase):
 
 
 class RelatorCollection(ItemCollection):
-    def _is_consistent(self, item):
+    def is_consistent(self, item):
         descriptor, inst = self._desc, self._inst
         rel_attr = getattr(item, descriptor.rel_attr, None)
         if rel_attr:

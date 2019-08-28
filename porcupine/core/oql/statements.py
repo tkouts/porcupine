@@ -1,29 +1,13 @@
 from functools import partial
-from aiostream import stream, pipe
 
-from porcupine import db
-from porcupine.exceptions import OqlError
+from porcupine import db, log, pipe
+from porcupine.core.stream.streamer import IdStreamer
+from porcupine.core.oql.runtime import get_var
 from porcupine.core.oql.tokens import Field, Variable, FunctionCall, \
     is_expression
 
 
 class BaseStatement:
-    funcs = {
-        'len': lambda i, x: len(x),
-        'slice': lambda i, x, start, end: x[start:end],
-        'hasattr': hasattr,
-    }
-
-    @staticmethod
-    def get_var(v, name):
-        try:
-            return v[name]
-        except KeyError:
-            raise OqlError(f'Unknown variable "{name}"')
-
-    def call_func(self, func, *args):
-        return self.funcs[func](*args)
-
     def prepare(self):
         raise NotImplementedError
 
@@ -36,12 +20,11 @@ class Select(BaseStatement):
         self.scope = scope
         self.select_list = select_list
         self.where_condition = None
+        self.order_by = None
+        self.range = None
         self.computed_fields = {}
-
-    def get_field(self, i, name, var_map):
-        if name in self.computed_fields:
-            return self.computed_fields[name](i, self, var_map)
-        return getattr(i, name)
+        self.optimized_feeder = None
+        self.apply_range_prematurely = False
 
     def prepare(self):
         unnamed_expressions = 0
@@ -61,7 +44,24 @@ class Select(BaseStatement):
                 self.computed_fields[field_spec.alias] = field_spec.expr
 
         if self.where_condition:
+            self.optimized_feeder = self.where_condition.optimize()
             self.where_condition = self.where_condition.compile()
+
+        order_by = None
+        if self.order_by:
+            if self.order_by.expr.is_indexed:
+                order_by = self.order_by.expr
+                if self.optimized_feeder is None:
+                    self.optimized_feeder = self.order_by.expr.get_index_lookup()
+                    if self.order_by.order == 'desc':
+                        self.optimized_feeder.reversed = True
+            self.order_by.expr = self.order_by.expr.compile()
+
+        if self.range and self.optimized_feeder \
+                and order_by == self.optimized_feeder.sort_order:
+            self.apply_range_prematurely = True
+
+        log.debug(f'Optimized Feeder: {self.optimized_feeder}')
 
     def extract_fields(self, i, v):
         return {
@@ -72,19 +72,36 @@ class Select(BaseStatement):
     async def execute(self, variables):
         scope = self.scope.item_id
         if isinstance(scope, Variable):
-            scope = self.get_var(variables, scope)
+            scope = get_var(variables, scope)
 
         item = await db.get_item(scope, quiet=False)
         # TODO: check we have a valid collection
-        feeder = stream.iterate(getattr(item, self.scope.collection).items())
+        feeder = getattr(item, self.scope.collection)
+        if self.optimized_feeder:
+            feeder = self.optimized_feeder(self, scope, variables)
+
+        if isinstance(feeder, IdStreamer):
+            feeder = feeder.items()
 
         if self.where_condition:
             flt = partial(self.where_condition, s=self, v=variables)
             feeder |= pipe.filter(flt)
+            # TODO: filter based on is_collection
+
+        # print(self.apply_range_prematurely)
+        if self.apply_range_prematurely:
+            feeder |= pipe.getitem(self.range)
+
+        if self.order_by:
+            key = partial(self.order_by.expr, s=self, v=variables)
+            reverse = self.order_by.order == 'desc'
+            feeder |= pipe.key_sort(key, reverse=reverse)
+
+        if self.range and not self.apply_range_prematurely:
+            feeder |= pipe.getitem(self.range)
 
         if self.select_list:
             field_extractor = partial(self.extract_fields, v=variables)
             feeder = feeder | pipe.map(field_extractor)
 
-        async with feeder.stream() as streamer:
-            return [result async for result in streamer]
+        return [result async for result in feeder]

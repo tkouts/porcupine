@@ -28,11 +28,10 @@ class EmbeddedCollection(ItemCollection):
         with system_override():
             return await super().get_item_by_id(item_id, quiet=quiet)
 
-    async def items(self, skip=0, take=None,
-                    resolve_shortcuts=False) -> AsyncIterator[
+    async def items(self, resolve_shortcuts=False) -> AsyncIterator[
                                                 TYPING.COMPOSITE_CO]:
         with system_override():
-            async for item in super().items(skip, take):
+            async for item in super().items():
                 yield item
 
     async def add(self, *composites: TYPING.COMPOSITE_CO):
