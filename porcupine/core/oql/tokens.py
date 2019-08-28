@@ -200,7 +200,7 @@ class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):
 
 FieldSpec = namedlist('FieldSpec', 'expr alias')
 Scope = namedlist('Scope', 'item_id collection')
-OrderBy = namedlist('OrderBy', 'expr order')
+OrderBy = namedlist('OrderBy', 'expr desc')
 
 
 def is_expression(t):

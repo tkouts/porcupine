@@ -53,7 +53,7 @@ class Select(BaseStatement):
                 order_by = self.order_by.expr
                 if self.optimized_feeder is None:
                     self.optimized_feeder = self.order_by.expr.get_index_lookup()
-                    if self.order_by.order == 'desc':
+                    if self.order_by.desc:
                         self.optimized_feeder.reversed = True
             self.order_by.expr = self.order_by.expr.compile()
 
@@ -94,8 +94,7 @@ class Select(BaseStatement):
 
         if self.order_by:
             key = partial(self.order_by.expr, s=self, v=variables)
-            reverse = self.order_by.order == 'desc'
-            feeder |= pipe.key_sort(key, reverse=reverse)
+            feeder |= pipe.key_sort(key, reverse=self.order_by.desc)
 
         if self.range and not self.apply_range_prematurely:
             feeder |= pipe.getitem(self.range)

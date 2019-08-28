@@ -144,13 +144,13 @@ class OqlParser(Parser):
 
     @_('select_statement ORDER BY expr')
     def select_statement(self, p):
-        p.select_statement.order_by = OrderBy(p.expr, 'asc')
+        p.select_statement.order_by = OrderBy(p.expr, False)
         return p.select_statement
 
     @_('select_statement ORDER BY expr ASC',
        'select_statement ORDER BY expr DESC')
     def select_statement(self, p):
-        p.select_statement.order_by = OrderBy(p.expr, p[4])
+        p.select_statement.order_by = OrderBy(p.expr, p[4] == 'desc')
         return p.select_statement
 
     @_('select_statement RANGE INT "-" INT')
