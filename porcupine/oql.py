@@ -1,7 +1,7 @@
 import inspect
 from lru import LRU
 from porcupine.core.oql import parse, prepare
-from porcupine.exceptions import OqlSyntaxError
+# from porcupine.exceptions import OqlSyntaxError
 
 
 _query_cache = LRU(100)
