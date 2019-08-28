@@ -1,3 +1,4 @@
+from sortedcontainers import SortedList
 from typing import TYPE_CHECKING, TypeVar, Dict, List, Any, ClassVar, Type
 
 
@@ -49,6 +50,12 @@ class _Hinter:
             self.RECYCLE_BIN_CO = TypeVar('RECYCLE_BIN_CO', bound=RecycleBin,
                                           covariant=True)
             self.ITEM_TYPE = Type[self.ITEM_CO]
+
+            ##############
+            # Containers #
+            ##############
+
+            self.SORTED_LIST_TYPE = Type[SortedList]
 
             #########
             # Other #
