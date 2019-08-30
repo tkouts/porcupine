@@ -4,7 +4,7 @@ from functools import partial
 from namedlist import namedlist
 
 from porcupine.core.services import db_connector
-from porcupine.core.utils.date import DateTime
+from porcupine.core.utils.date import DateTime, Date
 from porcupine.connectors.base.cursor import Range
 from porcupine.pipe import filter
 
@@ -42,8 +42,10 @@ class IndexLookup(namedlist('IndexLookup',
         return self.index_name
 
     @staticmethod
-    def date_to_utc(date: DateTime):
-        return date.in_timezone('UTC').isoformat()
+    def date_to_utc(date: Date):
+        if isinstance(date, DateTime):
+            date = date.in_timezone('UTC')
+        return date.isoformat()
 
     def __call__(self, statement, scope, v):
         feeder = db_connector().indexes[self.index_name].get_cursor()
@@ -51,11 +53,11 @@ class IndexLookup(namedlist('IndexLookup',
         if self.bounds is not None:
             bounds = self.bounds(None, statement, v)
             if isinstance(bounds, Range):
-                if isinstance(bounds.l_bound, DateTime):
+                if isinstance(bounds.l_bound, Date):
                     bounds.l_bound = self.date_to_utc(bounds.l_bound)
-                if isinstance(bounds.u_bound, DateTime):
+                if isinstance(bounds.u_bound, Date):
                     bounds.u_bound = self.date_to_utc(bounds.u_bound)
-            elif isinstance(bounds, DateTime):
+            elif isinstance(bounds, Date):
                 bounds = self.date_to_utc(bounds)
             feeder.set(bounds)
         if self.reversed:

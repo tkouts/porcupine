@@ -28,7 +28,7 @@ class OqlLexer(Lexer):
         'and', 'or', 'not'
     }
 
-    functions = {'len', 'slice', 'hasattr', 'date'}
+    functions = {'len', 'slice', 'hasattr', 'datetime', 'date'}
 
     literals = {'=', '+', '-', '*', '/', '(', ')', '.', ','}
 
