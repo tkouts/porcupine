@@ -36,7 +36,6 @@ def sort(reverse: bool = False):
         init = AsyncSortedList(async_reverse=reverse)
         item_streamer |= chunks(20000)
         item_streamer |= reduce(init.reduce_sort, initializer=init)
-        item_streamer |= flatten()
         return item_streamer
     return sort_wrapper
 
@@ -46,6 +45,5 @@ def key_sort(key: Callable, reverse: bool = False):
         init = AsyncSortedKeyList(key=key, async_reverse=reverse)
         item_streamer |= chunks(20000)
         item_streamer |= reduce(init.reduce_sort, initializer=init)
-        item_streamer |= flatten()
         return item_streamer
     return key_sort_wrapper

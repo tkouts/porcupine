@@ -94,7 +94,11 @@ class Select(BaseStatement):
 
         if self.order_by:
             key = partial(self.order_by.expr, s=self, v=variables)
-            feeder |= pipe.key_sort(key, reverse=self.order_by.desc)
+            feeder = (
+                feeder |
+                pipe.key_sort(key, reverse=self.order_by.desc) |
+                pipe.flatten()
+            )
 
         if self.range and not self.apply_range_prematurely:
             feeder |= pipe.getitem(self.range)
