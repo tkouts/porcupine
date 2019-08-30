@@ -42,11 +42,13 @@ class DataType:
         return self.lock_on_update or self.unique
 
     def get_value(self, instance, snapshot=True):
-        if snapshot and self.storage_key in instance.__snapshot__:
+        storage_key = self.storage_key
+        i_snapshot = instance.__snapshot__
+        if snapshot and storage_key in i_snapshot:
             # modified attr
-            return instance.__snapshot__[self.storage_key]
+            return i_snapshot[storage_key]
         storage = getattr(instance, self.storage)
-        return getattr(storage, self.storage_key, self.default)
+        return getattr(storage, storage_key, self.default)
 
     def validate_value(self, instance, value):
         if instance is not None:
@@ -81,18 +83,20 @@ class DataType:
     def set_default(self, instance, value=None):
         if value is None:
             value = self.default
+        storage_key = self.storage_key
         storage = getattr(instance, self.storage)
         # add to snapshot in order to validate
         if not instance.__is_new__:
-            instance.__snapshot__[self.storage_key] = value
-        setattr(storage, self.storage_key, value)
+            instance.__snapshot__[storage_key] = value
+        setattr(storage, storage_key, value)
 
     def snapshot(self, instance, new_value, previous_value):
         storage_key = self.storage_key
+        i_snapshot = instance.__snapshot__
         if new_value != previous_value:
-            instance.__snapshot__[storage_key] = new_value
-        elif storage_key in instance.__snapshot__:
-            del instance.__snapshot__[storage_key]
+            i_snapshot[storage_key] = new_value
+        elif storage_key in i_snapshot:
+            del i_snapshot[storage_key]
 
     def validate(self, value) -> None:
         """

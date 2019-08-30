@@ -6,7 +6,6 @@ from porcupine.core.utils.collections import FrozenDict
 from porcupine.exceptions import DBAlreadyExists
 from porcupine.connectors.base.transaction import Transaction
 from porcupine.connectors.base.persist import DefaultPersistence
-# from porcupine.connectors.base.join import Join
 
 
 class BaseConnector(metaclass=abc.ABCMeta):
@@ -121,53 +120,43 @@ class BaseConnector(metaclass=abc.ABCMeta):
         return key, key_exists
 
     # item operations
+    @abc.abstractmethod
     async def key_exists(self, key):
         raise NotImplementedError
 
-    # @abc.abstractmethod
+    @abc.abstractmethod
     async def get_raw(self, key, quiet=True):
         raise NotImplementedError
 
-    # @abc.abstractmethod
+    @abc.abstractmethod
     async def get_multi_raw(self, keys):
         raise NotImplementedError
 
+    @abc.abstractmethod
     def insert_multi(self, insertions, ttl=None) -> list:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def upsert_multi(self, upsertions, ttl=None):
         raise NotImplementedError
 
+    @abc.abstractmethod
     def delete_multi(self, deletions):
         raise NotImplementedError
 
     def touch_multi(self, touches):
         pass
 
+    @abc.abstractmethod
     def mutate_in(self, item_id, mutations_dict: dict):
         raise NotImplementedError
 
+    @abc.abstractmethod
     def append_multi(self, appends):
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def swap_if_not_modified(self, key, xform, ttl=None):
-        raise NotImplementedError
-
-    # atomic operations
-    # @abc.abstractmethod
-    async def get_atomic(self, object_id, name):
-        raise NotImplementedError
-
-    # @abc.abstractmethod
-    async def set_atomic(self, object_id, name, value):
-        raise NotImplementedError
-
-    # @abc.abstractmethod
-    async def delete_atomic(self, object_id, name):
-        raise NotImplementedError
-
-    # @abc.abstractmethod
-    async def increment_atomic(self, object_id, name, amount, default):
         raise NotImplementedError
 
     # transaction
@@ -182,41 +171,11 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def get_index(self, data_type):
         return self.IndexType(self, data_type)
 
-    # def get_cursor(self, index_name, value=None, c_range=None):
-    #     cursor = self.CursorType(self, self.indexes[index_name])
-    #     if c_range is None:
-    #         cursor.set(value)
-    #     else:
-    #         cursor.set_range(c_range)
-    #     return cursor
-    #
-    # def get_cursor_list(self, conditions):
-    #     cur_list = []
-    #     for index, value in conditions:
-    #         cursor = self.CursorType(self, self.indexes[index])
-    #         if isinstance(value, (list, tuple)):
-    #             is_reversed = len(value) == 3 and value[2]
-    #             cursor.set_range(value[0], value[1])
-    #             if is_reversed:
-    #                 cursor.reverse()
-    #         else:
-    #             cursor.set(value)
-    #         cur_list.append(cursor)
-    #     return cur_list
-    #
-    # def query(self, conditions):
-    #     cur_list = self.get_cursor_list(conditions)
-    #     if len(cur_list) == 1:
-    #         return cur_list[0]
-    #     else:
-    #         c_join = Join(self, cur_list)
-    #         return c_join
-
     # management
-    # @abc.abstractmethod
+    @abc.abstractmethod
     async def truncate(self, **options):
         raise NotImplementedError
 
-    # @abc.abstractmethod
+    @abc.abstractmethod
     def close(self):
         raise NotImplementedError

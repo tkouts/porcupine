@@ -1,7 +1,5 @@
-from sanic.response import json, redirect
-
-from porcupine import App
-from porcupine import db, context_user
+from porcupine import App, db, context_user
+from porcupine.response import json, redirect
 
 
 class Auth(App):

@@ -1,25 +1,18 @@
-from arrow import api, Arrow
+from pendulum import parse, instance, DateTime, Date, now
 
 
-class JsonArrow(Arrow):
-    date_only = False
-
-    def __json__(self):
-        if self.date_only:
-            return f'"{self.date().isoformat()}"'
-        return f'"{self.isoformat()}"'
+DATE_TYPES = {DateTime, Date}
 
 
-_factory = api.factory(JsonArrow)
+def get(dt, date_only=False, **options):
+    if isinstance(dt, str):
+        parsed = parse(dt, **options)
+    else:
+        parsed = instance(dt, **options)
+    if date_only:
+        return parsed.date()
+    return parsed
 
 
-def get(*args, **kwargs) -> JsonArrow:
-    return _factory.get(*args, **kwargs)
-
-
-def utcnow() -> JsonArrow:
-    return _factory.utcnow()
-
-
-def now(tz=None) -> JsonArrow:
-    return _factory.now(tz)
+def utcnow() -> DateTime:
+    return now('UTC')

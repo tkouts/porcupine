@@ -1,7 +1,7 @@
 import asyncio
 import copy
 import functools
-from typing import List, ClassVar
+from typing import List, ClassVar, Type
 
 from porcupine.hinting import TYPING
 from porcupine.config.default import DEFAULTS
@@ -19,7 +19,7 @@ class ElasticMeta(type):
             dct['__slots__'] = ()
         return super().__new__(mcs, name, bases, dct)
 
-    def __init__(cls: 'Elastic', name, bases, dct):
+    def __init__(cls: Type['Elastic'], name, bases, dct):
         schema = {}
         field_spec = []
         ext_spec = []
@@ -56,7 +56,7 @@ class ElasticMeta(type):
 
 
 class ElasticSlotsBase:
-    __slots__ = '__storage__', '_ext', '_snap', '__is_new__'
+    __slots__ = '__storage__', '__externals__', '__snapshot__', '__is_new__'
 
 
 class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
@@ -109,9 +109,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     def __init__(self, dict_storage=None):
         if dict_storage is None:
             dict_storage = {}
-        self._ext = None
-        self._snap = None
         self.__is_new__ = 'id' not in dict_storage
+        self.__snapshot__ = {}
+        self.__externals__ = self.__ext_record__()
+
         current_sig = type(self).__sig__
 
         if self.__is_new__:
@@ -139,43 +140,34 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 self.sig = str(id(self))
 
     @property
-    def __snapshot__(self):
-        if self._snap is None:
-            self._snap = {}
-        return self._snap
-
-    @property
-    def __externals__(self) -> storage:
-        if self._ext is None:
-            self._ext = self.__ext_record__()
-        return self._ext
-
-    @property
     def friendly_name(self):
         return '{0}({1})'.format(self.id, self.content_class)
 
     def __reset__(self) -> None:
-        snapshot_items = self._snap.items()
-        self.__storage__.update({
+        snapshot_items = self.__snapshot__.items()
+        store = self.__storage__
+        externals = self.__externals__
+        store.update({
             k: v for k, v in snapshot_items
-            if hasattr(self.__storage__, k)
+            if hasattr(store, k)
         })
-        self.__externals__.update({
+        externals.update({
             k: v for k, v in snapshot_items
-            if hasattr(self.__externals__, k)
+            if hasattr(externals, k)
         })
-        self._snap = {}
+        self.__snapshot__ = {}
 
     def __repr__(self) -> str:
-        if self._snap:
-            store = self.__storage__.as_dict()
+        _store = self.__storage__
+        if self.__snapshot__:
+            store = _store.as_dict()
             store.update({
-                k: v for k, v in self._snap.items()
-                if hasattr(self.__storage__, k)
+                k: v for k, v in self.__snapshot__.items()
+                if hasattr(_store, k)
             })
             return repr(self.__record__(**store))
         else:
-            return repr(self.__storage__)
+            return repr(_store)
 
     def __add_defaults(self, data_types: List[DataType]) -> None:
         for dt in data_types:
@@ -189,17 +181,15 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             return getattr(self, attr_name)
 
     def to_dict(self) -> dict:
+        store = self.__storage__
         dct = {
-            data_type.name: getattr(self.__storage__,
+            data_type.name: getattr(store,
                                     data_type.storage_key,
                                     data_type.default)
             for data_type in self.view_data_types()
         }
         dct['_type'] = self.content_class
         return dct
-
-    # ujson hook
-    toDict = to_dict
 
     @property
     def content_class(self) -> str:

@@ -7,10 +7,12 @@ import hashlib
 import random
 import re
 from typing import Union
+
 import mmh3
 
 from porcupine.core.context import context
 from porcupine.core.utils.collections import WriteOnceDict
+from porcupine.core.utils.date import DATE_TYPES
 
 VALID_ID_CHARS = [
     chr(x) for x in
@@ -19,6 +21,13 @@ VALID_ID_CHARS = [
     list(range(ord('0'), ord('9')))]
 
 ELASTIC_MAP = WriteOnceDict()
+
+
+def default_json_encoder(obj):
+    if obj.__class__ in DATE_TYPES:
+        return obj.isoformat()
+    elif hasattr(obj, 'to_dict'):
+        return obj.to_dict()
 
 
 def chunks(l, n):

@@ -4,7 +4,7 @@ from functools import partial
 from namedlist import namedlist
 
 from porcupine.core.services import db_connector
-from porcupine.core.utils.date import JsonArrow
+from porcupine.core.utils.date import DateTime
 from porcupine.connectors.base.cursor import Range
 from porcupine.pipe import filter
 
@@ -42,8 +42,8 @@ class IndexLookup(namedlist('IndexLookup',
         return self.index_name
 
     @staticmethod
-    def date_to_utc(date):
-        return date.to('UTC').for_json()
+    def date_to_utc(date: DateTime):
+        return date.in_timezone('UTC').isoformat()
 
     def __call__(self, statement, scope, v):
         feeder = db_connector().indexes[self.index_name].get_cursor()
@@ -51,11 +51,11 @@ class IndexLookup(namedlist('IndexLookup',
         if self.bounds is not None:
             bounds = self.bounds(None, statement, v)
             if isinstance(bounds, Range):
-                if isinstance(bounds.l_bound, JsonArrow):
+                if isinstance(bounds.l_bound, DateTime):
                     bounds.l_bound = self.date_to_utc(bounds.l_bound)
-                if isinstance(bounds.u_bound, JsonArrow):
+                if isinstance(bounds.u_bound, DateTime):
                     bounds.u_bound = self.date_to_utc(bounds.u_bound)
-            elif isinstance(bounds, JsonArrow):
+            elif isinstance(bounds, DateTime):
                 bounds = self.date_to_utc(bounds)
             feeder.set(bounds)
         if self.reversed:

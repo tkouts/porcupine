@@ -1,10 +1,10 @@
-from datetime import datetime
 from porcupine.core.utils import date
-from porcupine.datatypes import String
+from porcupine.datatypes import DataType
 
 
-class DateTime(String):
+class DateTime(DataType):
     """Datetime data type"""
+    safe_type = date.DateTime
 
     def __init__(self, default=None, **kwargs):
         super().__init__(default, allow_none=True, **kwargs)
@@ -12,32 +12,26 @@ class DateTime(String):
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        iso_string = super().__get__(instance, owner)
-        if iso_string is not None:
-            return date.get(iso_string)
+        value = super().__get__(instance, owner)
+        if value is not None and isinstance(value, str):
+            # convert to pendulum date
+            value = date.get(value, date_only=self.safe_type == date.Date)
+            storage = getattr(instance, self.storage)
+            setattr(storage, self.storage_key, value)
+        return value
 
     def __set__(self, instance, value):
-        if isinstance(value, str):
-            # we need to validate
-            value = date.get(value)
-        super().__set__(instance, value and value.isoformat())
+        if value is not None:
+            date_only = self.safe_type == date.Date
+            if not isinstance(value, self.safe_type):
+                # we need to validate
+                value = date.get(value, date_only=date_only)
+            if not date_only:
+                # convert to utc
+                value = value.in_timezone('UTC')
+        super().__set__(instance, value)
 
 
 class Date(DateTime):
     """Date data type"""
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        arrow_obj = super().__get__(instance, owner)
-        if arrow_obj is not None:
-            arrow_obj.date_only = True
-        return arrow_obj
-
-    def __set__(self, instance, value):
-        if isinstance(value, str):
-            # we need to validate
-            value = date.get(value)
-        if isinstance(value, datetime):
-            value = value.date()
-        String.__set__(self, instance, value and value.isoformat())
+    safe_type = date.Date

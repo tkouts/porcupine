@@ -1,9 +1,8 @@
 import asyncio
 
-from sanic.response import json, HTTPResponse
 
-from porcupine import App
-from porcupine import db, exceptions
+from porcupine import App, db, exceptions
+from porcupine.response import json, HTTPResponse
 from porcupine.core.schema.elastic import Elastic
 from porcupine.core.schema.composite import Composite
 from porcupine.datatypes import Composition, Embedded, ReferenceN

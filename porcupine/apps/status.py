@@ -1,6 +1,6 @@
 import multiprocessing
-from sanic.response import json
 from porcupine import App, __version__
+from porcupine.response import json
 from porcupine.core.services import get_service
 
 

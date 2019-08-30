@@ -1,20 +1,26 @@
 import asyncio
 import random
-import ujson
+import orjson
+from functools import partial
 
 import couchbase.subdocument as sub_doc
 import couchbase.experimental
 from couchbase.exceptions import NotFoundError, DocumentNotJsonError, \
     SubdocPathNotFoundError, KeyExistsError, NotStoredError, \
     CouchbaseNetworkError
+
 from porcupine import exceptions, log
 from porcupine.core.context import context_cacheable
+from porcupine.core.utils import default_json_encoder
 from porcupine.connectors.base.connector import BaseConnector
 
 from .index import Index
 
 couchbase.experimental.enable()
-couchbase.set_json_converters(ujson.dumps, ujson.loads)
+couchbase.set_json_converters(
+    partial(orjson.dumps, default=default_json_encoder),
+    orjson.loads
+)
 
 
 class Couchbase(BaseConnector):
@@ -210,6 +216,9 @@ class Couchbase(BaseConnector):
         # for index in old_indexes:
         #     log.info('Dropping index {0}'.format(index))
         #     mgr.drop_n1ql_index(index, ignore_missing=True)
+
+    async def truncate(self, **options):
+        ...
 
     async def close(self):
         pass

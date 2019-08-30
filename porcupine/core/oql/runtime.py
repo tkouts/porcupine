@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from porcupine.exceptions import OqlError
 from porcupine.core.utils import date
 
@@ -15,12 +17,17 @@ def get_var(var_map, var_name):
         raise OqlError(f'Unknown variable "{var_name}"')
 
 
+@lru_cache(maxsize=100, typed=False)
+def get_date(x):
+    return date.get(x)
+
+
 environment = {
     # functions
     'len': lambda i, x: len(x),
     'slice': lambda i, x, start, end: x[start:end],
     'hasattr': hasattr,
-    'date': lambda i, x: date.get(x),
+    'date': lambda i, x: get_date(x),
 
     # helpers
     'get_field': get_field,
