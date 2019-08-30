@@ -6,11 +6,13 @@ from namedlist import namedlist
 from porcupine.core.services import db_connector
 from porcupine.core.utils.date import DateTime, Date
 from porcupine.connectors.base.cursor import Range
-from porcupine.pipe import filter
+from porcupine.pipe import filter, id_getter
 
 __all__ = (
     'DynamicRange',
     'IndexLookup',
+    'Intersection',
+    'Union',
 )
 
 
@@ -66,3 +68,17 @@ class IndexLookup(namedlist('IndexLookup',
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
         return feeder
+
+
+class Intersection(namedlist('Intersection', 'first second'), Feeder):
+    def __call__(self, statement, scope, v):
+        first_feeder = self.first(statement, scope, v)
+        second_feeder = self.second(statement, scope, v)
+        return first_feeder.intersection(second_feeder)
+
+
+class Union(namedlist('Union', 'first second'), Feeder):
+    def __call__(self, statement, scope, v):
+        first_feeder = self.first(statement, scope, v)
+        second_feeder = self.second(statement, scope, v)
+        return first_feeder.union(second_feeder)

@@ -19,8 +19,6 @@ class FrozenDict(collections.Mapping):
     def to_dict(self):
         return {**self._dct}
 
-    toDict = to_dict
-
 
 class WriteOnceDict(collections.MutableMapping, dict):
     # dict implementations to override the MutableMapping versions

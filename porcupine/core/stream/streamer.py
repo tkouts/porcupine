@@ -23,6 +23,12 @@ class BaseStreamer(AsyncIterable):
         self.iterator = self.feeder | p
         return self
 
+    def intersection(self, other):
+        return IntersectionStreamer(self, other)
+
+    def union(self, other):
+        return UnionStreamer(self, other)
+
     async def count(self):
         n = 0
         async for _ in self:
@@ -58,3 +64,41 @@ class ItemStreamer(BaseStreamer):
             pipe.flatmap(multi_fetch, task_limit=1)
         )
         super().__init__(item_iterator)
+
+
+class CombinedIdStreamer(IdStreamer):
+    def __init__(self, streamer1: BaseStreamer, streamer2: BaseStreamer):
+        self.streamer1 = streamer1
+        if isinstance(streamer1, ItemStreamer):
+            streamer1 |= pipe.id_getter
+        self.streamer2 = streamer2
+        if isinstance(streamer2, ItemStreamer):
+            streamer2 |= pipe.id_getter
+        super().__init__(self._generator())
+
+    async def _generator(self):
+        yield None
+
+
+class IntersectionStreamer(CombinedIdStreamer):
+    async def _generator(self):
+        collection = []
+        async for sorted_collection in self.streamer1 | pipe.sort():
+            collection = sorted_collection
+        # print('COLLECTION', collection)
+        async for x in self.streamer2:
+            if x in collection:
+                yield x
+
+
+class UnionStreamer(CombinedIdStreamer):
+    async def _generator(self):
+        collection = []
+        async for sorted_collection in self.streamer1 | pipe.sort():
+            collection = sorted_collection
+        # print('COLLECTION', collection)
+        for x in collection:
+            yield x
+        async for x in self.streamer2:
+            if x not in collection:
+                yield x

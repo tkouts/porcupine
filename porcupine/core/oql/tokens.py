@@ -165,7 +165,7 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
             if self.operator == 'and':
                 if all(optimized):
                     # intersection
-                    return None
+                    return Intersection(*optimized)
                 elif any(optimized):
                     if optimized[0] is not None:
                         feeder = optimized[0]
@@ -178,7 +178,7 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
             if self.operator == 'or':
                 if all(optimized):
                     # union
-                    return None
+                    return Union(*optimized)
 
 
 class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):

@@ -51,7 +51,7 @@ class GenericItem(Removable, Elastic):
     acl: AclValue = Acl()
 
     # common attributes
-    name = String(required=True, unique=True)
+    name = String(required=True, unique=True, indexed=True)
     description = String(store_as='desc')
 
     def __init__(self, dict_storage=None):
