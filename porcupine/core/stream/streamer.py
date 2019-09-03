@@ -36,6 +36,11 @@ class BaseStreamer(AsyncIterable):
         return n
 
 
+class EmptyStreamer(BaseStreamer):
+    def __init__(self):
+        super().__init__(stream.empty())
+
+
 class IdStreamer(BaseStreamer):
 
     def items(self, _multi_fetch=db.get_multi) -> 'ItemStreamer':

@@ -6,7 +6,8 @@ from namedlist import namedlist
 from porcupine.core.services import db_connector
 from porcupine.core.utils.date import DateTime, Date
 from porcupine.connectors.base.cursor import Range
-from porcupine.pipe import filter, id_getter
+from porcupine.core.stream.streamer import EmptyStreamer
+from porcupine.pipe import filter
 
 __all__ = (
     'DynamicRange',
@@ -25,9 +26,8 @@ class DynamicRange(namedlist('DynamicRange',
 
 
 class Feeder:
-    @property
-    def sort_order(self):
-        return None
+    def __init__(self, *args, **kwargs):
+        self.sort_order = None
 
     def __call__(self, statement, scope, v):
         raise NotImplementedError
@@ -38,10 +38,8 @@ class IndexLookup(namedlist('IndexLookup',
                             default=None), Feeder):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-    @property
-    def sort_order(self):
-        return self.index_name
+        Feeder.__init__(self)
+        self.sort_order = self.index_name
 
     @staticmethod
     def date_to_utc(date: Date):
@@ -71,14 +69,45 @@ class IndexLookup(namedlist('IndexLookup',
 
 
 class Intersection(namedlist('Intersection', 'first second'), Feeder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        Feeder.__init__(self)
+
     def __call__(self, statement, scope, v):
         first_feeder = self.first(statement, scope, v)
         second_feeder = self.second(statement, scope, v)
+        if self.first.index_name == self.second.index_name:
+            ranged = next(feeder for feeder in (first_feeder, second_feeder)
+                          if feeder.is_ranged)
+            if ranged:
+                other = (second_feeder if ranged is first_feeder
+                         else first_feeder)
+                inter = ranged.bounds.intersection(other.bounds)
+                # print('INTER', inter)
+                if inter:
+                    first_feeder.set(inter)
+                    return first_feeder
+                return EmptyStreamer()
         return first_feeder.intersection(second_feeder)
 
 
 class Union(namedlist('Union', 'first second'), Feeder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        Feeder.__init__(self)
+
     def __call__(self, statement, scope, v):
         first_feeder = self.first(statement, scope, v)
         second_feeder = self.second(statement, scope, v)
+        if self.first.index_name == self.second.index_name:
+            ranged = next(feeder for feeder in (first_feeder, second_feeder)
+                          if feeder.is_ranged)
+            if ranged:
+                other = (second_feeder if ranged is first_feeder
+                         else first_feeder)
+                union = ranged.bounds.union(other.bounds)
+                # print('UNION', union)
+                if union:
+                    first_feeder.set(union)
+                    return first_feeder
         return first_feeder.union(second_feeder)

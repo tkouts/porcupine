@@ -52,10 +52,10 @@ class Select(BaseStatement):
             if self.order_by.expr.is_indexed:
                 order_by = self.order_by.expr
                 if self.optimized_feeder is None:
-                    self.optimized_feeder = self.order_by.expr.get_index_lookup()
+                    self.optimized_feeder = order_by.get_index_lookup()
                     if self.order_by.desc:
                         self.optimized_feeder.reversed = True
-            self.order_by.expr = self.order_by.expr.compile()
+            self.order_by.expr = order_by.compile()
 
         if self.range and self.optimized_feeder \
                 and order_by == self.optimized_feeder.sort_order:
@@ -79,6 +79,8 @@ class Select(BaseStatement):
         feeder = getattr(item, self.scope.collection)
         if self.optimized_feeder:
             feeder = self.optimized_feeder(self, scope, variables)
+
+        # print('FEEDER', feeder)
 
         if isinstance(feeder, IdStreamer):
             feeder = feeder.items()
