@@ -16,7 +16,7 @@ class FrozenDict(collections.Mapping):
     def __len__(self):
         return len(self._dct)
 
-    def to_dict(self):
+    def to_json(self):
         return {**self._dct}
 
 

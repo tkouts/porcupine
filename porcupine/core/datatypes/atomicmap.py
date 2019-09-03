@@ -58,12 +58,10 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
             return 0
         return super().__len__()
 
-    def to_dict(self):
+    def to_json(self):
         if self._dct is None:
             return None
-        return super().to_dict()
-
-    toDict = to_dict
+        return super().to_json()
 
 
 class AtomicMap(AsyncSetter, Dictionary):

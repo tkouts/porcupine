@@ -26,8 +26,8 @@ ELASTIC_MAP = WriteOnceDict()
 def default_json_encoder(obj):
     if obj.__class__ in DATE_TYPES:
         return obj.isoformat()
-    elif hasattr(obj, 'to_dict'):
-        return obj.to_dict()
+    elif hasattr(obj, 'to_json'):
+        return obj.to_json()
 
 
 def chunks(l, n):

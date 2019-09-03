@@ -180,7 +180,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         else:
             return getattr(self, attr_name)
 
-    def to_dict(self) -> dict:
+    def to_json(self) -> dict:
         store = self.__storage__
         dct = {
             data_type.name: getattr(store,
