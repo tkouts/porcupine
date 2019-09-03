@@ -3,6 +3,7 @@ from functools import partial
 
 from namedlist import namedlist
 
+from porcupine import db
 from porcupine.core.services import db_connector
 from porcupine.core.utils.date import DateTime, Date
 from porcupine.connectors.base.cursor import Range
@@ -11,6 +12,7 @@ from porcupine.pipe import filter
 
 __all__ = (
     'DynamicRange',
+    'CollectionFeeder',
     'IndexLookup',
     'Intersection',
     'Union',
@@ -27,10 +29,32 @@ class DynamicRange(namedlist('DynamicRange',
 
 class Feeder:
     def __init__(self, *args, **kwargs):
-        self.sort_order = None
+        self.ordered_by = None
+        self.desc = False
 
     def __call__(self, statement, scope, v):
         raise NotImplementedError
+
+
+class CollectionFeeder(namedlist('CollectionFeeder',
+                                 'collection reversed',
+                                 default=None), Feeder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.desc = True
+
+    @property
+    def ordered_by(self):
+        if self.collection in {'items', 'containers', 'children'}:
+            return 'created'
+
+    async def __call__(self, statement, scope, v):
+        item = await db.get_item(scope, quiet=False)
+        # TODO: check we have a valid collection
+        feeder = getattr(item, self.collection)
+        if self.reversed:
+            feeder.reverse()
+        return feeder
 
 
 class IndexLookup(namedlist('IndexLookup',
@@ -39,7 +63,7 @@ class IndexLookup(namedlist('IndexLookup',
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         Feeder.__init__(self)
-        self.sort_order = self.index_name
+        self.ordered_by = self.index_name
 
     @staticmethod
     def date_to_utc(date: Date):

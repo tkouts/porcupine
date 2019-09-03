@@ -1,10 +1,9 @@
 from lru import LRU
-from typing import AsyncIterator, AsyncIterable
+from typing import AsyncIterable
 from functools import partial
 
-from porcupine import pipe
 from porcupine.hinting import TYPING
-from porcupine import db, exceptions
+from porcupine import db, exceptions, pipe
 from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
 from porcupine.core.utils import get_content_class, get_collection_key

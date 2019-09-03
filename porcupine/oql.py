@@ -7,9 +7,7 @@ from porcupine.core.oql import parse, prepare
 _query_cache = LRU(100)
 
 
-async def execute(script, variables=None):
-    if variables is None:
-        variables = {}
+async def execute(script, **variables):
     if script in _query_cache:
         prepared = _query_cache[script]
     else:

@@ -153,9 +153,9 @@ class OqlParser(Parser):
         p.select_statement.order_by = OrderBy(p.expr, p[4] == 'desc')
         return p.select_statement
 
-    @_('select_statement RANGE INT "-" INT')
+    @_('select_statement RANGE expr "-" expr')
     def select_statement(self, p):
-        p.select_statement.range = slice(p.INT0 - 1, p.INT1)
+        p.select_statement.range = DynamicSlice(p.expr0, p.expr1)
         return p.select_statement
 
     # field spec
@@ -182,13 +182,13 @@ class OqlParser(Parser):
 
     # scope
 
-    @_('NAME')
+    @_('expr')
     def scope(self, p):
-        return Scope(p.NAME, 'children')
+        return Scope(p.expr, 'children')
 
-    @_('VAR')
-    def scope(self, p):
-        return Scope(Variable(p.VAR), 'children')
+    # @_('VAR')
+    # def scope(self, p):
+    #     return Scope(Variable(p.VAR), 'children')
 
     @_('scope "." NAME')
     def scope(self, p):

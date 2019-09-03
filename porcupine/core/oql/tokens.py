@@ -16,6 +16,7 @@ __all__ = (
     'FunctionCall',
     'Expression',
     'UnaryExpression',
+    'DynamicSlice',
     'FieldSpec',
     'Scope',
     'OrderBy',
@@ -198,8 +199,18 @@ class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):
         return source
 
 
+class Scope(namedlist('Scope', 'target collection')):
+    def __call__(self, statement, v):
+        return self.target(None, statement, v), self.collection
+
+
+class DynamicSlice(namedlist('DynamicSlice', 'low high')):
+    def __call__(self, statement, v):
+        return slice(self.low(None, statement, v) - 1,
+                     self.high(None, statement, v))
+
+
 FieldSpec = namedlist('FieldSpec', 'expr alias')
-Scope = namedlist('Scope', 'item_id collection')
 OrderBy = namedlist('OrderBy', 'expr desc')
 
 

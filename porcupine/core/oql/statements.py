@@ -1,10 +1,10 @@
+from inspect import isawaitable
 from functools import partial
 
 from porcupine import db, log, pipe
 from porcupine.core.stream.streamer import IdStreamer
-from porcupine.core.oql.runtime import get_var
-from porcupine.core.oql.tokens import Field, Variable, FunctionCall, \
-    is_expression
+from porcupine.core.oql.feeder import CollectionFeeder
+from porcupine.core.oql.tokens import Field, FunctionCall, is_expression
 
 
 class BaseStatement:
@@ -16,6 +16,11 @@ class BaseStatement:
 
 
 class Select(BaseStatement):
+    __slots__ = (
+        'scope', 'select_list', 'where_condition', 'order_by',
+        'range', 'computed_fields', 'feeder', 'apply_range_prematurely'
+    )
+
     def __init__(self, scope, select_list):
         self.scope = scope
         self.select_list = select_list
@@ -23,7 +28,7 @@ class Select(BaseStatement):
         self.order_by = None
         self.range = None
         self.computed_fields = {}
-        self.optimized_feeder = None
+        self.feeder = None
         self.apply_range_prematurely = False
 
     def prepare(self):
@@ -43,25 +48,34 @@ class Select(BaseStatement):
             if is_computed:
                 self.computed_fields[field_spec.alias] = field_spec.expr
 
+        self.scope.target = self.scope.target.compile()
+
         if self.where_condition:
-            self.optimized_feeder = self.where_condition.optimize()
+            self.feeder = self.where_condition.optimize()
             self.where_condition = self.where_condition.compile()
+
+        if self.feeder is None:
+            self.feeder = CollectionFeeder(self.scope.collection)
 
         order_by = None
         if self.order_by:
-            if self.order_by.expr.is_indexed:
-                order_by = self.order_by.expr
-                if self.optimized_feeder is None:
-                    self.optimized_feeder = order_by.get_index_lookup()
-                    if self.order_by.desc:
-                        self.optimized_feeder.reversed = True
+            order_by = self.order_by.expr
+            if order_by.is_indexed and isinstance(self.feeder,
+                                                  CollectionFeeder):
+                self.feeder = order_by.get_index_lookup()
             self.order_by.expr = order_by.compile()
 
-        if self.range and self.optimized_feeder \
-                and order_by == self.optimized_feeder.sort_order:
-            self.apply_range_prematurely = True
+        if self.range:
+            self.range.low = self.range.low.compile()
+            self.range.high = self.range.high.compile()
 
-        log.debug(f'Optimized Feeder: {self.optimized_feeder}')
+        if order_by == self.feeder.ordered_by:
+            if self.order_by.desc != self.feeder.desc:
+                self.feeder.reversed = True
+            if self.range:
+                self.apply_range_prematurely = True
+
+        log.debug(f'Feeder: {self.feeder}')
 
     def extract_fields(self, i, v):
         return {
@@ -70,17 +84,21 @@ class Select(BaseStatement):
         }
 
     async def execute(self, variables):
-        scope = self.scope.item_id
-        if isinstance(scope, Variable):
-            scope = get_var(variables, scope)
+        scope, _ = self.scope(self, variables)
 
-        item = await db.get_item(scope, quiet=False)
-        # TODO: check we have a valid collection
-        feeder = getattr(item, self.scope.collection)
-        if self.optimized_feeder:
-            feeder = self.optimized_feeder(self, scope, variables)
+        select_range = None
+        if self.range:
+            select_range = self.range(self, variables)
 
-        # print('FEEDER', feeder)
+        # print(select_range)
+
+        if not isinstance(self.feeder, CollectionFeeder):
+            # make sure scope is accessible
+            await db.get_item(scope, quiet=False)
+
+        feeder = self.feeder(self, scope, variables)
+        if isawaitable(feeder):
+            feeder = await feeder
 
         if isinstance(feeder, IdStreamer):
             feeder = feeder.items()
@@ -92,18 +110,18 @@ class Select(BaseStatement):
 
         # print(self.apply_range_prematurely)
         if self.apply_range_prematurely:
-            feeder |= pipe.getitem(self.range)
+            feeder |= pipe.getitem(select_range)
 
         if self.order_by:
             key = partial(self.order_by.expr, s=self, v=variables)
             feeder = (
                 feeder |
-                pipe.key_sort(key, reverse=self.order_by.desc) |
+                pipe.key_sort(key, _reverse=self.order_by.desc) |
                 pipe.flatten()
             )
 
-        if self.range and not self.apply_range_prematurely:
-            feeder |= pipe.getitem(self.range)
+        if select_range and not self.apply_range_prematurely:
+            feeder |= pipe.getitem(select_range)
 
         if self.select_list:
             field_extractor = partial(self.extract_fields, v=variables)

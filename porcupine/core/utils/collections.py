@@ -60,6 +60,17 @@ class AsyncList(collections.AsyncIterable, TYPING.SORTED_LIST_TYPE):
             yield i
 
 
+class AsyncReversedList(AsyncList, list):
+    def __init__(self, iterable=None):
+        super().__init__(async_reverse=True)
+        list.__init__(self, iterable or [])
+
+    @staticmethod
+    def populate(l, chunk):
+        l.extend(chunk)
+        return l
+
+
 # noinspection PyAbstractClass
 class AsyncSortedList(AsyncList, SortedList):
     def __init__(self, iterable=None, async_reverse=False):
