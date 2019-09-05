@@ -84,15 +84,15 @@ class Select(BaseStatement):
         }
 
     async def execute(self, variables):
-        scope, _ = self.scope(self, variables)
+        scope, collection = self.scope(self, variables)
 
         select_range = None
         if self.range:
             select_range = self.range(self, variables)
 
-        # print(select_range)
+        has_optimized_feeder = not isinstance(self.feeder, CollectionFeeder)
 
-        if not isinstance(self.feeder, CollectionFeeder):
+        if has_optimized_feeder:
             # make sure scope is accessible
             await db.get_item(scope, quiet=False)
 
@@ -103,10 +103,15 @@ class Select(BaseStatement):
         if isinstance(feeder, IdStreamer):
             feeder = feeder.items()
 
+        if has_optimized_feeder and collection in {'items', 'containers'}:
+            if collection == 'items':
+                feeder |= pipe.filter(lambda i: not i.is_collection)
+            else:
+                feeder |= pipe.filter(lambda i: i.is_collection)
+
         if self.where_condition:
             flt = partial(self.where_condition, s=self, v=variables)
             feeder |= pipe.filter(flt)
-            # TODO: filter based on is_collection
 
         # print(self.apply_range_prematurely)
         if self.apply_range_prematurely:
