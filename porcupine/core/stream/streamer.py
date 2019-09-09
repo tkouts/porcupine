@@ -1,30 +1,32 @@
 from typing import AsyncIterable
-from aiostream import stream
+from aiostream import stream, streamcontext
 
 from porcupine import pipe
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions
+from porcupine.core.stream.operators import reverse
 
 
 class BaseStreamer(AsyncIterable):
     def __init__(self, iterator: AsyncIterable):
         self.iterator = iterator
-
-    @property
-    def feeder(self):
-        return stream.iterate(self.iterator)
+        self.is_wrapped = False
 
     async def __aiter__(self):
-        async with self.feeder.stream() as streamer:
+        async with streamcontext(self.iterator) as streamer:
             async for x in streamer:
                 yield x
 
     def __or__(self, p: AsyncIterable):
-        self.iterator = self.feeder | p
+        iterator = self.iterator
+        if not self.is_wrapped:
+            iterator = stream.iterate(iterator)
+            self.is_wrapped = True
+        self.iterator = iterator | p
         return self
 
     def reverse(self):
-        self.iterator = self.feeder | pipe.reverse()
+        self.iterator = reverse(self.iterator)
 
     def intersection(self, other):
         return IntersectionStreamer(self, other)
