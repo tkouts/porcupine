@@ -182,10 +182,10 @@ class Couchbase(BaseConnector):
         design_doc = {
             'views': {},
             'options': {
-                'updateInterval': config.COUCH_VIEWS_UPDATE_INTERVAL,
-                'updateMinChanges': config.COUCH_VIEWS_UPDATE_MIN_CHANGES,
+                'updateInterval': int(config.COUCH_VIEWS_UPDATE_INTERVAL),
+                'updateMinChanges': int(config.COUCH_VIEWS_UPDATE_MIN_CHANGES),
                 'replicaUpdateMinChanges':
-                    config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES
+                    int(config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES)
             }
         }
         mgr = bucket.bucket_manager()
