@@ -70,7 +70,7 @@ class IdStreamer(BaseStreamer):
 class ItemStreamer(BaseStreamer):
     def __init__(self, id_iterator: IdStreamer, multi_fetch):
         item_iterator = (
-            id_iterator | pipe.chunks(40) |
+            id_iterator | pipe.chunks(20) |
             pipe.flatmap(multi_fetch, task_limit=1)
         )
         super().__init__(item_iterator)
