@@ -35,7 +35,7 @@ class CursorIterator(AbstractCursorIterator):
         is_ranged = self.is_ranged
 
         if self.reduce:
-            kwargs['group_level'] = 1
+            # kwargs['group_level'] = 1
             # range
             kwargs['mapkey_range'] = [
                 [self._scope],
