@@ -75,8 +75,13 @@ class BaseConnector(metaclass=abc.ABCMeta):
     async def get_multi(self, object_ids):
         loads = self.persist.loads
         if object_ids:
-            for chunk in utils.chunks(list(object_ids),
-                                      self.multi_fetch_chunk_size):
+            if len(object_ids) > self.multi_fetch_chunk_size:
+                # split in chunks
+                chunks = utils.chunks(object_ids, self.multi_fetch_chunk_size)
+            else:
+                chunks = [object_ids]
+
+            for chunk in chunks:
                 fetched = {}
                 for item_id in chunk:
                     if context.txn is not None and item_id in context.txn:
