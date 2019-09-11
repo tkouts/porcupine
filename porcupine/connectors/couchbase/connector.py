@@ -217,6 +217,17 @@ class Couchbase(BaseConnector):
         #     log.info('Dropping index {0}'.format(index))
         #     mgr.drop_n1ql_index(index, ignore_missing=True)
 
+    def config(self):
+        config = self.server.config
+        return {
+            'v_update_interval':
+                int(config.COUCH_VIEWS_UPDATE_INTERVAL),
+            'v_update_min_changes':
+                int(config.COUCH_VIEWS_UPDATE_MIN_CHANGES),
+            'v_replica_update_min_changes':
+                int(config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES)
+        }
+
     async def truncate(self, **options):
         ...
 

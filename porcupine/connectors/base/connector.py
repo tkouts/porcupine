@@ -172,6 +172,9 @@ class BaseConnector(metaclass=abc.ABCMeta):
         return self.IndexType(self, data_type)
 
     # management
+    def config(self):
+        return {}
+
     @abc.abstractmethod
     async def truncate(self, **options):
         raise NotImplementedError

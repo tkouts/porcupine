@@ -22,5 +22,6 @@ class Db(AbstractService):
 
     async def status(self):
         return {
-            'active_txns': self.connector.active_txns
+            'active_txns': self.connector.active_txns,
+            'config': self.connector.config()
         }
