@@ -7,6 +7,7 @@ from porcupine import db, exceptions, pipe
 from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
 from porcupine.core.utils import get_content_class, get_collection_key
+from porcupine.core.schema.storage import UNSET
 from porcupine.core.stream.streamer import IdStreamer
 from .asyncsetter import AsyncSetterValue
 from .external import Text
@@ -88,7 +89,8 @@ class CollectionIterator(AsyncIterable):
     async def __aiter__(self) -> TYPING.ITEM_ID:
         descriptor, instance = self._desc, self._inst
         dirtiness = 0.0
-        current_value = descriptor.get_value(instance)
+        storage = getattr(instance, descriptor.storage)
+        current_value = getattr(storage, descriptor.storage_key)
         chunk_no = descriptor.current_chunk(instance)
         resolver = CollectionResolver(instance.id, descriptor.name, chunk_no)
 
@@ -101,7 +103,7 @@ class CollectionIterator(AsyncIterable):
                 for item_id in resolver.resolve_chunk(append):
                     yield item_id
 
-        if current_value is not None:
+        if current_value is not UNSET:
             # collection is small and fetched
             if append:
                 # w/appends: need to recompute
@@ -128,7 +130,7 @@ class CollectionIterator(AsyncIterable):
         if total_items < 301:
             # set storage / no snapshot
             # cache / mark as fetched
-            storage = getattr(instance, descriptor.storage)
+            # storage = getattr(instance, descriptor.storage)
             setattr(storage, descriptor.storage_key, collection)
 
         # compute dirtiness factor

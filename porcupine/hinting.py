@@ -1,5 +1,5 @@
 from sortedcontainers import SortedList
-from typing import TYPE_CHECKING, TypeVar, Dict, List, Any, ClassVar, Type
+from typing import TYPE_CHECKING, TypeVar, Dict, Any, ClassVar, Type
 
 
 class _Hinter:
@@ -54,8 +54,10 @@ class _Hinter:
             ##############
             # Containers #
             ##############
+            from porcupine.core.schema.storage import Record
 
             self.SORTED_LIST_TYPE = Type[SortedList]
+            self.STORAGE_TYPE = Type[Record]
 
             #########
             # Other #

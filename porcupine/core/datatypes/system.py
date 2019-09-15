@@ -2,7 +2,7 @@ from porcupine import db, exceptions
 from porcupine.hinting import TYPING
 from porcupine.contract import contract
 from porcupine.core.context import system_override, context
-from porcupine.core.services import db_connector, get_service
+from porcupine.core.services import db_connector
 from porcupine.core.utils import permissions, date, add_uniques, \
     remove_uniques, get_content_class
 from .collection import ItemCollection
@@ -42,16 +42,6 @@ class Acl(AtomicMap):
     # HTTP views
     async def get(self, instance, _):
         return await instance.effective_acl
-
-
-class SchemaSignature(String):
-    def __init__(self):
-        super().__init__(required=True, readonly=True, protected=True)
-
-    async def on_change(self, instance, value, old_value):
-        await super().on_change(instance, value, old_value)
-        await get_service('schema').clean_schema(instance.id,
-                                                 await instance.ttl)
 
 
 class ChildrenCollection(ItemCollection):

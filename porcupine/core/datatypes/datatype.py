@@ -3,6 +3,7 @@ from collections import MutableSequence, MutableMapping
 
 from porcupine import db, exceptions
 from porcupine.core.context import context
+from porcupine.core.schema.storage import UNSET
 from porcupine.response import json
 from porcupine.core.services import db_connector
 from porcupine.core.utils import get_key_of_unique
@@ -48,7 +49,10 @@ class DataType:
             # modified attr
             return i_snapshot[storage_key]
         storage = getattr(instance, self.storage)
-        return getattr(storage, storage_key, self.default)
+        value = getattr(storage, storage_key)
+        if value is UNSET:
+            value = self.default
+        return value
 
     def validate_value(self, instance, value):
         if instance is not None:

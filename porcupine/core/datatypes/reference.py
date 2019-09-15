@@ -2,6 +2,7 @@ from porcupine import db, exceptions
 from porcupine.contract import contract
 from porcupine.core.context import context, system_override
 from porcupine.core.services import db_connector
+from porcupine.core.schema.storage import UNSET
 from porcupine.core import utils
 from .collection import ItemCollection
 from .datatype import DataType
@@ -136,7 +137,7 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
     def current_chunk(self, instance) -> int:
         active_chunk_key = utils.get_active_chunk_key(self.name)
         current_chunk = getattr(instance.__storage__, active_chunk_key)
-        if current_chunk is None:
+        if current_chunk is UNSET:
             return 0
         return current_chunk
 

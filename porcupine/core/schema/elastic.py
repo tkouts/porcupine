@@ -1,14 +1,14 @@
 import asyncio
 import copy
 import functools
-from typing import List, ClassVar, Type
+from typing import List, ClassVar, Type, Optional
 
 from porcupine.hinting import TYPING
 from porcupine.config.default import DEFAULTS
 from porcupine.core.context import system_override
+from porcupine.core.services import get_service
 from porcupine.core import utils
 from porcupine.datatypes import DataType, String, ReferenceN
-from porcupine.core.datatypes.system import SchemaSignature
 from porcupine.core.datatypes.asyncsetter import AsyncSetter
 from .storage import storage
 
@@ -55,11 +55,7 @@ class ElasticMeta(type):
         super().__init__(name, bases, dct)
 
 
-class ElasticSlotsBase:
-    __slots__ = '__storage__', '__externals__', '__snapshot__', '__is_new__'
-
-
-class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
+class Elastic(metaclass=ElasticMeta):
     """
     Base class for all Porcupine objects.
     Accommodates schema updates without requiring database updates.
@@ -69,6 +65,12 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     :cvar is_collection: A boolean indicating if the object is a container.
     :type is_collection: bool
     """
+    __slots__ = (
+        '__storage__',
+        '__externals__',
+        '__snapshot__',
+        '__is_new__',
+    )
     __schema__: TYPING.SCHEMA = {}
     __sig__: ClassVar[str] = ''
     __record__: TYPING.STORAGE = None
@@ -80,7 +82,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     is_deleted: ClassVar[bool] = False
 
     id = String(required=True, readonly=True)
-    sig = SchemaSignature()
+    sig = String(required=True, readonly=True, protected=True)
 
     @staticmethod
     async def new_from_dict(dct: dict) -> TYPING.ANY_ITEM_CO:
@@ -106,55 +108,27 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         schema = cls.__schema__.values()
         return [data_type for data_type in schema if data_type.unique]
 
-    def __init__(self, dict_storage=None):
-        if dict_storage is None:
-            dict_storage = {}
-        self.__is_new__ = 'id' not in dict_storage
+    def __init__(self, dict_storage: Optional[dict] = None):
+        self.__is_new__ = dict_storage is None or 'id' not in dict_storage
         self.__snapshot__ = {}
         self.__externals__ = self.__ext_record__()
-
-        current_sig = type(self).__sig__
+        self.__storage__ = self.__record__(store=dict_storage)
 
         if self.__is_new__:
             # new item
-            self.__storage__ = self.__record__(**dict_storage)
             # initialize storage with default values
+            current_sig = type(self).__sig__
             self.__add_defaults(list(self.__schema__.values()))
             self.__storage__.id = utils.generate_oid(self._id_size_)
             self.__storage__.sig = current_sig
-        elif dict_storage['sig'] == current_sig:
-            self.__storage__ = self.__record__(**dict_storage)
-        else:
-            # construct new record that fits the new schema and the old one
-            old_schema = tuple(dict_storage.keys())
-            new_schema = self.__record__.fields()
-            field_spec = frozenset(new_schema + old_schema)
-            record = storage(type(self).__name__, field_spec)
-            self.__storage__ = record(**dict_storage)
-            # update storage with default values of added attributes
-            additions = [dt for dt in self.__schema__.values()
-                         if dt.storage_key not in old_schema]
-            self.__add_defaults(additions)
-            # change sig to trigger schema update
-            with system_override():
-                self.sig = str(id(self))
 
     @property
     def friendly_name(self):
         return '{0}({1})'.format(self.id, self.content_class)
 
     def __reset__(self) -> None:
-        snapshot_items = self.__snapshot__.items()
-        store = self.__storage__
-        externals = self.__externals__
-        store.update({
-            k: v for k, v in snapshot_items
-            if hasattr(store, k)
-        })
-        externals.update({
-            k: v for k, v in snapshot_items
-            if hasattr(externals, k)
-        })
+        self.__storage__.update(store=self.__snapshot__)
+        self.__externals__.update(store=self.__snapshot__)
         self.__snapshot__ = {}
 
     def __repr__(self) -> str:
@@ -165,7 +139,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
                 k: v for k, v in self.__snapshot__.items()
                 if hasattr(_store, k)
             })
-            return repr(self.__record__(**store))
+            return repr(self.__record__(store=store))
         else:
             return repr(_store)
 
@@ -224,6 +198,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     async def effective_acl(self):
         raise NotImplementedError
 
+    @property
+    async def ttl(self):
+        raise NotImplementedError
+
     def reset(self):
         data_types = list(self.__schema__.values())
         for data_type in data_types:
@@ -272,7 +250,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         ...
 
     async def on_post_change(self, actor):
-        ...
+        if self.__storage__.sig != type(self).__sig__:
+            await get_service('schema').clean_schema(self.id, await self.ttl)
 
     async def on_post_delete(self, actor):
         ...
