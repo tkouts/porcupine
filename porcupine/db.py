@@ -56,12 +56,13 @@ async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[bool]:
         if it.parent_id is None:
             break
         else:
-            it = await _get(it.parent_id)
-            if it is None:
+            parent = await _get(it.parent_id)
+            if parent is None:
                 # stale - remove from DB
                 await get_service('schema').remove_stale(it.id)
                 visibility = None
                 break
+            it = parent
 
     if visibility is None:
         if it != item:
