@@ -23,8 +23,7 @@ class Composite(Elastic):
     @see: L{porcupine.datatypes.Composition}
     """
     is_composite = True
-    path = String(required=True, readonly=True, protected=True,
-                  immutable=True)
+    path = String(required=True, readonly=True, protected=True, immutable=True)
 
     @property
     async def effective_acl(self):
