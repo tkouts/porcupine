@@ -223,7 +223,9 @@ class Embedded(AsyncSetter, Reference1):
                 # validate value
                 await super().on_create(instance, composite_id)
             # keep composite id in snapshot
-            super().snapshot(instance, '_comp1_:{0}'.format(composite_id), None)
+            super().snapshot(instance,
+                             f'{self.storage_info}:{composite_id}',
+                             None)
         else:
             # None validation
             await super().on_create(instance, None)
@@ -236,7 +238,7 @@ class Embedded(AsyncSetter, Reference1):
         await DataType.on_change(
             self,
             instance,
-            f'_comp1_:{composite.id}' if composite else None,
+            f'{self.storage_info}:{composite.id}' if composite else None,
             old_composite_id
         )
         if old_composite_id is not None:
