@@ -132,14 +132,15 @@ class Transaction:
 
     async def touch(self, item):
         # touch has to be fast / no event handlers
-        if 'md' not in item.__snapshot__:
-            now = date.utcnow().isoformat()
+        now = date.utcnow().isoformat()
+        if item.__is_new__:
+            item.__storage__.md = now
+        elif 'md' not in item.__snapshot__:
             item.__snapshot__['md'] = now
-            if not item.__is_new__:
-                self.mutate(item, 'md', self.connector.SUB_DOC_UPSERT_MUT, now)
-                ttl = await item.ttl
-                if ttl:
-                    self._touches[item.id] = ttl
+            self.mutate(item, 'md', self.connector.SUB_DOC_UPSERT_MUT, now)
+            ttl = await item.ttl
+            if ttl:
+                self._touches[item.id] = ttl
 
     async def delete(self, item):
         if item.is_collection:
@@ -243,8 +244,8 @@ class Transaction:
                     for storage_key in i.__snapshot__:
                         desc = desc_locator(type(i), storage_key)
                         if desc.get_value(i) != desc.get_value(i, False):
-                            log.warn('Detected uncommitted '
-                                     f'changes to {i.friendly_name}')
+                            log.warn('Detected uncommitted change '
+                                     f'to {desc.name} of {i.friendly_name}')
 
         inserted_items = []
         modified_items = []
