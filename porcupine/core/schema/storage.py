@@ -1,22 +1,17 @@
 from unittest.mock import sentinel
 from porcupine.hinting import TYPING
-from typing import Optional
+from typing import Dict, Any, Optional
 
 UNSET = sentinel.NotSet
 
 
 class Record(object):
     __slots__ = ()
+    fields = frozenset()
 
-    @classmethod
-    def fields(cls) -> frozenset:
-        return frozenset(cls.__slots__)
-
-    def __init__(self, *args, store: Optional[dict] = None):
-        for field, value in zip(self.__slots__[:len(args)], args):
-            setattr(self, field, value)
+    def __init__(self, store: Optional[Dict[str, Any]] = None):
         if store is not None:
-            fields = self.fields()
+            fields = self.fields
             for field, value in store.items():
                 if field in fields:
                     setattr(self, field, value)
@@ -25,7 +20,7 @@ class Record(object):
         return getattr(self, self.__slots__[index], UNSET)
 
     def __getattr__(self, field):
-        if field in self.fields():
+        if field in self.fields:
             return UNSET
         raise AttributeError(
             f'{type(self).__name__} has no field named "{field}"')
@@ -44,13 +39,12 @@ class Record(object):
         return '%s(%s)' % (type(self).__name__, ', '.join(fields))
 
     def __getstate__(self):
-        return tuple(self)
+        return tuple(self.as_dict().items())
 
     def __setstate__(self, state):
-        self.__init__(*state)
+        self.__init__(dict(state))
 
-    def update(self, *args, store=None):
-        self.__init__(*args, store=store)
+    update = __init__
 
     def as_dict(self) -> dict:
         # do not persist UNSET as it is the default value
@@ -60,6 +54,10 @@ class Record(object):
 
 def storage(typename, field_names) -> TYPING.STORAGE_TYPE:
     record_type = type(
-        typename, (Record, ), {'__slots__': field_names}
+        typename, (Record, ),
+        {
+            '__slots__': field_names,
+            'fields': frozenset(field_names)
+        }
     )
     return record_type

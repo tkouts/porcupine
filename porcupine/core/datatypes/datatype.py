@@ -84,15 +84,15 @@ class DataType:
         self.validate_value(instance, value)
         self.snapshot(instance, value, self.get_value(instance, snapshot=False))
 
-    def set_default(self, instance, value=None):
-        if value is None:
-            value = self.default
-        storage_key = self.storage_key
-        storage = getattr(instance, self.storage)
-        # add to snapshot in order to validate
-        if not instance.__is_new__:
-            instance.__snapshot__[storage_key] = value
-        setattr(storage, storage_key, value)
+    # def set_default(self, instance, value=None):
+    #     if value is None:
+    #         value = self.default
+    #     storage_key = self.storage_key
+    #     storage = getattr(instance, self.storage)
+    #     # add to snapshot in order to validate
+    #     if not instance.__is_new__:
+    #         instance.__snapshot__[storage_key] = value
+    #     setattr(storage, storage_key, value)
 
     def snapshot(self, instance, new_value, previous_value):
         storage_key = self.storage_key
@@ -188,18 +188,20 @@ class MutableDataType(DataType):
             return self
         value = super().__get__(instance, owner)
         if value is not None:
-            if context.txn is not None and \
-                    self.storage_key not in instance.__snapshot__:
+            if isinstance(value, (MutableMapping, MutableSequence)):
                 value = self.clone_value(value)
-                self.snapshot(instance, value, None)
+            # if context.txn is not None and \
+            #         self.storage_key not in instance.__snapshot__:
+            #     value = self.clone_value(value)
+            #     self.snapshot(instance, value, None)
         return value
 
-    def set_default(self, instance, value=None):
-        if value is None:
-            value = self.default
-        if isinstance(value, (MutableMapping, MutableSequence)):
-            value = self.clone_value(value)
-        super().set_default(instance, value)
+    # def set_default(self, instance, value=None):
+    #     if value is None:
+    #         value = self.default
+    #     if isinstance(value, (MutableMapping, MutableSequence)):
+    #         value = self.clone_value(value)
+    #     super().set_default(instance, value)
 
     async def on_change(self, instance, value, old_value):
         if value != old_value:
