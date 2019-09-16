@@ -42,7 +42,7 @@ def generate_oid(length: int = 8) -> str:
 
     @rtype: str
     """
-    return ''.join(random.sample(VALID_ID_CHARS, length))
+    return ''.join(random.choice(VALID_ID_CHARS) for _ in range(length))
 
 
 def get_content_class(name: str):
