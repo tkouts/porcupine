@@ -19,25 +19,35 @@ class SchemaCleaner(SchemaMaintenanceTask):
                                  and not key.endswith('_')])
         current_schema = frozenset([dt.storage_key
                                     for dt in clazz.__schema__.values()])
-        for_removal = item_schema.difference(current_schema)
         externals = {}
+
         # remove old attributes
-        for attr_name in for_removal:
+        for_removal = item_schema.difference(current_schema)
+        for storage_key in for_removal:
             # detect if it is composite attribute
-            attr_value = item_dict.pop(attr_name)
+            attr_value = item_dict.pop(storage_key)
             # TODO: handle composites
             if isinstance(attr_value, str):
                 if attr_value == Blob.storage_info:
-                    externals[attr_name] = (attr_value, None)
+                    externals[storage_key] = (attr_value, None)
                 elif attr_value == ReferenceN.storage_info \
                         or attr_value.startswith(RelatorN.storage_info_prefix):
                     try:
                         active_chunk_key = \
-                            utils.get_active_chunk_key(attr_name)
+                            utils.get_active_chunk_key(storage_key)
                         active_chunk = item_dict.pop(active_chunk_key)
                     except KeyError:
                         active_chunk = 0
-                    externals[attr_name] = (attr_value, active_chunk)
+                    externals[storage_key] = (attr_value, active_chunk)
+
+        # add externals storage info
+        for_addition = current_schema.difference(item_schema)
+        for storage_key in for_addition:
+            dt = utils.get_descriptor_by_storage_key(clazz, storage_key)
+            if isinstance(dt, Blob):
+                # print('ADDING', storage_key, dt.storage_info)
+                item_dict[storage_key] = dt.storage_info
+
         # update sig
         item_dict['sig'] = clazz.__sig__
         return item_dict, externals
