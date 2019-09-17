@@ -44,16 +44,6 @@ class Blob(DataType):
             return future
         return self.fetch(instance)
 
-    # def set_default(self, instance, value=None):
-    #     super().set_default(instance, value)
-    #     # add external info
-    #     setattr(instance.__storage__, self.name, self.storage_info)
-    #     if not instance.__is_new__ and context.txn:
-    #         # add schema info
-    #         context.txn.mutate(instance, self.name,
-    #                            db_connector().SUB_DOC_INSERT,
-    #                            self.storage_info)
-
     def key_for(self, instance):
         return utils.get_blob_key(instance.id, self.name)
 

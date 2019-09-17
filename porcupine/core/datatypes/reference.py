@@ -141,13 +141,6 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
             return 0
         return current_chunk
 
-    # def set_default(self, instance, value=None):
-    #     if value is None:
-    #         value = self.default
-    #     if isinstance(value, tuple):
-    #         value = list(value)
-    #     super().set_default(instance, value)
-
     def key_for(self, instance, chunk=None):
         if chunk is None:
             chunk = self.current_chunk(instance)

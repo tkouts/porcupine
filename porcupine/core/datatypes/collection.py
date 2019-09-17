@@ -15,8 +15,14 @@ from .external import Text
 
 class CollectionResolver:
     __slots__ = (
-        'item_id', 'collection_name', 'chunk_no', 'total',
-        'dirty', 'removed', 'resolved', 'chunk_sizes'
+        'item_id',
+        'collection_name',
+        'chunk_no',
+        'total',
+        'dirty',
+        'removed',
+        'resolved',
+        'chunk_sizes'
     )
 
     def __init__(self, item_id: str, name: str, chunk_no: int):
@@ -89,7 +95,7 @@ class CollectionIterator(AsyncIterable):
     async def __aiter__(self) -> TYPING.ITEM_ID:
         descriptor, instance = self._desc, self._inst
         dirtiness = 0.0
-        storage = getattr(instance, descriptor.storage)
+        storage = instance.__externals__
         current_value = getattr(storage, descriptor.storage_key)
         chunk_no = descriptor.current_chunk(instance)
         resolver = CollectionResolver(instance.id, descriptor.name, chunk_no)
@@ -130,7 +136,6 @@ class CollectionIterator(AsyncIterable):
         if total_items < 301:
             # set storage / no snapshot
             # cache / mark as fetched
-            # storage = getattr(instance, descriptor.storage)
             setattr(storage, descriptor.storage_key, collection)
 
         # compute dirtiness factor
@@ -171,7 +176,8 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
 
     @property
     def is_fetched(self) -> bool:
-        return self._desc.get_value(self._inst, snapshot=False) is not None
+        return getattr(self._inst.__externals__,
+                       self._desc.storage_key) is not UNSET
 
     @property
     def ttl(self):

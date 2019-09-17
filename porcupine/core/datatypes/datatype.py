@@ -51,7 +51,7 @@ class DataType:
         storage = getattr(instance, self.storage)
         value = getattr(storage, storage_key)
         if value is UNSET:
-            value = self.default
+            return self.default
         return value
 
     def validate_value(self, instance, value):
@@ -83,16 +83,6 @@ class DataType:
             value = self.xform(value)
         self.validate_value(instance, value)
         self.snapshot(instance, value, self.get_value(instance, snapshot=False))
-
-    # def set_default(self, instance, value=None):
-    #     if value is None:
-    #         value = self.default
-    #     storage_key = self.storage_key
-    #     storage = getattr(instance, self.storage)
-    #     # add to snapshot in order to validate
-    #     if not instance.__is_new__:
-    #         instance.__snapshot__[storage_key] = value
-    #     setattr(storage, storage_key, value)
 
     def snapshot(self, instance, new_value, previous_value):
         storage_key = self.storage_key
