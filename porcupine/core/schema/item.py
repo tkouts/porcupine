@@ -206,9 +206,9 @@ class GenericItem(Removable, Elastic):
 
             with system_override():
                 self.modified_by = user.name
-                # self.modified = date.utcnow()
+                self.modified = date.utcnow()
 
-            await self.touch()
+            # await self.touch()
             await context.txn.upsert(self)
             return True
         return False

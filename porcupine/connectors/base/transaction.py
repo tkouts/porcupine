@@ -141,6 +141,9 @@ class Transaction:
             ttl = await item.ttl
             if ttl:
                 self._touches[item.id] = ttl
+            if item.has_outdated_schema:
+                # add to items map to trigger schema update
+                self._items[item.id] = None, item
 
     async def delete(self, item):
         if item.is_collection:

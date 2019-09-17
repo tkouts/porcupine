@@ -103,17 +103,17 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     @classmethod
     @functools.lru_cache(maxsize=None)
-    def view_data_types(cls):
+    def view_attrs(cls):
         schema = cls.__schema__.values()
-        return [data_type for data_type in schema
-                if not data_type.protected
-                and data_type.storage == '__storage__']
+        return tuple([data_type.name for data_type in schema
+                     if not data_type.protected
+                     and data_type.storage == '__storage__'])
 
     @classmethod
     @functools.lru_cache(maxsize=None)
     def unique_data_types(cls):
         schema = cls.__schema__.values()
-        return [data_type for data_type in schema if data_type.unique]
+        return tuple([data_type for data_type in schema if data_type.unique])
 
     def __init__(self, dict_storage: Optional[dict] = None):
         self.__is_new__ = dict_storage is None or 'id' not in dict_storage
@@ -160,12 +160,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             return getattr(self, attr_name)
 
     def to_json(self) -> dict:
-        store = self.__storage__
         dct = {
-            data_type.name: getattr(store,
-                                    data_type.storage_key,
-                                    data_type.default)
-            for data_type in self.view_data_types()
+            attr: getattr(self, attr)
+            for attr in self.view_attrs()
         }
         dct['_type'] = self.content_class
         return dct
@@ -190,7 +187,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     def custom_view(self, *args, snake_to_camel=False, **kwargs) -> dict:
         if '*' in args:
-            args = [dt.name for dt in self.view_data_types()]
+            args = self.view_attrs()
         result = {
             utils.snake_to_camel(key)
             if snake_to_camel else key: getattr(self, key) for key in args
@@ -206,6 +203,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @property
     async def ttl(self):
         raise NotImplementedError
+
+    @property
+    def has_outdated_schema(self):
+        return self.__storage__.sig != type(self).__sig__
 
     def reset(self):
         data_types = list(self.__schema__.values())
@@ -255,7 +256,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         ...
 
     async def on_post_change(self, actor):
-        if self.__storage__.sig != type(self).__sig__:
+        if self.has_outdated_schema:
             await get_service('schema').clean_schema(self.id, await self.ttl)
 
     async def on_post_delete(self, actor):
