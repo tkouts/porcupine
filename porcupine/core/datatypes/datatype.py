@@ -177,21 +177,11 @@ class MutableDataType(DataType):
         if instance is None:
             return self
         value = super().__get__(instance, owner)
-        if value is not None:
+        if value is not None and self.storage_key not in instance.__snapshot__:
             if isinstance(value, (MutableMapping, MutableSequence)):
                 value = self.clone_value(value)
-            # if context.txn is not None and \
-            #         self.storage_key not in instance.__snapshot__:
-            #     value = self.clone_value(value)
-            #     self.snapshot(instance, value, None)
+                self.snapshot(instance, value, None)
         return value
-
-    # def set_default(self, instance, value=None):
-    #     if value is None:
-    #         value = self.default
-    #     if isinstance(value, (MutableMapping, MutableSequence)):
-    #         value = self.clone_value(value)
-    #     super().set_default(instance, value)
 
     async def on_change(self, instance, value, old_value):
         if value != old_value:
