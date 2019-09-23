@@ -190,6 +190,12 @@ class EmbeddedItem(AsyncSetterValue):
                 composite = value
         return composite
 
+    def to_json(self):
+        value = self._desc.get_value(self._inst)
+        if isinstance(value, str):
+            return value.split(':')[1]
+        return value.id
+
 
 class Embedded(AsyncSetter, Reference1):
     """

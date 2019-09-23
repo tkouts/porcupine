@@ -45,6 +45,9 @@ class ItemReference(str):
         """
         return await db.get_item(self, quiet=quiet)
 
+    def to_json(self):
+        return str(self)
+
 
 class Reference1(String, Acceptable):
     """
