@@ -154,8 +154,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     def get_snapshot_of(self, attr_name: str):
         if attr_name in self.__schema__:
-            storage_key = self.__schema__[attr_name].storage_key
-            return getattr(self.__storage__, storage_key)
+            return self.__schema__[attr_name].get_value(self, snapshot=False)
         else:
             return getattr(self, attr_name)
 
