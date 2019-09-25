@@ -12,6 +12,8 @@ from porcupine.core.services.schematasks.collrebuilder import \
 from porcupine.core.services.schematasks.schemacleaner import SchemaCleaner
 from porcupine.core.services.schematasks.staleremover import StaleRemover
 from porcupine.core.services.schematasks.collcleaner import CollectionCleaner
+from porcupine.core.services.schematasks.collautosplitter import \
+    CollectionAutoSplitter
 
 from .service import AbstractService
 
@@ -70,6 +72,11 @@ class SchemaMaintenance(AbstractService):
     async def rebuild_collection(self, key, ttl):
         if self.queue is not None:
             task = CollectionReBuilder(key, ttl)
+            await self.queue.put(task)
+
+    async def auto_split(self, key, ttl):
+        if self.queue is not None:
+            task = CollectionAutoSplitter(key, ttl)
             await self.queue.put(task)
 
     async def clean_schema(self, key, ttl):

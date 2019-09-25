@@ -2,20 +2,14 @@ import asyncio
 from inspect import isawaitable
 from collections import deque
 
-from porcupine import exceptions
+from porcupine import log
 from porcupine.core import utils
 from porcupine.core.datatypes.collection import CollectionResolver
-from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
+from porcupine.core.services.schematasks.task import CollectionMaintenanceTask
 
 
-class CollectionReBuilder(SchemaMaintenanceTask):
-    __slots__ = 'ttl', 'item_id', 'chunk_no', 'collection_name'
-
-    def __init__(self, key, ttl):
-        super().__init__(key)
-        self.ttl = ttl
-        self.item_id, self.collection_name, chunk_no = self.key.split('/')
-        self.chunk_no = int(chunk_no)
+class CollectionReBuilder(CollectionMaintenanceTask):
+    __slots__ = ()
 
     async def rebuild_set(self, _raw_string):
         # if len(raw_string) < db.connector.coll_split_threshold:
@@ -62,57 +56,42 @@ class CollectionReBuilder(SchemaMaintenanceTask):
 
         return first, (insertions, deletions)
 
-    async def bump_up_active_chunk(self):
-        connector = self.connector
-        counter_path = utils.get_active_chunk_key(self.collection_name)
-        try:
-            new_chunk_key = utils.get_collection_key(self.item_id,
-                                                     self.collection_name,
-                                                     self.chunk_no + 1)
-            await connector.insert_multi({new_chunk_key: ''}, ttl=self.ttl)
-        except exceptions.DBAlreadyExists:
-            pass
-        await connector.mutate_in(
-            self.item_id,
-            {counter_path: (connector.SUB_DOC_UPSERT_MUT, self.chunk_no + 1)}
-        )
-        if self.ttl:
-            await connector.touch_multi({self.item_id: self.ttl})
-
     async def execute(self):
-        # print('splitting collection', self.key)
         connector = self.connector
         # bump up active chunk number
-        await self.bump_up_active_chunk()
-        # replace active chunk
-        while True:
-            success, chunks = await connector.swap_if_not_modified(
-                self.key,
-                xform=self.rebuild_set,
-                ttl=self.ttl
-            )
-            if success:
-                break
-            else:
-                # wait for pending to complete and try again
-                # print('failed to split')
-                await asyncio.sleep(0.1)
-        if chunks is not None:
-            tasks = []
-            insertions, deletions = chunks
-            # print(insertions)
-            # print(deletions)
-            if insertions:
-                task = connector.upsert_multi(insertions, ttl=self.ttl)
-                if isawaitable(task):
-                    tasks.append(task)
-            if deletions:
-                task = connector.delete_multi(deletions)
-                if isawaitable(task):
-                    tasks.append(task)
-            if tasks:
-                completed, _ = await asyncio.wait(tasks)
-                errors = [task.exception() for task in tasks]
-                if any(errors):
-                    # TODO: log errors
-                    print(errors)
+        bumped_up = await self.bump_up_active_chunk()
+        if bumped_up:
+            if connector.server.debug:
+                log.debug(f'Rebuilding collection {self.key}')
+            # replace active chunk
+            while True:
+                success, chunks = await connector.swap_if_not_modified(
+                    self.key,
+                    xform=self.rebuild_set,
+                    ttl=self.ttl
+                )
+                if success:
+                    break
+                else:
+                    # wait for pending to complete and try again
+                    # print('failed to split')
+                    await asyncio.sleep(0.1)
+            if chunks is not None:
+                tasks = []
+                insertions, deletions = chunks
+                # print(insertions)
+                # print(deletions)
+                if insertions:
+                    task = connector.upsert_multi(insertions, ttl=self.ttl)
+                    if isawaitable(task):
+                        tasks.append(task)
+                if deletions:
+                    task = connector.delete_multi(deletions)
+                    if isawaitable(task):
+                        tasks.append(task)
+                if tasks:
+                    completed, _ = await asyncio.wait(tasks)
+                    errors = [task.exception() for task in tasks]
+                    if any(errors):
+                        # TODO: log errors
+                        print(errors)

@@ -1,10 +1,12 @@
 import asyncio
+import random
 from inspect import isawaitable
 from collections import defaultdict
 
 from porcupine import exceptions, log, server
 from porcupine.core import utils
 from porcupine.core.utils import date
+from porcupine.core.services import get_service
 from porcupine.core.context import system_override, with_context, context
 
 
@@ -340,9 +342,19 @@ class Transaction:
                     tasks.append(task)
 
         # appends
-        # print('Appends', self._appends)
+        auto_splits = []
+
         if self._appends:
-            appends = {k: ''.join(v) for k, v in self._appends.items()}
+            split_threshold = connector.coll_split_threshold
+            rnd = random.random()
+            appends = {}
+            for k, v in self._appends.items():
+                append = ''.join(v)
+                appends[k] = append
+                possibility = len(append) / split_threshold
+                if rnd <= possibility * 1.8:
+                    auto_splits.append((k, self._touches.get(k)))
+
             task = connector.append_multi(appends)
             if isawaitable(task):
                 tasks.append(task)
@@ -382,6 +394,11 @@ class Transaction:
         if deleted_items:
             asyncio.create_task(self._exec_post_handler('on_post_delete',
                                 deleted_items, actor))
+
+        if auto_splits:
+            schema_service = get_service('schema')
+            for key, ttl in auto_splits:
+                await schema_service.auto_split(key, ttl)
 
     @with_context(server.system_user)
     async def _exec_post_handler(self, handler: str, items: list, actor):
