@@ -36,6 +36,7 @@ class App(Blueprint):
     async def __process_item(self, connector, item_dict, parent):
         item_id = item_dict.pop('id', None)
         item_type = item_dict.pop('type', None)
+        in_sync = item_dict.pop('keep_in_sync', False)
         children = item_dict.pop('children', [])
 
         # resolve item
@@ -56,13 +57,14 @@ class App(Blueprint):
                 item_dict['id'] = item_id
 
         if item_dict:
-            with system_override():
-                await item.apply_patch(item_dict)
+            if item.__is_new__ or in_sync:
+                with system_override():
+                    await item.apply_patch(item_dict)
 
-            if item.__is_new__:
-                await item.append_to(parent)
-            else:
-                await item.update()
+                if item.__is_new__:
+                    await item.append_to(parent)
+                else:
+                    await item.update()
 
         for child_dict in children:
             await self.__process_item(connector, child_dict, item)
