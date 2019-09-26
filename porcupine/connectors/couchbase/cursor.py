@@ -28,8 +28,7 @@ class CursorIterator(AbstractCursorIterator):
         self.reduce = False
 
     async def __aiter__(self):
-        kwargs = {'stale': STALE_OK,
-                  'streaming': True,
+        kwargs = {'stale': STALE_UPDATE_AFTER,
                   'reduce': self.reduce}
 
         is_ranged = self.is_ranged
