@@ -374,7 +374,12 @@ class Transaction:
                 pass
 
         if self._touches:
-            await connector.touch_multi(self._touches)
+            touches = {
+                k: v for k, v in self._touches.items()
+                if k not in deletions
+            }
+            if touches:
+                await connector.touch_multi(touches)
 
         self.connector.active_txns -= 1
         self._committed = True
