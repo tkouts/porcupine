@@ -92,13 +92,14 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     sig = String(required=True, readonly=True, protected=True)
 
     @staticmethod
-    async def new_from_dict(dct: dict) -> TYPING.ANY_ITEM_CO:
+    async def new_from_dict(dct: dict,
+                            camel_to_snake=False) -> TYPING.ANY_ITEM_CO:
         item_type = dct.pop('type')
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
             item_type = utils.get_content_class(item_type)
         new_item = item_type()
-        await new_item.apply_patch(dct)
+        await new_item.apply_patch(dct, camel_to_snake)
         return new_item
 
     @classmethod
