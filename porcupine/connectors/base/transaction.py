@@ -6,6 +6,7 @@ from collections import defaultdict
 from porcupine import exceptions, log, server
 from porcupine.core import utils
 from porcupine.core.utils import date
+from porcupine.core.context import ctx_txn
 from porcupine.core.services import get_service
 from porcupine.core.context import system_override, with_context, context
 
@@ -390,20 +391,22 @@ class Transaction:
 
         if inserted_items:
             asyncio.create_task(self._exec_post_handler('on_post_create',
-                                inserted_items, actor))
+                                                        inserted_items, actor))
 
         if modified_items:
             asyncio.create_task(self._exec_post_handler('on_post_change',
-                                modified_items, actor))
+                                                        modified_items, actor))
 
         if deleted_items:
             asyncio.create_task(self._exec_post_handler('on_post_delete',
-                                deleted_items, actor))
+                                                        deleted_items, actor))
 
         if auto_splits:
             schema_service = get_service('schema')
             for key, ttl in auto_splits:
                 await schema_service.auto_split(key, ttl)
+
+        ctx_txn.set(None)
 
     @with_context(server.system_user)
     async def _exec_post_handler(self, handler: str, items: list, actor):
@@ -432,3 +435,4 @@ class Transaction:
             if self._attr_locks:
                 await self.connector.delete_multi(self._attr_locks.keys())
             self.connector.active_txns -= 1
+        ctx_txn.set(None)

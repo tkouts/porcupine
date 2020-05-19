@@ -152,49 +152,49 @@ def transactional(auto_commit=True):
                 retries = 0
                 sleep_time = min_sleep_time
                 max_retries = connector.txn_max_retries
-                try:
-                    while retries < max_retries:
-                        # print('trying.... %d' % retries)
-                        # context.txn = txn = connector.get_transaction()
-                        txn = connector.get_transaction()
-                        ctx_txn.set(txn)
-                        try:
-                            args_copy = [
-                                copy.deepcopy(arg)
-                                if not isinstance(arg, do_not_copy_types)
-                                else arg
-                                for arg in args]
-                            keyword_args_copy = {
-                                name: copy.deepcopy(value)
-                                if not isinstance(value, do_not_copy_types)
-                                else value
-                                for name, value in kwargs.items()
-                            }
-                            if retries > 0:
-                                await asyncio.sleep(sleep_time)
-                                sleep_time *= 2
-                                if sleep_time > max_sleep_time:
-                                    sleep_time = max_sleep_time + \
-                                                 (retries * min_sleep_time)
-                            val = await func(*args_copy,
-                                             **keyword_args_copy)
-                            if auto_commit:
-                                await txn.commit()
-                            elif not txn.committed:
-                                # abort if not committed
-                                await txn.abort()
-                            return val
-                        except exceptions.DBDeadlockError:
+                # try:
+                while retries < max_retries:
+                    # print('trying.... %d' % retries)
+                    # context.txn = txn = connector.get_transaction()
+                    txn = connector.get_transaction()
+                    ctx_txn.set(txn)
+                    try:
+                        args_copy = [
+                            copy.deepcopy(arg)
+                            if not isinstance(arg, do_not_copy_types)
+                            else arg
+                            for arg in args]
+                        keyword_args_copy = {
+                            name: copy.deepcopy(value)
+                            if not isinstance(value, do_not_copy_types)
+                            else value
+                            for name, value in kwargs.items()
+                        }
+                        if retries > 0:
+                            await asyncio.sleep(sleep_time)
+                            sleep_time *= 2
+                            if sleep_time > max_sleep_time:
+                                sleep_time = max_sleep_time + \
+                                             (retries * min_sleep_time)
+                        val = await func(*args_copy,
+                                         **keyword_args_copy)
+                        if auto_commit:
+                            await txn.commit()
+                        elif not txn.committed:
+                            # abort if not committed
                             await txn.abort()
-                            retries += 1
-                        except Exception:
-                            await txn.abort()
-                            raise
-                    # maximum retries exceeded
-                    raise exceptions.DBDeadlockError(
-                        'Maximum transaction retries exceeded')
-                finally:
-                    ctx_txn.set(None)
+                        return val
+                    except exceptions.DBDeadlockError:
+                        await txn.abort()
+                        retries += 1
+                    except Exception:
+                        await txn.abort()
+                        raise
+                # maximum retries exceeded
+                raise exceptions.DBDeadlockError(
+                    'Maximum transaction retries exceeded')
+                # finally:
+                #     ctx_txn.set(None)
             else:
                 # pass through
                 return await func(*args, **kwargs)
