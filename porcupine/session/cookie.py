@@ -45,6 +45,7 @@ class SessionManager(BaseSessionManager):
             cookie_name = '_s{0}'.format(i)
             response.cookies[cookie_name] = chunks[i]
             response.cookies[cookie_name]['httponly'] = True
+            response.cookies[cookie_name]['samesite'] = 'lax'
         # remove extra cookies
         self.remove(request, response, start=len(chunks))
 
