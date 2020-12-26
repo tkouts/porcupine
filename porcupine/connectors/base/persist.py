@@ -14,4 +14,6 @@ class DefaultPersistence:
     def dumps(obj):
         dct = obj.__storage__.as_dict()
         dct['_cc'] = obj.content_class
+        if not obj.is_composite:
+            dct['_col'] = obj.is_collection
         return dct

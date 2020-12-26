@@ -1,4 +1,5 @@
 import tempfile
+from collections import defaultdict
 
 temp_folder = tempfile.gettempdir()
 
@@ -16,7 +17,7 @@ DEFAULTS = {
     'DB_HOST': 'localhost',
     'DB_NAME': 'porcupine',
     'DB_USER': 'porcupine',
-    'DB_PASSWORD': '',
+    'DB_PASSWORD': '111111',
     'DB_CACHE_SIZE': 1000,
     # how many times a transaction is retried
     # before an error is raised
@@ -27,7 +28,7 @@ DEFAULTS = {
     # split threshold set to 16K
     'DB_COLLECTION_SPLIT_THRESHOLD': 16 * 1024,
     # internal indexes map - maintained by the system
-    '__indices__': {},
+    '__indices__': defaultdict(list),
 
     # Couchbase VIEWS update parameters
     'COUCH_VIEWS_UPDATE_INTERVAL': 5000,
@@ -39,7 +40,6 @@ DEFAULTS = {
     'SM_SESSION_TIMEOUT': 1200,
     'SM_GUEST_USER_ID': None,
     'SM_SECRET': 'SECRET',
-
 
     # LOG
     # 10 - DEBUG

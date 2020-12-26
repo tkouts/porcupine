@@ -43,15 +43,15 @@ class GenericItem(Removable, Elastic):
                          protected=True, store_as='exp')
     owner = String(required=True, readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
-    modified = DateTime(required=True, readonly=True, store_as='md',
-                        indexed=True)
+    modified = DateTime(required=True, readonly=True, store_as='md')
+    p_type = String(readonly=True, protected=True, store_as='_pcc')
 
     # security attributes
     is_system = Boolean(readonly=True, protected=True, store_as='sys')
     acl: AclValue = Acl()
 
     # common attributes
-    name = String(required=True, unique=True, indexed=True)
+    name = String(required=True, unique=True)
     description = String(store_as='desc')
 
     def __init__(self, dict_storage=None):

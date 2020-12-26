@@ -25,7 +25,7 @@ class Blob(DataType):
 
     def __init__(self, default=None, **kwargs):
         super().__init__(default, allow_none=True, store_as=None,
-                         indexed=False, **kwargs)
+                         **kwargs)
 
     async def fetch(self, instance):
         connector = db_connector()

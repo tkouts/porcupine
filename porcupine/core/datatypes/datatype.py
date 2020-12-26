@@ -18,7 +18,7 @@ class DataType:
 
     def __init__(self, default=None, required=False, allow_none=False,
                  readonly=False, immutable=False, protected=False,
-                 store_as=None, indexed=False, unique=False, xform=None,
+                 store_as=None, unique=False, xform=None,
                  lock_on_update=False):
         self.default = default
         self.required = required
@@ -27,7 +27,7 @@ class DataType:
         self.immutable = immutable
         self.protected = protected
         self.store_as = store_as
-        self.indexed = indexed
+        # self.indexed = indexed
         self.unique = unique
         self.lock_on_update = lock_on_update
         self.xform = xform

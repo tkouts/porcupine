@@ -20,9 +20,11 @@ class Container(Item):
     @type containment: tuple
     """
     is_collection = True
-    containment = ()
+    containment = (Item, )
     items = Items()
     containers = Containers()
+
+    indexes = ('is_collection', )
 
     async def child_exists(self, name: str) -> bool:
         """
@@ -39,8 +41,20 @@ class Container(Item):
         return exists
 
     async def children_count(self):
-        cursor = db_connector().indexes['modified'].get_cursor()
+        cursor = db_connector().indexes['is_collection'].get_cursor()
         cursor.set_scope(self.id)
+        return await cursor.count()
+
+    async def items_count(self):
+        cursor = db_connector().indexes['is_collection'].get_cursor()
+        cursor.set_scope(self.id)
+        cursor.set(False)
+        return await cursor.count()
+
+    async def containers_count(self):
+        cursor = db_connector().indexes['is_collection'].get_cursor()
+        cursor.set_scope(self.id)
+        cursor.set(True)
         return await cursor.count()
 
     async def get_child_by_name(self, name, resolve_shortcut=False):

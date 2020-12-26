@@ -131,7 +131,7 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
 
     def __init__(self, default=(), accepts=(), cascade_delete=False, **kwargs):
         super(Blob, self).__init__(default, allow_none=False,
-                                   store_as=None, indexed=False, **kwargs)
+                                   store_as=None, **kwargs)
         Acceptable.__init__(self, accepts, cascade_delete)
 
     def getter(self, instance, value=None):

@@ -1,5 +1,7 @@
 from typing import Optional, Callable
 from namedlist import namedlist
+from functools import lru_cache
+
 from porcupine.core.services import db_connector
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
@@ -42,8 +44,7 @@ class Token:
     def source(self):
         return repr(self.value)
 
-    @property
-    def is_indexed(self) -> bool:
+    def is_indexed(self, container_type) -> bool:
         return False
 
     def get_index_lookup(self,
@@ -69,7 +70,7 @@ class String(Token, str):
     ...
 
 
-class Field(Token, str):
+class Field(String):
     primitive = False
     immutable = False
 
@@ -80,9 +81,11 @@ class Field(Token, str):
     def source(self):
         return f'get_field(i, "{self}", s, v)'
 
-    @property
-    def is_indexed(self) -> bool:
-        return self in db_connector().indexes
+    @lru_cache(maxsize=None)
+    def is_indexed(self, container_type) -> bool:
+        indexes = db_connector().indexes
+        return self in indexes and \
+            container_type in indexes[self].container_types
 
     def get_index_lookup(self,
                          operator: Optional[str] = None,
@@ -142,14 +145,14 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
             return repr(eval(source))
         return source
 
-    def optimize(self):
+    def optimize(self, container_type):
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
-            if self.l_op.is_indexed and self.r_op.immutable:
+            if self.l_op.is_indexed(container_type) and self.r_op.immutable:
                 bounds = self.r_op.compile()
                 return self.l_op.get_index_lookup(self.operator, bounds)
-            if self.r_op.is_indexed and self.l_op.immutable:
+            if self.r_op.is_indexed(container_type) and self.l_op.immutable:
                 bounds = self.l_op.compile()
                 # reverse operator
                 operator = self.operator

@@ -1,18 +1,56 @@
 import abc
+from porcupine.exceptions import SchemaError
 
 
 class BaseIndex(metaclass=abc.ABCMeta):
-    def __init__(self, connector, data_type):
+    system_attrs = {
+        'content_class': '_cc',
+        'is_collection': '_col'
+    }
+
+    def __init__(self, connector, attr_name, container_types):
         self.connector = connector
-        self.data_type = data_type
 
-    @property
-    def name(self):
-        return self.data_type.name
+        if attr_name in self.system_attrs:
+            # system attribute
+            self.name = attr_name
+            self.key = self.system_attrs[attr_name]
+        else:
+            # gather data types
+            data_types = set()
+            for container_type in container_types:
+                children_types = self.get_all_subclasses(
+                    container_type.containment)
+                container_data_types = [
+                    child_type.__schema__[attr_name]
+                    for child_type in children_types
+                    if attr_name in child_type.__schema__
+                ]
+                if len(container_data_types) == 0:
+                    raise SchemaError(
+                        f'Cannot locate indexed attribute "{attr_name}" '
+                        f'in container type "{container_type.__name__}"'
+                    )
+                data_types.update(container_data_types)
 
-    @property
-    def key(self):
-        return self.data_type.storage_key
+            # make sure all storage keys are the same
+            storage_keys = [dt.storage_key for dt in data_types]
+            if len(storage_keys) > 1 and len(set(storage_keys)) > 1:
+                raise SchemaError(
+                    f'Index {attr_name} references data types '
+                    'with diverse storage keys'
+                )
+            self.name = attr_name
+            self.key = storage_keys[0]
+        self.container_types = self.get_all_subclasses(container_types)
+
+    @staticmethod
+    def get_all_subclasses(cls_list) -> set:
+        all_subs = set()
+        for cls in cls_list:
+            all_subs.add(cls)
+            all_subs.update(BaseIndex.get_all_subclasses(cls.__subclasses__()))
+        return all_subs
 
     @abc.abstractmethod
     def get_cursor(self):

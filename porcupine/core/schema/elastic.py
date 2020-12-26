@@ -40,12 +40,10 @@ class ElasticMeta(type):
                         if isinstance(attr, ReferenceN):
                             field_spec.append(
                                 utils.get_active_chunk_key(attr.storage_key))
-                    if cls.is_composite and (attr.unique or attr.indexed):
+                    if cls.is_composite and attr.unique:
                         raise TypeError(f'Data type "{attr.name}" '
                                         f'of composite "{cls.__name__}" '
-                                        'cannot be unique or indexed')
-                    if attr.indexed:
-                        DEFAULTS['__indices__'][attr.name] = attr
+                                        'cannot be unique')
             except AttributeError:
                 continue
         cls.__schema__ = schema
@@ -53,6 +51,14 @@ class ElasticMeta(type):
         cls.__ext_record__ = storage(cls.__name__, ext_spec)
         cls.__sig__ = utils.hash_series(*schema.keys())
         cls.__externals_info__ = externals_info
+
+        # add indexes
+        if cls.is_collection and hasattr(cls, 'indexes'):
+            for attr in cls.indexes:
+                container_types = DEFAULTS['__indices__'][attr]
+                if not any([issubclass(cls, c) for c in container_types]):
+                    container_types.append(cls)
+
         # register content class
         utils.ELASTIC_MAP[cls.__name__] = cls
         super().__init__(name, bases, dct)

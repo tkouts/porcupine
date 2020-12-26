@@ -52,8 +52,8 @@ class BaseConnector(metaclass=abc.ABCMeta):
             # create index map
             indexed_data_types = self.server.config.__indices__
             self.__indexes = FrozenDict({
-                k: self.get_index(v)
-                for k, v in indexed_data_types.items()
+                attr_name: self.get_index(attr_name, container_types)
+                for attr_name, container_types in indexed_data_types.items()
             })
         return self.__indexes
 
@@ -173,8 +173,8 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def prepare_indexes(self):
         raise NotImplementedError
 
-    def get_index(self, data_type):
-        return self.IndexType(self, data_type)
+    def get_index(self, attr_name, container_types):
+        return self.IndexType(self, attr_name, container_types)
 
     # management
     def config(self):
