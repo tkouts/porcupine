@@ -145,3 +145,5 @@ class UsersContainer(Container):
     This is the container of all users and groups.
     """
     containment = (Membership, )
+
+    indexes = ['name', 'created', 'modified']
