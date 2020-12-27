@@ -15,12 +15,10 @@ class Index(BaseIndex):
         )
         map_func = """
             function(d, m) {{
-                if (
-                    '_pcc' in d &&
-                    [{1}].lastIndexOf(d._pcc) > -1 &&
-                    '{0}' in d
-                ) {{
-                    emit([d.pid, d.{0}]);
+                if ('_pcc' in d && [{1}].includes(d._pcc)) {{
+                    try {{
+                        emit([d.pid, d.{0}]);
+                    }} catch(e) {{}}
                 }}
             }}
         """

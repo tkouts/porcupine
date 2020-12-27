@@ -18,13 +18,15 @@ class BaseIndex(metaclass=abc.ABCMeta):
         else:
             # gather data types
             data_types = set()
+            attr_path = attr_name.split('.')
             for container_type in container_types:
                 children_types = self.get_all_subclasses(
                     container_type.containment)
+                top_level_attr = attr_path[0]
                 container_data_types = [
-                    child_type.__schema__[attr_name]
+                    child_type.__schema__[top_level_attr]
                     for child_type in children_types
-                    if attr_name in child_type.__schema__
+                    if top_level_attr in child_type.__schema__
                 ]
                 if len(container_data_types) == 0:
                     raise SchemaError(
@@ -41,7 +43,7 @@ class BaseIndex(metaclass=abc.ABCMeta):
                     'with diverse storage keys'
                 )
             self.name = attr_name
-            self.key = storage_keys[0]
+            self.key = '.'.join([storage_keys[0]] + attr_path[1:])
         self.container_types = self.get_all_subclasses(container_types)
 
     @staticmethod
