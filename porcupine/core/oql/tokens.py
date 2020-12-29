@@ -79,9 +79,12 @@ class Field(String):
         return None
 
     def source(self):
+        if '.' in self:
+            # nested attribute
+            path = self.split('.')
+            return f'get_nested_field(i, "{path[0]}", {path[1:]})'
         return f'get_field(i, "{self}", s, v)'
 
-    @lru_cache(maxsize=None)
     def is_indexed(self, container_type) -> bool:
         indexes = db_connector().indexes
         return self in indexes and \
@@ -89,8 +92,9 @@ class Field(String):
 
     def get_index_lookup(self,
                          operator: Optional[str] = None,
-                         bounds: Optional[Callable] = None) -> IndexLookup:
-        index_lookup = IndexLookup(self)
+                         bounds: Optional[Callable] = None,
+                         **options) -> IndexLookup:
+        index_lookup = IndexLookup(self, options=options)
         if operator is not None:
             if operator == '==':
                 # equality
@@ -136,6 +140,7 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
         return self.l_op.primitive and self.r_op.primitive
 
     @property
+    # @lru_cache(maxsize=None)
     def immutable(self):
         return self.l_op.immutable and self.r_op.immutable
 
@@ -145,13 +150,18 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
             return repr(eval(source))
         return source
 
-    def optimize(self, container_type):
+    # def __hash__(self):
+    #     return id(self)
+
+    def optimize(self, container_type, **options):
+        print('optimizing')
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
             if self.l_op.is_indexed(container_type) and self.r_op.immutable:
                 bounds = self.r_op.compile()
-                return self.l_op.get_index_lookup(self.operator, bounds)
+                return self.l_op.get_index_lookup(self.operator, bounds,
+                                                  **options)
             if self.r_op.is_indexed(container_type) and self.l_op.immutable:
                 bounds = self.l_op.compile()
                 # reverse operator
@@ -160,7 +170,7 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                     operator = f'<{operator[1:]}'
                 elif operator.startswith('<'):
                     operator = f'>{operator[1:]}'
-                return self.r_op.get_index_lookup(operator, bounds)
+                return self.r_op.get_index_lookup(operator, bounds, **options)
 
         # logical
         is_logical = self.operator in {'and', 'or'}

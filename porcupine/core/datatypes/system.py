@@ -10,7 +10,6 @@ from .common import String
 from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
 from .reference import ReferenceN
-from .composition import Composition
 
 
 class AclValue(AtomicMapValue):
@@ -199,19 +198,6 @@ class ParentId(String):
         await super().on_change(instance, value, old_value)
         remove_uniques(instance)
         await add_uniques(instance)
-        # # update p_type in composites
-        # for composite_dt in instance.composite_data_types():
-        #     composition = composite_dt.__get__(instance, None)
-        #     with system_override():
-        #         if isinstance(composite_dt, Composition):
-        #             async for composite in composition.items():
-        #                 composite.p_type = instance.p_type
-        #                 await context.txn.upsert(composite)
-        #         else:
-        #             # embedded
-        #             composite = await composition.item()
-        #             composite.p_type = instance.p_type
-        #             await context.txn.upsert(composite)
         instance.reset_effective_acl()
 
     def on_delete(self, instance, value):

@@ -21,6 +21,7 @@ class Select(BaseStatement):
         'where_condition', 'order_by',
         'range', 'computed_fields',
         'where_compiled', 'order_by_compiled',
+        'stale'
     )
 
     def __init__(self, scope, select_list):
@@ -32,6 +33,7 @@ class Select(BaseStatement):
         self.computed_fields = {}
         self.where_compiled = None
         self.order_by_compiled = None
+        self.stale = 'ok'
 
     def prepare(self):
         unnamed_expressions = 0
@@ -69,14 +71,17 @@ class Select(BaseStatement):
         }
 
     async def execute(self, variables):
+        print(self.stale)
         scope, collection = self.scope(self, variables)
         # get scope
         item = await db.get_item(scope, quiet=False)
         scope_type = item.__class__
 
-        feeder = CollectionFeeder(self.scope.collection)
+        feeder = CollectionFeeder(item, collection)
+
         if self.where_condition is not None:
-            feeder = self.where_condition.optimize() or feeder
+            feeder = self.where_condition.optimize(scope_type,
+                                                   stale=self.stale) or feeder
 
         order_by = None
         results_ordered = False
@@ -84,7 +89,7 @@ class Select(BaseStatement):
             order_by = self.order_by.expr
             if order_by.is_indexed(scope_type) and isinstance(feeder,
                                                               CollectionFeeder):
-                feeder = order_by.get_index_lookup()
+                feeder = order_by.get_index_lookup(stale=self.stale)
                 results_ordered = True
 
         select_range = None
@@ -92,7 +97,7 @@ class Select(BaseStatement):
             select_range = self.range(self, variables)
 
         apply_range_prematurely = False
-        if order_by == feeder.ordered_by:
+        if order_by is not None and order_by == feeder.ordered_by:
             if self.order_by.desc != feeder.desc:
                 feeder.reversed = True
             if self.range is not None:
@@ -116,7 +121,7 @@ class Select(BaseStatement):
             else:
                 feeder |= pipe.filter(lambda i: i.is_collection)
 
-        if self.where_condition:
+        if self.where_condition is not None:
             flt = partial(self.where_compiled, s=self, v=variables)
             feeder |= pipe.filter(flt)
 
@@ -124,11 +129,11 @@ class Select(BaseStatement):
         if apply_range_prematurely:
             feeder |= pipe.getitem(select_range)
 
-        if self.order_by and not results_ordered:
+        if self.order_by is not None and not results_ordered:
             key = partial(self.order_by_compiled, s=self, v=variables)
             feeder |= pipe.key_sort(key, _reverse=self.order_by.desc)
 
-        if select_range and not apply_range_prematurely:
+        if select_range is not None and not apply_range_prematurely:
             feeder |= pipe.getitem(select_range)
 
         if self.select_list:

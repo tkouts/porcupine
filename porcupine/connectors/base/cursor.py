@@ -159,8 +159,9 @@ class Range(namedlist('Range', 'l_bound l_inclusive u_bound, u_inclusive')):
 
 
 class BaseCursor(IdStreamer, metaclass=abc.ABCMeta):
-    def __init__(self, index):
+    def __init__(self, index, **options):
         self.index = index
+        self.options = options
         super().__init__(self.get_iterator())
 
     @property

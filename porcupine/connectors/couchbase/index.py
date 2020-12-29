@@ -26,8 +26,8 @@ class Index(BaseIndex):
         view['map'] = str.format(map_func, self.key, subclasses)
         return view
 
-    def get_cursor(self):
-        return Cursor(self)
+    def get_cursor(self, **options):
+        return Cursor(self, **options)
 
     def close(self):
         ...

@@ -16,20 +16,25 @@ class Cursor(BaseCursor):
         return await super().count()
 
     def get_iterator(self):
-        return CursorIterator(self.index)
+        return CursorIterator(self.index,
+                              self.options.get('stale', STALE_OK))
 
     def close(self):
         pass
 
 
 class CursorIterator(AbstractCursorIterator):
-    def __init__(self, index):
+    def __init__(self, index, stale):
         super().__init__(index)
         self.reduce = False
+        self.stale = stale
 
     async def __aiter__(self):
-        kwargs = {'stale': STALE_UPDATE_AFTER,
-                  'reduce': self.reduce}
+        print('stale', self.stale)
+        kwargs = {
+            'stale': self.stale,
+            'reduce': self.reduce
+        }
 
         is_ranged = self.is_ranged
 

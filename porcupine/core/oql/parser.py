@@ -18,12 +18,12 @@ class OqlLexer(Lexer):
         NAME,
         FUNCTION,
         # keywords
-        SELECT, AS, FROM, WHERE, ORDER, BY, ASC, DESC, RANGE
+        SELECT, AS, FROM, WHERE, ORDER, BY, ASC, DESC, RANGE, STALE
     }
 
     keywords = {
         'select', 'as', 'from', 'where', 'order', 'by',
-        'asc', 'desc', 'range',
+        'asc', 'desc', 'range', 'stale',
         # logical operators
         'and', 'or', 'not'
     }
@@ -158,6 +158,16 @@ class OqlParser(Parser):
         p.select_statement.range = DynamicSlice(p.expr0, p.expr1)
         return p.select_statement
 
+    @_('select_statement STALE NAME')
+    def select_statement(self, p):
+        p.select_statement.stale = p.NAME
+        return p.select_statement
+
+    @_('select_statement STALE BOOLEAN')
+    def select_statement(self, p):
+        p.select_statement.stale = p.BOOLEAN
+        return p.select_statement
+
     # field spec
 
     @_('expr')
@@ -182,18 +192,21 @@ class OqlParser(Parser):
 
     # scope
 
-    @_('expr')
+    @_('NAME')
     def scope(self, p):
-        return Scope(p.expr, 'children')
+        return Scope(String(p.NAME), 'children')
 
-    # @_('VAR')
-    # def scope(self, p):
-    #     return Scope(Variable(p.VAR), 'children')
-
-    @_('scope "." NAME')
+    @_('VAR')
     def scope(self, p):
-        p.scope.collection = p.NAME
-        return p.scope
+        return Scope(Variable(p.VAR), 'children')
+
+    @_('NAME "." NAME')
+    def scope(self, p):
+        return Scope(String(p[0]), p[2])
+
+    @_('VAR "." NAME')
+    def scope(self, p):
+        return Scope(Variable(p.VAR), p.NAME)
 
     # expression list
 
@@ -205,6 +218,16 @@ class OqlParser(Parser):
     def expression_list(self, p):
         p.expression_list.append(p.expr)
         return p.expression_list
+
+    # attribute
+
+    @_('NAME')
+    def attr(self, p):
+        return Field(p.NAME)
+
+    @_('attr "." NAME')
+    def attr(self, p):
+        return Field(f'{p.attr}.{p.NAME}')
 
     # expression
 
@@ -242,7 +265,7 @@ class OqlParser(Parser):
 
     @_('BOOLEAN')
     def expr(self, p):
-        return T_False if p.BOOLEAN else T_False
+        return T_True if p.BOOLEAN else T_False
 
     @_('NULL')
     def expr(self, _):
@@ -252,9 +275,9 @@ class OqlParser(Parser):
     def expr(self, p):
         return String(p.STRING)
 
-    @_('NAME')
+    @_('attr')
     def expr(self, p):
-        return Field(p.NAME)
+        return p.attr
 
     @_('INT')
     def expr(self, p):

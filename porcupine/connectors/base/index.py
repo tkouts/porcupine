@@ -55,7 +55,7 @@ class BaseIndex(metaclass=abc.ABCMeta):
         return all_subs
 
     @abc.abstractmethod
-    def get_cursor(self):
+    def get_cursor(self, **options):
         raise NotImplementedError
 
     @abc.abstractmethod
