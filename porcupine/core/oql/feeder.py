@@ -60,9 +60,12 @@ class CollectionFeeder(namedlist('CollectionFeeder',
         return feeder
 
 
-class IndexLookup(namedlist('IndexLookup',
-                            'index_name bounds reversed filter_func',
-                            default=None), Feeder):
+class IndexLookup(
+        namedlist(
+            'IndexLookup',
+            'index_type index_name bounds reversed filter_func',
+            default=None
+        ), Feeder):
     def __init__(self, *args, **kwargs):
         self.options = kwargs.pop('options', {})
         super().__init__(*args, **kwargs)
@@ -76,7 +79,7 @@ class IndexLookup(namedlist('IndexLookup',
         return date.isoformat()
 
     def __call__(self, statement, scope, v):
-        feeder = db_connector().indexes[self.index_name].\
+        feeder = db_connector().indexes[self.index_type][self.index_name].\
             get_cursor(**self.options)
         feeder.set_scope(scope)
         if self.bounds is not None:

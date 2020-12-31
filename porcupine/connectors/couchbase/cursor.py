@@ -30,7 +30,7 @@ class CursorIterator(AbstractCursorIterator):
         self.stale = stale
 
     async def __aiter__(self):
-        print(self.index.name, self.stale)
+        # print(self.index.name, self.stale)
         kwargs = {
             'stale': self.stale,
             'reduce': self.reduce
@@ -73,8 +73,8 @@ class CursorIterator(AbstractCursorIterator):
 
         # print(kwargs)
 
-        async for result in bucket.query('indexes', self.index.name, **kwargs):
-            print('yielding')
+        async for result in bucket.query(self.index.container_type.__name__,
+                                         self.index.name, **kwargs):
             if self.reduce:
                 yield result.value
             else:

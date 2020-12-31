@@ -50,11 +50,18 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def indexes(self):
         if self.__indexes is None:
             # create index map
-            indexed_data_types = self.server.config.__indices__
-            self.__indexes = FrozenDict({
-                attr_name: self.get_index(attr_name, container_types)
-                for attr_name, container_types in indexed_data_types.items()
-            })
+            indexes = self.server.config.__indices__
+            index_map = {}
+            for container_type, indexed_attrs in indexes.items():
+                index_map[container_type] = {
+                    attr: self.get_index(container_type, attr)
+                    for attr in indexed_attrs
+                }
+            self.__indexes = FrozenDict(index_map)
+            # self.__indexes = FrozenDict({
+            #     attr_name: self.get_index(attr_name, container_types)
+            #     for attr_name, container_types in indexed_data_types.items()
+            # })
         return self.__indexes
 
     @abc.abstractmethod

@@ -53,11 +53,9 @@ class ElasticMeta(type):
         cls.__externals_info__ = externals_info
 
         # add indexes
-        if cls.is_collection and hasattr(cls, 'indexes'):
-            for attr in cls.indexes:
-                container_types = DEFAULTS['__indices__'][attr]
-                if not any([issubclass(cls, c) for c in container_types]):
-                    container_types.append(cls)
+        if cls.is_collection:
+            if hasattr(cls, 'indexes') and 'indexes' in cls.__dict__:
+                DEFAULTS['__indices__'][cls] = cls.indexes
 
         # register content class
         utils.ELASTIC_MAP[cls.__name__] = cls

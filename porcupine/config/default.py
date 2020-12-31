@@ -1,5 +1,4 @@
 import tempfile
-from collections import defaultdict
 
 temp_folder = tempfile.gettempdir()
 
@@ -28,7 +27,7 @@ DEFAULTS = {
     # split threshold set to 16K
     'DB_COLLECTION_SPLIT_THRESHOLD': 16 * 1024,
     # internal indexes map - maintained by the system
-    '__indices__': defaultdict(list),
+    '__indices__': {},
 
     # Couchbase VIEWS update parameters
     'COUCH_VIEWS_UPDATE_INTERVAL': 5000,

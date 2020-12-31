@@ -94,9 +94,12 @@ class Select(BaseStatement):
             if feeder is None:
                 if order_by == 'is_collection':
                     results_ordered = True
-                elif order_by.is_indexed(scope_type):
-                    feeder = order_by.get_index_lookup(stale=stale)
-                    results_ordered = True
+                else:
+                    index_type = order_by.get_index_type(scope_type)
+                    if index_type is not None:
+                        feeder = order_by.get_index_lookup(index_type,
+                                                           stale=stale)
+                        results_ordered = True
 
         if feeder is None:
             # full scan

@@ -8,7 +8,7 @@ class BaseIndex(metaclass=abc.ABCMeta):
         'is_collection': '_col'
     }
 
-    def __init__(self, connector, attr_name, container_types):
+    def __init__(self, connector, container_type, attr_name):
         self.connector = connector
 
         if attr_name in self.system_attrs:
@@ -19,21 +19,21 @@ class BaseIndex(metaclass=abc.ABCMeta):
             # gather data types
             data_types = set()
             attr_path = attr_name.split('.')
-            for container_type in container_types:
-                children_types = self.get_all_subclasses(
-                    container_type.containment)
-                top_level_attr = attr_path[0]
-                container_data_types = [
-                    child_type.__schema__[top_level_attr]
-                    for child_type in children_types
-                    if top_level_attr in child_type.__schema__
-                ]
-                if len(container_data_types) == 0:
-                    raise SchemaError(
-                        f'Cannot locate indexed attribute "{attr_name}" '
-                        f'in container type "{container_type.__name__}"'
-                    )
-                data_types.update(container_data_types)
+            # for container_type in container_types:
+            children_types = self.get_all_subclasses(
+                container_type.containment)
+            top_level_attr = attr_path[0]
+            container_data_types = [
+                child_type.__schema__[top_level_attr]
+                for child_type in children_types
+                if top_level_attr in child_type.__schema__
+            ]
+            if len(container_data_types) == 0:
+                raise SchemaError(
+                    f'Cannot locate indexed attribute "{attr_name}" '
+                    f'in container type "{container_type.__name__}"'
+                )
+            data_types.update(container_data_types)
 
             # make sure all storage keys are the same
             storage_keys = [dt.storage_key for dt in data_types]
@@ -45,7 +45,8 @@ class BaseIndex(metaclass=abc.ABCMeta):
             self.name = attr_name
             self.key = '.'.join([storage_keys[0]] + attr_path[1:])
             self.immutable = all([dt.immutable for dt in data_types])
-        self.container_types = self.get_all_subclasses(container_types)
+        self.container_type = container_type
+        self.all_types = self.get_all_subclasses([container_type])
 
     @staticmethod
     def get_all_subclasses(cls_list) -> dict:

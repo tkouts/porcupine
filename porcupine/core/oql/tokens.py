@@ -2,7 +2,7 @@ from typing import Optional, Callable
 from namedlist import namedlist
 from functools import lru_cache
 
-from porcupine.core.services import db_connector
+# from porcupine.core.services import db_connector
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
 
@@ -44,10 +44,11 @@ class Token:
     def source(self):
         return repr(self.value)
 
-    def is_indexed(self, container_type) -> bool:
-        return False
+    def get_index_type(self, container_type) -> Optional[type]:
+        return None
 
     def get_index_lookup(self,
+                         container_type,
                          operator: Optional[str] = None,
                          bounds: Optional[Callable] = None) -> None:
         return None
@@ -85,16 +86,19 @@ class Field(String):
             return f'get_nested_field(i, "{path[0]}", {path[1:]})'
         return f'get_field(i, "{self}", s, v)'
 
-    def is_indexed(self, container_type) -> bool:
-        indexes = db_connector().indexes
-        return self in indexes and \
-            container_type in indexes[self].container_types
+    @lru_cache(maxsize=None)
+    def get_index_type(self, container_type) -> Optional[type]:
+        for cls in container_type.mro():
+            if 'indexes' in cls.__dict__ and self in cls.indexes:
+                return cls
+        return None
 
     def get_index_lookup(self,
+                         index_type,
                          operator: Optional[str] = None,
                          bounds: Optional[Callable] = None,
                          **options) -> IndexLookup:
-        index_lookup = IndexLookup(self, options=options)
+        index_lookup = IndexLookup(index_type, self, options=options)
         if operator is not None:
             if operator == '==':
                 # equality
@@ -160,19 +164,32 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
-            if self.l_op.is_indexed(container_type) and self.r_op.immutable:
-                bounds = self.r_op.compile()
-                return self.l_op.get_index_lookup(self.operator, bounds,
-                                                  **options)
-            if self.r_op.is_indexed(container_type) and self.l_op.immutable:
-                bounds = self.l_op.compile()
-                # reverse operator
-                operator = self.operator
-                if operator.startswith('>'):
-                    operator = f'<{operator[1:]}'
-                elif operator.startswith('<'):
-                    operator = f'>{operator[1:]}'
-                return self.r_op.get_index_lookup(operator, bounds, **options)
+            if self.r_op.immutable:
+                index_type = self.l_op.get_index_type(container_type)
+                if index_type is not None:
+                    bounds = self.r_op.compile()
+                    return self.l_op.get_index_lookup(
+                        index_type,
+                        self.operator,
+                        bounds,
+                        **options
+                    )
+            if self.l_op.immutable:
+                index_type = self.r_op.get_index_type(container_type)
+                if index_type is not None:
+                    bounds = self.l_op.compile()
+                    # reverse operator
+                    operator = self.operator
+                    if operator.startswith('>'):
+                        operator = f'<{operator[1:]}'
+                    elif operator.startswith('<'):
+                        operator = f'>{operator[1:]}'
+                    return self.r_op.get_index_lookup(
+                        index_type,
+                        operator,
+                        bounds,
+                        **options
+                    )
 
         # logical
         is_logical = self.operator in {'and', 'or'}

@@ -41,18 +41,18 @@ class Container(Item):
         return exists
 
     async def children_count(self):
-        cursor = db_connector().indexes['is_collection'].get_cursor()
+        cursor = db_connector().indexes[Container]['is_collection'].get_cursor()
         cursor.set_scope(self.id)
         return await cursor.count()
 
     async def items_count(self):
-        cursor = db_connector().indexes['is_collection'].get_cursor()
+        cursor = db_connector().indexes[Container]['is_collection'].get_cursor()
         cursor.set_scope(self.id)
         cursor.set(False)
         return await cursor.count()
 
     async def containers_count(self):
-        cursor = db_connector().indexes['is_collection'].get_cursor()
+        cursor = db_connector().indexes[Container]['is_collection'].get_cursor()
         cursor.set_scope(self.id)
         cursor.set(True)
         return await cursor.count()

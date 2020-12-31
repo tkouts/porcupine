@@ -56,7 +56,9 @@ class Couchbase(BaseConnector):
             from acouchbase.bucket import Bucket
         else:
             from couchbase.bucket import Bucket
-        return Bucket(connection_string, password=self.password)
+        return Bucket(connection_string,
+                      username=self.user_name,
+                      password=self.password)
 
     def connect(self):
         self.bucket = self._get_bucket()
@@ -175,23 +177,45 @@ class Couchbase(BaseConnector):
 
     # indexes
     async def prepare_indexes(self):
-        # return
         log.info('Preparing indexes')
         config = self.server.config
         bucket = self._get_bucket(_async=False)
-        design_doc = {
-            'views': {},
-            'options': {
-                'updateInterval': int(config.COUCH_VIEWS_UPDATE_INTERVAL),
-                'updateMinChanges': int(config.COUCH_VIEWS_UPDATE_MIN_CHANGES),
-                'replicaUpdateMinChanges':
-                    int(config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES)
-            }
-        }
         mgr = bucket.bucket_manager()
-        for index in self.indexes.values():
-            design_doc['views'][index.name] = index.get_view()
-        mgr.design_create('indexes', design_doc, use_devmode=False)
+
+        old_indexes = set()
+        new_indexes = set()
+
+        # get current indexes
+        for name, _ in mgr.design_list().value.items():
+            if not name.startswith('_design/dev_'):
+                old_indexes.add(name.split('/')[1])
+
+        # create indexes
+        for container_type, indexes in self.indexes.items():
+            design_doc = {
+                'views': {},
+                'options': {
+                    'updateInterval':
+                        int(config.COUCH_VIEWS_UPDATE_INTERVAL),
+                    'updateMinChanges':
+                        int(config.COUCH_VIEWS_UPDATE_MIN_CHANGES),
+                    'replicaUpdateMinChanges':
+                        int(config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES)
+                }
+            }
+            for index in indexes.values():
+                design_doc['views'][index.name] = index.get_view()
+            new_indexes.add(container_type.__name__)
+            mgr.design_create(
+                container_type.__name__,
+                design_doc,
+                use_devmode=False
+            )
+
+        # remove unused
+        for_removal = old_indexes - new_indexes
+        for design in for_removal:
+            mgr.design_delete(design, use_devmode=False)
 
         # # get existing indexes
         # existing = [index.name for index in mgr.list_n1ql_indexes()]

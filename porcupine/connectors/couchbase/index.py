@@ -10,20 +10,25 @@ class Index(BaseIndex):
         view = {
             'reduce': '_count'
         }
-        subclasses = ','.join(
-            [f"'{cls.__name__}'" for cls in self.container_types]
-        )
         map_func = """
             function(d, m) {{
-                if ('_pcc' in d && [{1}].includes(d._pcc)) {{
+                if ('_pcc' in d && {1}) {{
                     try {{
                         emit([d.pid, d.{0}]);
                     }} catch(e) {{}}
                 }}
             }}
         """
+        if len(self.all_types) == 1:
+            type_name = list(self.all_types.keys())[0].__name__
+            type_check = f'"{type_name}" == d._pcc'
+        else:
+            subclasses = ','.join(
+                [f"'{cls.__name__}'" for cls in self.all_types]
+            )
+            type_check = f'[{subclasses}].includes(d._pcc)'
         # print(str.format(map_func, self.key, subclasses))
-        view['map'] = str.format(map_func, self.key, subclasses)
+        view['map'] = str.format(map_func, self.key, type_check)
         return view
 
     def get_cursor(self, **options):
