@@ -44,14 +44,18 @@ class BaseIndex(metaclass=abc.ABCMeta):
                 )
             self.name = attr_name
             self.key = '.'.join([storage_keys[0]] + attr_path[1:])
+            self.immutable = all([dt.immutable for dt in data_types])
         self.container_types = self.get_all_subclasses(container_types)
 
     @staticmethod
-    def get_all_subclasses(cls_list) -> set:
-        all_subs = set()
+    def get_all_subclasses(cls_list) -> dict:
+        all_subs = {}
         for cls in cls_list:
-            all_subs.add(cls)
-            all_subs.update(BaseIndex.get_all_subclasses(cls.__subclasses__()))
+            all_subs.update({
+                cls: None
+                for cls in BaseIndex.get_all_subclasses(cls.__subclasses__())
+            })
+            all_subs[cls] = None
         return all_subs
 
     @abc.abstractmethod
