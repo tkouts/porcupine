@@ -17,7 +17,7 @@ class Cursor(BaseCursor):
 
     def get_iterator(self):
         return CursorIterator(self.index,
-                              self.options.get('stale', STALE_OK))
+                              self.options.get('stale', STALE_UPDATE_AFTER))
 
     def close(self):
         pass
@@ -30,7 +30,7 @@ class CursorIterator(AbstractCursorIterator):
         self.stale = stale
 
     async def __aiter__(self):
-        print('stale', self.stale)
+        print(self.index.name, self.stale)
         kwargs = {
             'stale': self.stale,
             'reduce': self.reduce
@@ -74,6 +74,7 @@ class CursorIterator(AbstractCursorIterator):
         # print(kwargs)
 
         async for result in bucket.query('indexes', self.index.name, **kwargs):
+            print('yielding')
             if self.reduce:
                 yield result.value
             else:

@@ -38,15 +38,15 @@ class Feeder:
 class CollectionFeeder(namedlist('CollectionFeeder',
                                  'item collection reversed',
                                  default=None), Feeder):
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.desc = False
-    #
-    # @property
-    # def ordered_by(self):
-    #     if self.collection == 'children':
-    #         return 'is_collection'
-    #     return None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.desc = False
+
+    @property
+    def ordered_by(self):
+        if self.collection == 'children':
+            return 'is_collection'
+        return None
 
     def __call__(self, statement, scope, v):
         item = self.item

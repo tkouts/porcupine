@@ -168,6 +168,11 @@ class OqlParser(Parser):
         p.select_statement.stale = p.BOOLEAN
         return p.select_statement
 
+    @_('select_statement STALE VAR')
+    def select_statement(self, p):
+        p.select_statement.stale = Variable(p.VAR)
+        return p.select_statement
+
     # field spec
 
     @_('expr')

@@ -4,7 +4,8 @@ from functools import partial
 from porcupine import db, log, pipe
 from porcupine.core.stream.streamer import IdStreamer
 from porcupine.core.oql.feeder import CollectionFeeder
-from porcupine.core.oql.tokens import Field, FunctionCall, is_expression
+from porcupine.core.oql.tokens import Field, FunctionCall, Variable, \
+    is_expression
 
 
 class BaseStatement:
@@ -33,7 +34,7 @@ class Select(BaseStatement):
         self.computed_fields = {}
         self.where_compiled = None
         self.order_by_compiled = None
-        self.stale = 'ok'
+        self.stale = 'update_after'
 
     def prepare(self):
         unnamed_expressions = 0
@@ -71,26 +72,35 @@ class Select(BaseStatement):
         }
 
     async def execute(self, variables):
-        print(self.stale)
         scope, collection = self.scope(self, variables)
         # get scope
         item = await db.get_item(scope, quiet=False)
         scope_type = item.__class__
 
-        feeder = CollectionFeeder(item, collection)
+        stale = self.stale
+        if isinstance(self.stale, Variable):
+            stale = variables[stale]
+
+        feeder = None
 
         if self.where_condition is not None:
             feeder = self.where_condition.optimize(scope_type,
-                                                   stale=self.stale) or feeder
+                                                   stale=stale)
 
         order_by = None
         results_ordered = False
         if self.order_by is not None:
             order_by = self.order_by.expr
-            if order_by.is_indexed(scope_type) and isinstance(feeder,
-                                                              CollectionFeeder):
-                feeder = order_by.get_index_lookup(stale=self.stale)
-                results_ordered = True
+            if feeder is None:
+                if order_by == 'is_collection':
+                    results_ordered = True
+                elif order_by.is_indexed(scope_type):
+                    feeder = order_by.get_index_lookup(stale=stale)
+                    results_ordered = True
+
+        if feeder is None:
+            # full scan
+            feeder = CollectionFeeder(item, collection)
 
         select_range = None
         if self.range is not None:
@@ -103,7 +113,7 @@ class Select(BaseStatement):
             if self.range is not None:
                 apply_range_prematurely = True
 
-        log.debug(f'Feeder: {feeder}')
+        log.debug(f'Feeder: {feeder}, {results_ordered}')
 
         has_optimized_feeder = not isinstance(feeder, CollectionFeeder)
 

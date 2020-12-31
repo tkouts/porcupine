@@ -116,6 +116,9 @@ class Field(String):
 class Variable(Token, str):
     primitive = False
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self})'
+
     def source(self):
         return f'get_var(v, "{self}")'
 
@@ -154,7 +157,6 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
     #     return id(self)
 
     def optimize(self, container_type, **options):
-        print('optimizing')
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
