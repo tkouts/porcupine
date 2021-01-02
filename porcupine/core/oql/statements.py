@@ -84,8 +84,7 @@ class Select(BaseStatement):
         feeder = None
 
         if self.where_condition is not None:
-            feeder = self.where_condition.optimize(scope_type,
-                                                   stale=stale)
+            feeder = self.where_condition.optimize(scope_type, stale=stale)
 
         order_by = None
         results_ordered = False
@@ -111,7 +110,7 @@ class Select(BaseStatement):
 
         apply_range_prematurely = False
         if order_by is not None and order_by == feeder.ordered_by:
-            if self.order_by.desc != feeder.desc:
+            if self.order_by.desc and not feeder.reversed:
                 feeder.reversed = True
             if self.range is not None:
                 apply_range_prematurely = True
