@@ -27,6 +27,7 @@ class BaseStreamer(AsyncIterable):
 
     def reverse(self):
         self.iterator = reverse(self.iterator)
+        return self
 
     def intersection(self, other):
         return IntersectionStreamer(self, other)
