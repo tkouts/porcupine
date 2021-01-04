@@ -49,7 +49,7 @@ class CollectionFeeder(namedlist('CollectionFeeder',
             feeder = item.containers | chain(item.items)
         else:
             feeder = getattr(item, self.collection)
-        if self.reversed:
+        if not self.reversed:
             feeder.reverse()
         return feeder
 
