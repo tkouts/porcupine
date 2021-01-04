@@ -1,4 +1,5 @@
 import abc
+from porcupine import log
 from porcupine.exceptions import SchemaError
 
 
@@ -10,10 +11,10 @@ class BaseIndex(metaclass=abc.ABCMeta):
 
     def __init__(self, connector, container_type, attr_name):
         self.connector = connector
+        self.name = attr_name
 
         if attr_name in self.system_attrs:
             # system attribute
-            self.name = attr_name
             self.key = self.system_attrs[attr_name]
         else:
             # gather data types
@@ -42,19 +43,28 @@ class BaseIndex(metaclass=abc.ABCMeta):
                     f'Index {attr_name} references data types '
                     'with diverse storage keys'
                 )
-            self.name = attr_name
             self.key = '.'.join([storage_keys[0]] + attr_path[1:])
             self.immutable = all([dt.immutable for dt in data_types])
         self.container_type = container_type
         self.all_types = self.get_all_subclasses([container_type])
 
-    @staticmethod
-    def get_all_subclasses(cls_list) -> dict:
+    def get_all_subclasses(self, cls_list) -> dict:
         all_subs = {}
         for cls in cls_list:
+            double_indexed_attrs = [
+                subclass for subclass in cls.__subclasses__()
+                if 'indexes' in subclass.__dict__ and
+                   self.name in subclass.indexes
+            ]
+            if double_indexed_attrs:
+                class_names = [c.__name__ for c in double_indexed_attrs]
+                log.warn(
+                    f'Duplicate index "{self.name}" defined '
+                    f'in {", ".join(class_names)}'
+                )
             all_subs.update({
                 cls: None
-                for cls in BaseIndex.get_all_subclasses(cls.__subclasses__())
+                for cls in self.get_all_subclasses(cls.__subclasses__())
             })
             all_subs[cls] = None
         return all_subs
