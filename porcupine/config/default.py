@@ -16,7 +16,7 @@ DEFAULTS = {
     'DB_HOST': 'localhost',
     'DB_NAME': 'porcupine',
     'DB_USER': 'porcupine',
-    'DB_PASSWORD': '111111',
+    'DB_PASSWORD': '',
     'DB_CACHE_SIZE': 1000,
     # how many times a transaction is retried
     # before an error is raised
