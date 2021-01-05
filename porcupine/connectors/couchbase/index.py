@@ -12,7 +12,7 @@ class Index(BaseIndex):
         }
         map_func = """
             function(d, m) {{
-                if ('_pcc' in d && !d.dl && {1}) {{
+                if (m.type == "json" && '_pcc' in d && !d.dl && {1}) {{
                     try {{
                         emit([d.pid, d.{0}]);
                     }} catch(e) {{}}
