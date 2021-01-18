@@ -1,5 +1,3 @@
-from operator import itemgetter
-
 from porcupine.exceptions import OqlError
 from porcupine.core.utils import date
 
