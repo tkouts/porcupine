@@ -28,6 +28,7 @@ DEFAULTS = {
     'DB_COLLECTION_SPLIT_THRESHOLD': 16 * 1024,
     # internal indexes map - maintained by the system
     '__indices__': {},
+    '__fts_indices__': {},
 
     # Couchbase VIEWS update parameters
     'COUCH_VIEWS_UPDATE_INTERVAL': 5000,

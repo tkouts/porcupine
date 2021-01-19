@@ -56,6 +56,9 @@ class ElasticMeta(type):
         if cls.is_collection:
             if hasattr(cls, 'indexes') and 'indexes' in cls.__dict__:
                 DEFAULTS['__indices__'][cls] = cls.indexes
+            if hasattr(cls, 'full_text_indexes') and \
+                    'full_text_indexes' in cls.__dict__:
+                DEFAULTS['__fts_indices__'][cls] = cls.full_text_indexes
 
         # register content class
         utils.ELASTIC_MAP[cls.__name__] = cls

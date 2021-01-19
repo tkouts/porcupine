@@ -1,4 +1,5 @@
 import abc
+from collections import defaultdict
 
 from porcupine import context
 from porcupine.core import utils
@@ -12,6 +13,7 @@ class BaseConnector(metaclass=abc.ABCMeta):
     active_txns = 0
     TransactionType = Transaction
     IndexType = None
+    FTSIndexType = None
     persist = DefaultPersistence
     supports_ttl = True
 
@@ -50,19 +52,29 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def indexes(self):
         if self.__indexes is None:
             # create index map
-            indexes = self.server.config.__indices__
-            index_map = {}
+            config = self.server.config
+            indexes = config.__indices__
+            fts_indexes = config.__fts_indices__
+            index_map = {
+                'views': defaultdict(dict),
+                'fts': {}
+            }
+            # views
             for container_type, indexed_attrs in indexes.items():
-                index_map[container_type] = {
-                    attr: self.get_index(container_type, attr)
-                    for attr in indexed_attrs
-                }
+                for attr_set in indexed_attrs:
+                    index = self.get_index(container_type, attr_set)
+                    index_map['views'][container_type][index.name] = index
+            # fts
+            for container_type, indexed_attrs in fts_indexes.items():
+                index_map['fts'][container_type] = self.get_fts_index(
+                    container_type, indexed_attrs
+                )
             self.__indexes = FrozenDict(index_map)
-            # self.__indexes = FrozenDict({
-            #     attr_name: self.get_index(attr_name, container_types)
-            #     for attr_name, container_types in indexed_data_types.items()
-            # })
         return self.__indexes
+
+    @property
+    def views(self):
+        return self.indexes['views']
 
     @abc.abstractmethod
     def connect(self):
@@ -180,8 +192,13 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def prepare_indexes(self):
         raise NotImplementedError
 
-    def get_index(self, attr_name, container_types):
-        return self.IndexType(self, attr_name, container_types)
+    def get_index(self, container_type, attrs):
+        if isinstance(attrs, str):
+            attrs = [attrs]
+        return self.IndexType(self, container_type, attrs)
+
+    def get_fts_index(self, container_type, attrs):
+        return self.FTSIndexType(self, container_type, attrs)
 
     # management
     def config(self):

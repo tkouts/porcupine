@@ -14,7 +14,7 @@ class Index(BaseIndex):
             function(d, m) {{
                 if (m.type == "json" && '_pcc' in d && !d.dl && {1}) {{
                     try {{
-                        emit([d.pid, d.{0}]);
+                        emit([d.pid, {0}]);
                     }} catch(e) {{}}
                 }}
             }}
@@ -27,8 +27,12 @@ class Index(BaseIndex):
                 [f"'{cls.__name__}'" for cls in self.all_types]
             )
             type_check = f'[{subclasses}].includes(d._pcc)'
+        formatted_keys = [
+            f'd.{key}' for key in self.keys
+        ]
         # print(str.format(map_func, self.key, subclasses))
-        view['map'] = str.format(map_func, self.key, type_check)
+        view['map'] = str.format(map_func, ', '.join(formatted_keys),
+                                 type_check)
         return view
 
     def get_cursor(self, **options):

@@ -15,6 +15,7 @@ from porcupine.core.utils import default_json_encoder
 from porcupine.connectors.base.connector import BaseConnector
 
 from .index import Index
+from .ftsindex import FTSIndex
 
 couchbase.experimental.enable()
 couchbase.set_json_converters(
@@ -25,6 +26,7 @@ couchbase.set_json_converters(
 
 class Couchbase(BaseConnector):
     IndexType = Index
+    FTSIndexType = FTSIndex
 
     def __init__(self, server):
         super().__init__(server)
@@ -190,8 +192,8 @@ class Couchbase(BaseConnector):
             if not name.startswith('_design/dev_'):
                 old_indexes.add(name.split('/')[1])
 
-        # create indexes
-        for container_type, indexes in self.indexes.items():
+        # create views
+        for container_type, indexes in self.views.items():
             design_doc = {
                 'views': {},
                 'options': {
@@ -217,29 +219,9 @@ class Couchbase(BaseConnector):
         for design in for_removal:
             mgr.design_delete(design, use_devmode=False)
 
-        # # get existing indexes
-        # existing = [index.name for index in mgr.list_n1ql_indexes()]
-        # new_indexes = [ind for name, ind in self.indexes.items()
-        #                if name not in existing]
-        # # create new indexes
-        # for index in new_indexes:
-        #     log.info('Creating index {0}'.format(index.name))
-        #     mgr.create_n1ql_index(index.name,
-        #                           fields=[index.key],
-        #                           defer=True,
-        #                           ignore_exists=True)
-        # # build new indexes
-        # if new_indexes:
-        #     new_indexes_names = [index.name for index in new_indexes]
-        #     log.info('Building indexes {0}'.format(new_indexes_names))
-        #     mgr.build_n1ql_deferred_indexes()
-        #     mgr.watch_n1ql_indexes(new_indexes_names, timeout=120)
-        # # drop old indexes
-        # old_indexes = [ind_name for ind_name in existing
-        #                if ind_name not in self.indexes]
-        # for index in old_indexes:
-        #     log.info('Dropping index {0}'.format(index))
-        #     mgr.drop_n1ql_index(index, ignore_missing=True)
+        # create FTS indexes
+        for container_type, index in self.indexes['fts'].items():
+            ...
 
     def config(self):
         config = self.server.config

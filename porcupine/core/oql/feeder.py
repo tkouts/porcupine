@@ -73,8 +73,8 @@ class IndexLookup(
         return date.isoformat()
 
     def __call__(self, statement, scope, v):
-        feeder = db_connector().indexes[self.index_type][self.index_name].\
-            get_cursor(**self.options)
+        type_views = db_connector().views[self.index_type]
+        feeder = type_views[self.index_name].get_cursor(**self.options)
         feeder.set_scope(scope)
         if self.bounds is not None:
             bounds = self.bounds(None, statement, v)
