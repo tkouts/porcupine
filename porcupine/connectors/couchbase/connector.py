@@ -12,9 +12,7 @@ from couchbase.exceptions import (
     PathNotFoundException,
     DocumentExistsException,
     NotStoredException,
-    NetworkException,
-    # HTTPException,
-    SearchIndexNotFoundException
+    NetworkException
 )
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.management.search import SearchIndex
