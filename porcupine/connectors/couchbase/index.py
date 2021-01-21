@@ -1,3 +1,5 @@
+from couchbase.management.views import View
+
 from porcupine.connectors.base.index import BaseIndex
 from porcupine.connectors.couchbase.cursor import Cursor
 
@@ -6,10 +8,7 @@ class Index(BaseIndex):
     """
     Couchbase index
     """
-    def get_view(self):
-        view = {
-            'reduce': '_count'
-        }
+    def get_view(self) -> View:
         map_func = """
             function(d, m) {{
                 if (m.type == "json" && '_pcc' in d && !d.dl && {1}) {{
@@ -30,10 +29,10 @@ class Index(BaseIndex):
         formatted_keys = [
             f'd.{key}' for key in self.keys
         ]
-        # print(str.format(map_func, self.key, subclasses))
-        view['map'] = str.format(map_func, ', '.join(formatted_keys),
-                                 type_check)
-        return view
+        return View(
+            str.format(map_func, ', '.join(formatted_keys), type_check),
+            reduce='_count'
+        )
 
     def get_cursor(self, **options):
         return Cursor(self, **options)

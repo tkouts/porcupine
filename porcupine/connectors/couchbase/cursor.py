@@ -1,4 +1,4 @@
-from couchbase.views.params import *
+from couchbase_core.views.params import *
 from porcupine.connectors.base.cursor import BaseCursor, AbstractCursorIterator
 
 
@@ -72,13 +72,15 @@ class CursorIterator(AbstractCursorIterator):
         bucket = self.index.connector.bucket
 
         # print(kwargs)
-
-        async for result in bucket.query(self.index.container_type.__name__,
-                                         self.index.name, **kwargs):
+        results = bucket.view_query(
+            self.index.container_type.__name__,
+            self.index.name, **kwargs
+        )
+        async for result in results:
             if self.reduce:
                 yield result.value
             else:
                 if exclude_key is not None and result.key[1] == exclude_key:
                     continue
                 # TODO: return new uncommitted items
-                yield result.docid
+                yield result.id
