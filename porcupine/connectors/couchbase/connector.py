@@ -47,6 +47,7 @@ class Couchbase(BaseConnector):
 
     def __init__(self, server):
         super().__init__(server)
+        self.cluster = None
         self.bucket = None
 
     @property
@@ -80,7 +81,8 @@ class Couchbase(BaseConnector):
         return cluster
 
     async def connect(self):
-        self.bucket = self._get_cluster().bucket(self.bucket_name)
+        self.cluster = self._get_cluster()
+        self.bucket = self.cluster.bucket(self.bucket_name)
         await self.bucket.on_connect()
 
     @context_cacheable(size=1000)
@@ -232,6 +234,7 @@ class Couchbase(BaseConnector):
         # remove unused
         for_removal = old_indexes - new_indexes
         for design in for_removal:
+            log.info(f'Dropping view index {design}')
             views_mgr.drop_design_document(design, namespace)
 
         search_mgr = cluster.search_indexes()
@@ -266,12 +269,13 @@ class Couchbase(BaseConnector):
                     source_name=self.bucket_name,
                     params=index_params
                 )
-                new_fts_indexes.add(search_index_name)
                 search_mgr.upsert_index(search_index)
+            new_fts_indexes.add(search_index_name)
 
         # remove old indexes
         for_removal = old_fts_indexes - new_fts_indexes
         for search_index in for_removal:
+            log.info(f'Dropping FTS index {search_index}')
             search_mgr.drop_index(search_index)
 
     async def truncate(self, **options):
