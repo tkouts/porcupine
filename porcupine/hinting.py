@@ -1,5 +1,12 @@
 from sortedcontainers import SortedList
-from typing import TYPE_CHECKING, TypeVar, Dict, Any, ClassVar, Type
+from typing import (
+    TYPE_CHECKING,
+    TypeVar,
+    Dict,
+    Any,
+    ClassVar,
+    Type
+)
 
 
 class _Hinter:
@@ -9,8 +16,12 @@ class _Hinter:
             # Data types #
             ##############
 
-            from porcupine.datatypes import DataType, Composition, Embedded, \
+            from porcupine.datatypes import (
+                DataType,
+                Composition,
+                Embedded,
                 ReferenceN
+            )
 
             self.DT_CO = TypeVar('DT_CO', bound=DataType, covariant=True)
             self.DT_COMPOSITION_CO = TypeVar('DT_COMPOSITION_CO',
@@ -25,8 +36,10 @@ class _Hinter:
             # Data type values #
             ####################
 
-            from porcupine.core.datatypes.composition import EmbeddedItem, \
+            from porcupine.core.datatypes.composition import (
+                EmbeddedItem,
                 EmbeddedCollection
+            )
 
             self.COMPOSITION_CO = TypeVar('COMPOSITION_CO',
                                           EmbeddedItem, EmbeddedCollection,
@@ -58,6 +71,19 @@ class _Hinter:
 
             self.SORTED_LIST_TYPE = Type[SortedList]
             self.STORAGE_TYPE = Type[Record]
+
+            #############
+            # Streamers #
+            #############
+
+            from porcupine.connectors.base.cursors import BaseIterator
+            from porcupine.core.stream.streamer import BaseStreamer
+
+            self.STREAMER_ITERATOR_TYPE = TypeVar(
+                'STREAMER_ITERATOR_TYPE',
+                BaseStreamer, BaseIterator,
+                covariant=True
+            )
 
             #########
             # Other #

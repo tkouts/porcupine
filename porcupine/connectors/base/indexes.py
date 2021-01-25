@@ -3,19 +3,20 @@ from porcupine import log
 from porcupine.exceptions import SchemaError
 
 
-class BaseIndex(metaclass=abc.ABCMeta):
+class SecondaryIndexBase(metaclass=abc.ABCMeta):
     system_attrs = {
         'content_class': '_cc',
         'is_collection': '_col'
     }
 
-    def __init__(self, connector, container_type, attr_names):
+    def __init__(self, connector, container_type, attr_list):
         self.connector = connector
-        self.name = ','.join(attr_names)
+        self.attrs = attr_list
+        self.name = ','.join(attr_list)
 
         self.keys = []
         self.immutable = True
-        for attr_name in attr_names:
+        for attr_name in attr_list:
             if attr_name in self.system_attrs:
                 # system attribute
                 self.keys.append(self.system_attrs[attr_name])
@@ -55,23 +56,33 @@ class BaseIndex(metaclass=abc.ABCMeta):
     def get_all_subclasses(self, cls_list) -> dict:
         all_subs = {}
         for cls in cls_list:
-            double_indexed_attrs = [
-                subclass for subclass in cls.__subclasses__()
-                if 'indexes' in subclass.__dict__ and
-                   self.name in subclass.indexes
-            ]
-            if double_indexed_attrs:
-                class_names = [c.__name__ for c in double_indexed_attrs]
-                log.warn(
-                    f'Duplicate index "{self.name}" defined '
-                    f'in {", ".join(class_names)}'
-                )
+            index_attr = self.index_attr
+            for attr_name in self.attrs:
+                double_indexed_attrs = [
+                    subclass for subclass in cls.__subclasses__()
+                    if index_attr in subclass.__dict__ and
+                    attr_name in getattr(subclass, index_attr)
+                ]
+                if double_indexed_attrs:
+                    class_names = [c.__name__ for c in double_indexed_attrs]
+                    log.warn(
+                        f'Duplicate index "{attr_name}" defined '
+                        f'in {", ".join(class_names)}'
+                    )
             all_subs.update({
                 cls: None
                 for cls in self.get_all_subclasses(cls.__subclasses__())
             })
             all_subs[cls] = None
         return all_subs
+
+    @property
+    def container_name(self):
+        return self.container_type.__name__
+
+    @property
+    def index_attr(self):
+        return 'indexes'
 
     @abc.abstractmethod
     def get_cursor(self, **options):
@@ -80,3 +91,9 @@ class BaseIndex(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def close(self):
         raise NotImplementedError
+
+
+class FTSIndexBase(SecondaryIndexBase, metaclass=abc.ABCMeta):
+    @property
+    def index_attr(self):
+        return 'fts_indexes'

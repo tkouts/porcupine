@@ -1,10 +1,13 @@
 from couchbase_core.views.params import *
-from porcupine.connectors.base.cursor import BaseCursor, AbstractCursorIterator
+from porcupine.connectors.base.cursors import (
+    SecondaryIndexCursor,
+    SecondaryIndexIterator
+)
 
 
-class Cursor(BaseCursor):
+class Cursor(SecondaryIndexCursor):
     """
-    Couchbase cursor
+    Couchbase view cursor
     """
     async def count(self):
         if not self.is_ranged:
@@ -16,14 +19,19 @@ class Cursor(BaseCursor):
         return await super().count()
 
     def get_iterator(self):
-        return CursorIterator(self.index,
-                              self.options.get('stale', STALE_UPDATE_AFTER))
+        return CursorIterator(
+            self.index,
+            self.options.get('stale', STALE_UPDATE_AFTER)
+        )
 
     def close(self):
         pass
 
 
-class CursorIterator(AbstractCursorIterator):
+class CursorIterator(SecondaryIndexIterator):
+    """
+    Couchbase view iterator
+    """
     def __init__(self, index, stale):
         super().__init__(index)
         self.reduce = False
@@ -73,8 +81,9 @@ class CursorIterator(AbstractCursorIterator):
 
         # print(kwargs)
         results = bucket.view_query(
-            self.index.container_type.__name__,
-            self.index.name, **kwargs
+            self.index.container_name,
+            self.index.name,
+            **kwargs
         )
         async for result in results:
             if self.reduce:

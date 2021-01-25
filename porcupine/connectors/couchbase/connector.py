@@ -24,7 +24,7 @@ from porcupine.core.utils import default_json_encoder
 from porcupine.connectors.base.connector import BaseConnector
 from porcupine.connectors.couchbase.management.views import \
     DesignDocumentWithOptions
-from porcupine.connectors.couchbase.index import Index
+from porcupine.connectors.couchbase.viewindex import Index
 from porcupine.connectors.couchbase.ftsindex import FTSIndex
 
 # SDK patch for fixing async appends

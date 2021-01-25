@@ -8,7 +8,7 @@ from porcupine.core.stream.operators import reverse
 
 
 class BaseStreamer(AsyncIterable):
-    def __init__(self, iterator: AsyncIterable):
+    def __init__(self, iterator: TYPING.STREAMER_ITERATOR_TYPE):
         self.iterator = iterator
         self.is_wrapped = False
 

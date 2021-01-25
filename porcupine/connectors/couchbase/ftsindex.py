@@ -1,10 +1,10 @@
-from porcupine.connectors.base.index import BaseIndex
-from porcupine.connectors.couchbase.cursor import Cursor
+from porcupine.connectors.base.indexes import FTSIndexBase
+from porcupine.connectors.couchbase.ftscursor import FTSCursor
 
 
-class FTSIndex(BaseIndex):
+class FTSIndex(FTSIndexBase):
     """
-    Couchbase FTS index
+    Couchbase FTS Index
     """
     def get_params(self) -> dict:
         params = dict(
@@ -64,7 +64,7 @@ class FTSIndex(BaseIndex):
         return params
 
     def get_cursor(self, **options):
-        return Cursor(self, **options)
+        return FTSCursor(self, **options)
 
     def close(self):
         ...

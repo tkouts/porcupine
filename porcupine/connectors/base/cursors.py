@@ -164,6 +164,29 @@ class BaseCursor(IdStreamer, metaclass=abc.ABCMeta):
         self.options = options
         super().__init__(self.get_iterator())
 
+    @abc.abstractmethod
+    def get_iterator(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def close(self):
+        raise NotImplementedError
+
+
+class BaseIterator(AsyncIterable, metaclass=abc.ABCMeta):
+    def __init__(self, index):
+        self.index = index
+
+    @abc.abstractmethod
+    def __aiter__(self):
+        raise NotImplementedError
+
+
+###############################
+# Secondary Index Base Cursor #
+###############################
+
+class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
     @property
     def is_ranged(self):
         return self.iterator.is_ranged
@@ -182,21 +205,15 @@ class BaseCursor(IdStreamer, metaclass=abc.ABCMeta):
         self.iterator.reverse()
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(scope="{self.iterator.scope}", ' \
-               f'bounds={self.iterator.bounds})'
-
-    @abc.abstractmethod
-    def get_iterator(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def close(self):
-        raise NotImplementedError
+        return (
+            f'{self.__class__.__name__}(scope="{self.iterator.scope}", '
+            f'bounds={self.iterator.bounds})'
+        )
 
 
-class AbstractCursorIterator(AsyncIterable, metaclass=abc.ABCMeta):
+class SecondaryIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
     def __init__(self, index):
-        self.index = index
+        super().__init__(index)
         self._bounds = None
         self._reversed = False
         self._scope = None
@@ -222,6 +239,49 @@ class AbstractCursorIterator(AsyncIterable, metaclass=abc.ABCMeta):
     def reverse(self):
         self._reversed = not self._reversed
 
-    @abc.abstractmethod
-    def __aiter__(self):
-        raise NotImplementedError
+
+#########################
+# FTS Index Base Cursor #
+#########################
+
+class FTSIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
+    @property
+    def is_ranged(self):
+        return self.iterator.is_ranged
+
+    @property
+    def scope(self):
+        return self.iterator.scope
+
+    def set_scope(self, scope):
+        self.iterator.set_scope(scope)
+
+    def set_term(self, term):
+        self.iterator.set_term(term)
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}(scope="{self.iterator.scope}", '
+            f'term={self.iterator.term})'
+        )
+
+
+class FTSIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
+    def __init__(self, index):
+        super().__init__(index)
+        self._term = None
+        self._scope = None
+
+    @property
+    def term(self):
+        return self._term
+
+    @property
+    def scope(self):
+        return self._scope
+
+    def set_scope(self, scope):
+        self._scope = scope
+
+    def set_term(self, term):
+        self._term = term

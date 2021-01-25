@@ -5,7 +5,7 @@ from namedlist import namedlist
 
 from porcupine.core.services import db_connector
 from porcupine.core.utils.date import DateTime, Date
-from porcupine.connectors.base.cursor import Range
+from porcupine.connectors.base.cursors import Range
 from porcupine.core.stream.streamer import EmptyStreamer
 from porcupine.pipe import filter, chain
 

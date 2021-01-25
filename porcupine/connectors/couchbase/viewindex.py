@@ -1,12 +1,12 @@
 from couchbase.management.views import View
 
-from porcupine.connectors.base.index import BaseIndex
-from porcupine.connectors.couchbase.cursor import Cursor
+from porcupine.connectors.base.indexes import SecondaryIndexBase
+from porcupine.connectors.couchbase.viewcursor import Cursor
 
 
-class Index(BaseIndex):
+class Index(SecondaryIndexBase):
     """
-    Couchbase index
+    Couchbase Views Index
     """
     def get_view(self) -> View:
         map_func = """
