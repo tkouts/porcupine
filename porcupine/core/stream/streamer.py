@@ -97,9 +97,10 @@ class IntersectionStreamer(CombinedIdStreamer):
         async for sorted_collection in self.streamer1 | pipe.sort():
             collection = sorted_collection
         # print('COLLECTION', collection)
-        async for x in self.streamer2:
-            if x in collection:
-                yield x
+        if collection:
+            async for x in self.streamer2:
+                if x in collection:
+                    yield x
 
 
 class UnionStreamer(CombinedIdStreamer):
