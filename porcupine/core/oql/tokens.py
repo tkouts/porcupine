@@ -2,7 +2,6 @@ from typing import Optional, Callable
 from namedlist import namedlist
 from functools import lru_cache
 
-# from porcupine.core.services import db_connector
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
 
@@ -16,6 +15,7 @@ __all__ = (
     'Field',
     'Variable',
     'FunctionCall',
+    'FreeText',
     'Expression',
     'UnaryExpression',
     'DynamicSlice',
@@ -38,19 +38,18 @@ class Token:
 
     def compile(self) -> Callable:
         code = f'lambda i, s, v: {self.source()}'
-        # print(code)
         return eval(code, environment)
 
     def source(self):
         return repr(self.value)
 
-    def get_index_type(self, container_type) -> Optional[type]:
+    def _get_indexed_container_type(self, container_type) -> None:
         return None
 
-    def get_index_lookup(self,
-                         container_type,
-                         operator: Optional[str] = None,
-                         bounds: Optional[Callable] = None) -> None:
+    def get_index_lookup(self, container_type, **options) -> None:
+        return None
+
+    def optimize(self, container_type, **options):
         return None
 
 
@@ -75,10 +74,6 @@ class Field(String):
     primitive = False
     immutable = False
 
-    @staticmethod
-    def optimize():
-        return None
-
     def source(self):
         if '.' in self:
             # nested attribute
@@ -87,34 +82,36 @@ class Field(String):
         return f'get_field(i, "{self}", s, v)'
 
     @lru_cache(maxsize=None)
-    def get_index_type(self, container_type) -> Optional[type]:
+    def _get_indexed_container_type(self, container_type) -> Optional[type]:
         for cls in container_type.mro():
             if 'indexes' in cls.__dict__ and self in cls.indexes:
                 return cls
         return None
 
     def get_index_lookup(self,
-                         index_type,
+                         container_type,
                          operator: Optional[str] = None,
                          bounds: Optional[Callable] = None,
-                         **options) -> IndexLookup:
-        index_lookup = IndexLookup(index_type, self, options=options)
-        if operator is not None:
-            if operator == '==':
-                # equality
-                index_lookup.bounds = bounds
-            elif operator.startswith('>'):
-                dynamic_range = DynamicRange(bounds)
-                dynamic_range.l_inclusive = operator == '>='
-                index_lookup.bounds = dynamic_range
-            elif operator.startswith('<'):
-                dynamic_range = DynamicRange(None, False, bounds)
-                dynamic_range.u_inclusive = operator == '<='
-                index_lookup.bounds = dynamic_range
-        else:
-            # scan all
-            index_lookup.bounds = DynamicRange()
-        return index_lookup
+                         **options) -> Optional[IndexLookup]:
+        indexed_type = self._get_indexed_container_type(container_type)
+        if indexed_type is not None:
+            index_lookup = IndexLookup(indexed_type, self, options=options)
+            if operator is not None:
+                if operator == '==':
+                    # equality
+                    index_lookup.bounds = bounds
+                elif operator.startswith('>'):
+                    dynamic_range = DynamicRange(bounds)
+                    dynamic_range.l_inclusive = operator == '>='
+                    index_lookup.bounds = dynamic_range
+                elif operator.startswith('<'):
+                    dynamic_range = DynamicRange(None, False, bounds)
+                    dynamic_range.u_inclusive = operator == '<='
+                    index_lookup.bounds = dynamic_range
+            else:
+                # scan all
+                index_lookup.bounds = DynamicRange()
+            return index_lookup
 
 
 class Variable(Token, str):
@@ -135,19 +132,66 @@ class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):
         return all((arg.immutable for arg in self.args))
 
     def source(self):
+        # add item arg first
         args = ['i']
         if self.args:
             args.extend([arg.source() for arg in self.args])
         return f'{self.func}({", ".join(args)})'
 
 
+class FreeText(namedlist('FreeText', 'field term'), Token):
+    primitive = False
+    immutable = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        Token.__init__(self, True)
+
+    def __hash__(self):
+        return hash(self.field)
+
+    @lru_cache(maxsize=None)
+    def _get_indexed_container_type(self, container_type) -> Optional[type]:
+        for cls in container_type.mro():
+            if 'full_text_indexes' in cls.__dict__:
+                if self.field == '*' or self in cls.full_text_indexes:
+                    return cls
+        return None
+
+    def get_index_lookup(self,
+                         container_type,
+                         **options):
+        indexed_type = self._get_indexed_container_type(container_type)
+        if indexed_type is not None:
+            index_lookup = FTSIndexLookup(
+                indexed_type,
+                self.field,
+                self.term,
+                options=options
+            )
+            return index_lookup
+        # print('Non indexed fts lookup')
+        return EmptyFeeder()
+
+    @lru_cache(maxsize=None)
+    def optimize(self, container_type, **options):
+        return self.get_index_lookup(
+            container_type,
+            **options
+        )
+
+
 class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
+    def __hash__(self):
+        source = self.source()
+        # print(source)
+        return hash(source)
+
     @property
     def primitive(self):
         return self.l_op.primitive and self.r_op.primitive
 
     @property
-    # @lru_cache(maxsize=None)
     def immutable(self):
         return self.l_op.immutable and self.r_op.immutable
 
@@ -157,44 +201,59 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
             return repr(eval(source))
         return source
 
-    # def __hash__(self):
-    #     return id(self)
-
+    @lru_cache(maxsize=None)
     def optimize(self, container_type, **options):
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
             if self.r_op.immutable:
-                index_type = self.l_op.get_index_type(container_type)
-                if index_type is not None:
-                    bounds = self.r_op.compile()
-                    return self.l_op.get_index_lookup(
-                        index_type,
-                        self.operator,
-                        bounds,
-                        **options
-                    )
+                # print('compiling')
+                bounds = self.r_op.compile()
+                index_lookup = self.l_op.get_index_lookup(
+                    container_type,
+                    self.operator,
+                    bounds,
+                    **options
+                )
+                if index_lookup is not None:
+                    # bounds = self.r_op.compile()
+                    # index_lookup.bounds = bounds
+                    return index_lookup
+                    # return self.l_op.get_index_lookup(
+                    #     index_type,
+                    #     self.operator,
+                    #     bounds,
+                    #     **options
+                    # )
             if self.l_op.immutable:
-                index_type = self.r_op.get_index_type(container_type)
-                if index_type is not None:
-                    bounds = self.l_op.compile()
-                    # reverse operator
-                    operator = self.operator
-                    if operator.startswith('>'):
-                        operator = f'<{operator[1:]}'
-                    elif operator.startswith('<'):
-                        operator = f'>{operator[1:]}'
-                    return self.r_op.get_index_lookup(
-                        index_type,
-                        operator,
-                        bounds,
-                        **options
-                    )
+                # reverse operator
+                operator = self.operator
+                if operator.startswith('>'):
+                    operator = f'<{operator[1:]}'
+                elif operator.startswith('<'):
+                    operator = f'>{operator[1:]}'
+                bounds = self.l_op.compile()
+                index_lookup = self.r_op.get_index_lookup(
+                    container_type,
+                    operator,
+                    bounds,
+                    **options
+                )
+                if index_lookup is not None:
+                    return index_lookup
+                    # bounds = self.l_op.compile()
+                    # return self.r_op.get_index_lookup(
+                    #     index_type,
+                    #     operator,
+                    #     bounds,
+                    #     **options
+                    # )
 
         # logical
         is_logical = self.operator in {'and', 'or'}
         if is_logical:
-            optimized = [op.optimize() for op in (self.l_op, self.r_op)]
+            optimized = [op.optimize(container_type, **options)
+                         for op in (self.l_op, self.r_op)]
             if self.operator == 'and':
                 if all(optimized):
                     # intersection

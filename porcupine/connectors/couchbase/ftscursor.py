@@ -18,10 +18,15 @@ class FTSCursor(FTSIndexCursor):
 
 
 class FTSCursorIterator(FTSIndexIterator):
-    PAGE_SIZE = 10
-
     async def __aiter__(self):
-        # print(self.index.name, self.stale)
         cluster = self.index.connector.cluster
         scope_query = TermQuery(self.scope, field='pid')
         match_query = MatchQuery(self._term)
+        query = ConjunctionQuery(match_query, scope_query)
+        results = cluster.search_query(
+            self.index.container_name,
+            query
+        )
+        async for hit in results:
+            # print(hit.id)
+            yield hit.id

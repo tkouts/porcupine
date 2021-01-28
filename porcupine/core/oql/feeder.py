@@ -12,7 +12,9 @@ from porcupine.pipe import filter, chain
 __all__ = (
     'DynamicRange',
     'CollectionFeeder',
+    'EmptyFeeder',
     'IndexLookup',
+    'FTSIndexLookup',
     'Intersection',
     'Union',
 )
@@ -33,6 +35,11 @@ class Feeder:
 
     def __call__(self, statement, scope, v):
         raise NotImplementedError
+
+
+class EmptyFeeder(Feeder):
+    def __call__(self, statement, scope, v):
+        return EmptyStreamer()
 
 
 class CollectionFeeder(namedlist('CollectionFeeder',
@@ -88,6 +95,28 @@ class IndexLookup(
             feeder.set(bounds)
         if self.reversed:
             feeder.reverse()
+        if self.filter_func is not None:
+            flt = partial(self.filter_func, s=statement, v=v)
+            feeder = feeder.items() | filter(flt)
+        return feeder
+
+
+class FTSIndexLookup(
+        namedlist(
+            'FTSIndexLookup',
+            'index_type field term filter_func',
+            default=None
+        ), Feeder):
+    def __init__(self, *args, **kwargs):
+        self.options = kwargs.pop('options', {})
+        super().__init__(*args, **kwargs)
+        Feeder.__init__(self)
+
+    def __call__(self, statement, scope, v):
+        fts_index = db_connector().fts_indexes[self.index_type]
+        feeder = fts_index.get_cursor(**self.options)
+        feeder.set_scope(scope)
+        feeder.set_term(self.term)
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)

@@ -18,12 +18,12 @@ class OqlLexer(Lexer):
         NAME,
         FUNCTION,
         # keywords
-        SELECT, AS, FROM, WHERE, ORDER, BY, ASC, DESC, RANGE, STALE
+        SELECT, AS, FROM, WHERE, ORDER, BY, ASC, DESC, RANGE, STALE, FREETEXT
     }
 
     keywords = {
         'select', 'as', 'from', 'where', 'order', 'by',
-        'asc', 'desc', 'range', 'stale',
+        'asc', 'desc', 'range', 'stale', 'freetext',
         # logical operators
         'and', 'or', 'not'
     }
@@ -259,6 +259,10 @@ class OqlParser(Parser):
     @_('FUNCTION "(" expression_list ")"')
     def expr(self, p):
         return FunctionCall(p.FUNCTION, p.expression_list)
+
+    @_('FREETEXT "(" STRING ")"')
+    def expr(self, p):
+        return FreeText('*', p.STRING)
 
     @_('"(" expr ")"')
     def expr(self, p):

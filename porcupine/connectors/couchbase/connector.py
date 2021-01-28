@@ -34,9 +34,14 @@ if 'append' not in Client._MEMCACHED_OPERATIONS:
     # noinspection PyProtectedMember
     Client._MEMCACHED_OPERATIONS = Client._MEMCACHED_OPERATIONS + ('append', )
 
+
+def json_dumps(obj):
+    return orjson.dumps(obj, default=default_json_encoder).decode()
+
+
 couchbase_core.experimental.enable()
 couchbase_core.set_json_converters(
-    partial(orjson.dumps, default=default_json_encoder),
+    json_dumps,
     orjson.loads
 )
 

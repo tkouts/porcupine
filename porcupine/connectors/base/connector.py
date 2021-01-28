@@ -76,6 +76,10 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def views(self):
         return self.indexes['views']
 
+    @property
+    def fts_indexes(self):
+        return self.indexes['fts']
+
     @abc.abstractmethod
     def connect(self):
         raise NotImplementedError
@@ -201,8 +205,8 @@ class BaseConnector(metaclass=abc.ABCMeta):
         return self.FTSIndexType(self, container_type, attrs)
 
     # management
-    def config(self):
-        return {}
+    # def config(self):
+    #     return {}
 
     @abc.abstractmethod
     async def truncate(self, **options):
