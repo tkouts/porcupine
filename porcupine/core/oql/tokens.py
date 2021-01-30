@@ -34,13 +34,16 @@ class Token:
 
     def __init__(self, value, *_args, **_kwargs):
         self.value = value
+        self.__lambda = None
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.value})'
 
     def compile(self) -> Callable:
-        code = f'lambda i, s, v: {self.source()}'
-        return eval(code, environment)
+        if self.__lambda is None:
+            code = f'lambda i, s, v: {self.source()}'
+            self.__lambda = eval(code, environment)
+        return self.__lambda
 
     def source(self):
         return repr(self.value)
@@ -123,6 +126,10 @@ class Variable(Token, str):
 class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):
     primitive = False
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        Token.__init__(self, None)
+
     @property
     def immutable(self):
         return all((arg.immutable for arg in self.args))
@@ -181,6 +188,10 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
 
 
 class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        Token.__init__(self, None)
+
     @property
     def primitive(self):
         return self.l_op.primitive and self.r_op.primitive
@@ -264,6 +275,10 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
 
 
 class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        Token.__init__(self, None)
+
     @property
     def primitive(self):
         return self.operand.primitive
