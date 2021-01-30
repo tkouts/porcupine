@@ -2,6 +2,8 @@ from typing import Optional, Callable
 from namedlist import namedlist
 from functools import lru_cache
 
+from porcupine import log
+from porcupine.exceptions import OqlError
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
 
@@ -52,6 +54,9 @@ class Token:
     def optimize(self, container_type, **options):
         return None
 
+    def __call__(self, statement, v):
+        return self.value
+
 
 T_True = Token(True)
 T_False = Token(False)
@@ -88,30 +93,18 @@ class Field(String):
                 return cls
         return None
 
-    def get_index_lookup(self,
-                         container_type,
-                         operator: Optional[str] = None,
-                         bounds: Optional[Callable] = None,
+    def get_index_lookup(self, container_type,
                          **options) -> Optional[IndexLookup]:
         indexed_type = self._get_indexed_container_type(container_type)
         if indexed_type is not None:
             index_lookup = IndexLookup(indexed_type, self, options=options)
-            if operator is not None:
-                if operator == '==':
-                    # equality
-                    index_lookup.bounds = bounds
-                elif operator.startswith('>'):
-                    dynamic_range = DynamicRange(bounds)
-                    dynamic_range.l_inclusive = operator == '>='
-                    index_lookup.bounds = dynamic_range
-                elif operator.startswith('<'):
-                    dynamic_range = DynamicRange(None, False, bounds)
-                    dynamic_range.u_inclusive = operator == '<='
-                    index_lookup.bounds = dynamic_range
-            else:
-                # scan all
-                index_lookup.bounds = DynamicRange()
             return index_lookup
+
+    def optimize(self, container_type, **options):
+        return self.get_index_lookup(
+            container_type,
+            **options
+        )
 
 
 class Variable(Token, str):
@@ -122,6 +115,9 @@ class Variable(Token, str):
 
     def source(self):
         return f'get_var(v, "{self}")'
+
+    def __call__(self, statement, v):
+        return environment['get_var'](v, self)
 
 
 class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):
@@ -137,6 +133,10 @@ class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):
         if self.args:
             args.extend([arg.source() for arg in self.args])
         return f'{self.func}({", ".join(args)})'
+
+    def __call__(self, statement, v):
+        args = [arg(statement, v) for arg in self.args]
+        return environment[self.func](None, *args)
 
 
 class FreeText(namedlist('FreeText', 'field term'), Token):
@@ -158,9 +158,7 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
                     return cls
         return None
 
-    def get_index_lookup(self,
-                         container_type,
-                         **options):
+    def get_index_lookup(self, container_type, **options):
         indexed_type = self._get_indexed_container_type(container_type)
         if indexed_type is not None:
             index_lookup = FTSIndexLookup(
@@ -170,11 +168,12 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
                 options=options
             )
             return index_lookup
-        # print('Non indexed fts lookup')
+        log.warn(f'Non indexed FTS lookup on {container_type.__name__}')
         return EmptyFeeder()
 
-    @lru_cache(maxsize=None)
     def optimize(self, container_type, **options):
+        if not self.term.immutable:
+            raise OqlError('FREETEXT term should be immutable')
         return self.get_index_lookup(
             container_type,
             **options
@@ -182,11 +181,6 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
 
 
 class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
-    def __hash__(self):
-        source = self.source()
-        # print(source)
-        return hash(source)
-
     @property
     def primitive(self):
         return self.l_op.primitive and self.r_op.primitive
@@ -201,53 +195,49 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
             return repr(eval(source))
         return source
 
-    @lru_cache(maxsize=None)
+    def __call__(self, statement, v):
+        return self.compile()(None, statement, v)
+
     def optimize(self, container_type, **options):
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
+            operator = self.operator
+            bounds = None
+            index_lookup = None
             if self.r_op.immutable:
-                # print('compiling')
-                bounds = self.r_op.compile()
                 index_lookup = self.l_op.get_index_lookup(
                     container_type,
-                    self.operator,
-                    bounds,
                     **options
                 )
-                if index_lookup is not None:
-                    # bounds = self.r_op.compile()
-                    # index_lookup.bounds = bounds
-                    return index_lookup
-                    # return self.l_op.get_index_lookup(
-                    #     index_type,
-                    #     self.operator,
-                    #     bounds,
-                    #     **options
-                    # )
-            if self.l_op.immutable:
+                bounds = self.r_op
+            elif self.l_op.immutable:
                 # reverse operator
-                operator = self.operator
                 if operator.startswith('>'):
                     operator = f'<{operator[1:]}'
                 elif operator.startswith('<'):
                     operator = f'>{operator[1:]}'
-                bounds = self.l_op.compile()
                 index_lookup = self.r_op.get_index_lookup(
                     container_type,
-                    operator,
-                    bounds,
                     **options
                 )
-                if index_lookup is not None:
-                    return index_lookup
-                    # bounds = self.l_op.compile()
-                    # return self.r_op.get_index_lookup(
-                    #     index_type,
-                    #     operator,
-                    #     bounds,
-                    #     **options
-                    # )
+                bounds = self.l_op
+
+            if index_lookup is not None:
+                bounds = bounds.compile()
+                if operator is not None:
+                    if operator == '==':
+                        # equality
+                        index_lookup.bounds = bounds
+                    elif operator.startswith('>'):
+                        dynamic_range = DynamicRange(bounds)
+                        dynamic_range.l_inclusive = operator == '>='
+                        index_lookup.bounds = dynamic_range
+                    elif operator.startswith('<'):
+                        dynamic_range = DynamicRange(None, False, bounds)
+                        dynamic_range.u_inclusive = operator == '<='
+                        index_lookup.bounds = dynamic_range
+                return index_lookup
 
         # logical
         is_logical = self.operator in {'and', 'or'}

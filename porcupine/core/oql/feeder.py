@@ -116,7 +116,7 @@ class FTSIndexLookup(
         fts_index = db_connector().fts_indexes[self.index_type]
         feeder = fts_index.get_cursor(**self.options)
         feeder.set_scope(scope)
-        feeder.set_term(self.term)
+        feeder.set_term(self.term(statement, v))
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
@@ -131,7 +131,11 @@ class Intersection(namedlist('Intersection', 'first second'), Feeder):
     def __call__(self, statement, scope, v):
         first_feeder = self.first(statement, scope, v)
         second_feeder = self.second(statement, scope, v)
-        if self.first.index_name == self.second.index_name:
+        is_same_index = (
+            all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
+            and self.first.index_name == self.second.index_name
+        )
+        if is_same_index:
             ranged = next(feeder for feeder in (first_feeder, second_feeder)
                           if feeder.is_ranged)
             if ranged:
@@ -154,7 +158,11 @@ class Union(namedlist('Union', 'first second'), Feeder):
     def __call__(self, statement, scope, v):
         first_feeder = self.first(statement, scope, v)
         second_feeder = self.second(statement, scope, v)
-        if self.first.index_name == self.second.index_name:
+        is_same_index = (
+            all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
+            and self.first.index_name == self.second.index_name
+        )
+        if is_same_index:
             ranged = next(feeder for feeder in (first_feeder, second_feeder)
                           if feeder.is_ranged)
             if ranged:

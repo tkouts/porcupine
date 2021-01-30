@@ -260,9 +260,9 @@ class OqlParser(Parser):
     def expr(self, p):
         return FunctionCall(p.FUNCTION, p.expression_list)
 
-    @_('FREETEXT "(" STRING ")"')
+    @_('FREETEXT "(" expr ")"')
     def expr(self, p):
-        return FreeText('*', p.STRING)
+        return FreeText('*', p.expr)
 
     @_('"(" expr ")"')
     def expr(self, p):
