@@ -5,13 +5,21 @@ from porcupine.core.utils import date
 def get_field(item, field, statement, var_map):
     if field in statement.computed_fields:
         return statement.computed_fields[field](item, statement, var_map)
-    return getattr(item, field)
+    try:
+        return getattr(item, field)
+    except AttributeError:
+        raise OqlError(f'{item.content_class} has no attribute {field}')
 
 
 def get_nested_field(item, field, path):
-    attr = getattr(item, field)
-    for key in path:
-        attr = attr[key]
+    try:
+        attr = getattr(item, field)
+        for key in path:
+            attr = attr[key]
+    except (AttributeError, KeyError, TypeError):
+        raise OqlError(
+            f'{item.content_class} has no attribute {field}.{".".join(path)}'
+        )
     return attr
 
 

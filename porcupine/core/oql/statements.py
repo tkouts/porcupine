@@ -4,8 +4,12 @@ from functools import partial
 from porcupine import db, log, pipe
 from porcupine.core.stream.streamer import IdStreamer
 from porcupine.core.oql.feeder import CollectionFeeder
-from porcupine.core.oql.tokens import Field, FunctionCall, Variable, \
+from porcupine.core.oql.tokens import (
+    Field,
+    FunctionCall,
+    Variable,
     is_expression
+)
 
 
 class BaseStatement:
