@@ -1,4 +1,4 @@
-from inspect import isawaitable
+import logging
 from functools import partial
 
 from porcupine import db, log, pipe
@@ -75,32 +75,15 @@ class Select(BaseStatement):
         scope, collection = self.scope(self, variables)
         # get scope
         item = await db.get_item(scope, quiet=False)
-        scope_type = item.__class__
 
         stale = self.stale
         if isinstance(self.stale, Variable):
             stale = variables[stale]
 
-        feeder = None
-
         if self.where_condition is not None:
-            feeder = self.where_condition.optimize(scope_type, stale=stale)
-
-        order_by = None
-        results_ordered = False
-        if self.order_by is not None:
-            order_by = self.order_by.expr
-            if feeder is None:
-                if order_by == 'is_collection':
-                    results_ordered = True
-                else:
-                    index_lookup = order_by.get_index_lookup(scope_type,
-                                                             stale=stale)
-                    if index_lookup is not None:
-                        feeder = index_lookup
-                        results_ordered = True
-
-        if feeder is None:
+            feeder = self.where_condition.optimize(item, collection,
+                                                   stale=stale)
+        else:
             # full scan
             feeder = CollectionFeeder(item, collection)
 
@@ -108,48 +91,54 @@ class Select(BaseStatement):
         if self.range is not None:
             select_range = self.range(self, variables)
 
-        apply_range_prematurely = False
-        if order_by is not None and order_by == feeder.ordered_by:
+        results_ordered = False
+        if self.order_by is not None:
+            order_by = self.order_by.expr
+            if order_by == feeder.ordered_by:
+                results_ordered = True
+            elif not feeder.optimized:
+                index_lookup = order_by.optimize(item, collection,
+                                                 stale=stale)
+                if index_lookup.optimized:
+                    feeder = index_lookup
+                    results_ordered = True
             if self.order_by.desc and not feeder.reversed:
                 feeder.reversed = True
-            if self.range is not None:
-                apply_range_prematurely = True
+        else:
+            results_ordered = True
 
-        log.debug(f'Feeder: {feeder}, {results_ordered}')
+        if log.level <= logging.DEBUG:
+            log.debug(f'Feeder: {feeder}, {results_ordered}')
 
-        has_optimized_feeder = not isinstance(feeder, CollectionFeeder)
+        streamer = feeder(self, scope, variables)
 
-        feeder = feeder(self, scope, variables)
+        if isinstance(streamer, IdStreamer):
+            streamer = streamer.items()
 
-        if isawaitable(feeder):
-            feeder = await feeder
-
-        if isinstance(feeder, IdStreamer):
-            feeder = feeder.items()
-
-        if has_optimized_feeder and collection in {'items', 'containers'}:
+        if feeder.optimized and collection in {'items', 'containers'}:
             if collection == 'items':
-                feeder |= pipe.filter(lambda i: not i.is_collection)
+                streamer |= pipe.filter(lambda i: not i.is_collection)
             else:
-                feeder |= pipe.filter(lambda i: i.is_collection)
+                streamer |= pipe.filter(lambda i: i.is_collection)
 
         if self.where_condition is not None:
             flt = partial(self.where_compiled, s=self, v=variables)
-            feeder |= pipe.filter(flt)
+            streamer |= pipe.filter(flt)
 
-        # print(apply_range_prematurely)
-        if apply_range_prematurely:
-            feeder |= pipe.getitem(select_range)
+        if select_range is not None and results_ordered:
+            # print('premature range')
+            streamer |= pipe.getitem(select_range)
 
         if self.order_by is not None and not results_ordered:
             key = partial(self.order_by_compiled, s=self, v=variables)
-            feeder |= pipe.key_sort(key, _reverse=self.order_by.desc)
+            streamer |= pipe.key_sort(key, _reverse=self.order_by.desc)
 
-        if select_range is not None and not apply_range_prematurely:
-            feeder |= pipe.getitem(select_range)
+        if select_range is not None and not results_ordered:
+            # print('mature range')
+            streamer |= pipe.getitem(select_range)
 
         if self.select_list:
             field_extractor = partial(self.extract_fields, v=variables)
-            feeder = feeder | pipe.map(field_extractor)
+            streamer |= pipe.map(field_extractor)
 
-        return [result async for result in feeder]
+        return [result async for result in streamer]

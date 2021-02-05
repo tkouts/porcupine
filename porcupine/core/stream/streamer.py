@@ -71,7 +71,8 @@ class IdStreamer(BaseStreamer):
 class ItemStreamer(BaseStreamer):
     def __init__(self, id_iterator: IdStreamer, multi_fetch):
         item_iterator = (
-            id_iterator | pipe.chunks(10) |
+            id_iterator |
+            pipe.chunks(10) |
             pipe.flatmap(multi_fetch, task_limit=1)
         )
         super().__init__(item_iterator)
@@ -109,8 +110,12 @@ class UnionStreamer(CombinedIdStreamer):
         async for sorted_collection in self.streamer1 | pipe.sort():
             collection = sorted_collection
         # print('COLLECTION', collection)
-        for x in collection:
-            yield x
-        async for x in self.streamer2:
-            if x not in collection:
+        if collection:
+            for x in collection:
+                yield x
+            async for x in self.streamer2:
+                if x not in collection:
+                    yield x
+        else:
+            async for x in self.streamer2:
                 yield x

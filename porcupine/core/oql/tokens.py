@@ -48,14 +48,8 @@ class Token:
     def source(self):
         return repr(self.value)
 
-    def _get_indexed_container_type(self, container_type) -> None:
-        return None
-
-    def get_index_lookup(self, container_type, **options) -> None:
-        return None
-
-    def optimize(self, container_type, **options):
-        return None
+    def optimize(self, item, collection, **options):
+        return CollectionFeeder(item, collection)
 
     def __call__(self, statement, v):
         return self.value
@@ -96,18 +90,12 @@ class Field(String):
                 return cls
         return None
 
-    def get_index_lookup(self, container_type,
-                         **options) -> Optional[IndexLookup]:
-        indexed_type = self._get_indexed_container_type(container_type)
+    def optimize(self, item, collection, **options):
+        indexed_type = self._get_indexed_container_type(item.__class__)
         if indexed_type is not None:
             index_lookup = IndexLookup(indexed_type, self, options=options)
             return index_lookup
-
-    def optimize(self, container_type, **options):
-        return self.get_index_lookup(
-            container_type,
-            **options
-        )
+        return CollectionFeeder(item, collection)
 
 
 class Variable(Token, str):
@@ -165,8 +153,10 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
                     return cls
         return None
 
-    def get_index_lookup(self, container_type, **options):
-        indexed_type = self._get_indexed_container_type(container_type)
+    def optimize(self, item, collection, **options):
+        if not self.term.immutable:
+            raise OqlError('FREETEXT term should be immutable')
+        indexed_type = self._get_indexed_container_type(item.__class__)
         if indexed_type is not None:
             index_lookup = FTSIndexLookup(
                 indexed_type,
@@ -175,16 +165,11 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
                 options=options
             )
             return index_lookup
-        log.warn(f'Non indexed FTS lookup on {container_type.__name__}')
+        log.warn(f'Non indexed FTS lookup on {item.__class__.__name__}')
         return EmptyFeeder()
 
-    def optimize(self, container_type, **options):
-        if not self.term.immutable:
-            raise OqlError('FREETEXT term should be immutable')
-        return self.get_index_lookup(
-            container_type,
-            **options
-        )
+
+OptimizedExpr = namedlist('OptimizedExpr', 'expr feeder')
 
 
 class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
@@ -209,18 +194,15 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
     def __call__(self, statement, v):
         return self.compile()(None, statement, v)
 
-    def optimize(self, container_type, **options):
+    def optimize(self, item, collection, **options):
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
             operator = self.operator
             bounds = None
-            index_lookup = None
+            feeder = None
             if self.r_op.immutable:
-                index_lookup = self.l_op.get_index_lookup(
-                    container_type,
-                    **options
-                )
+                feeder = self.l_op.optimize(item, collection, **options)
                 bounds = self.r_op
             elif self.l_op.immutable:
                 # reverse operator
@@ -228,50 +210,54 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                     operator = f'<{operator[1:]}'
                 elif operator.startswith('<'):
                     operator = f'>{operator[1:]}'
-                index_lookup = self.r_op.get_index_lookup(
-                    container_type,
-                    **options
-                )
+                feeder = self.r_op.optimize(item, collection, **options)
                 bounds = self.l_op
 
-            if index_lookup is not None:
+            if feeder.optimized:
                 bounds = bounds.compile()
                 if operator is not None:
                     if operator == '==':
                         # equality
-                        index_lookup.bounds = bounds
+                        feeder.bounds = bounds
                     elif operator.startswith('>'):
                         dynamic_range = DynamicRange(bounds)
                         dynamic_range.l_inclusive = operator == '>='
-                        index_lookup.bounds = dynamic_range
+                        feeder.bounds = dynamic_range
                     elif operator.startswith('<'):
                         dynamic_range = DynamicRange(None, False, bounds)
                         dynamic_range.u_inclusive = operator == '<='
-                        index_lookup.bounds = dynamic_range
-                return index_lookup
+                        feeder.bounds = dynamic_range
+                return feeder
 
         # logical
         is_logical = self.operator in {'and', 'or'}
         if is_logical:
-            optimized = [op.optimize(container_type, **options)
-                         for op in (self.l_op, self.r_op)]
+            optimized = [
+                OptimizedExpr(op, op.optimize(item, collection, **options))
+                for op in (self.l_op, self.r_op)
+            ]
+            optimized.sort(key=lambda f: -f.feeder.priority)
+            first, second = optimized
             if self.operator == 'and':
-                if all(optimized):
-                    # intersection
-                    return Intersection(*optimized)
-                elif any(optimized):
-                    if optimized[0] is not None:
-                        feeder = optimized[0]
-                        flt = self.r_op.compile()
+                # print(optimized)
+                if first.feeder.optimized:
+                    if second.feeder.optimized:
+                        # intersection
+                        return Intersection(*[o.feeder for o in optimized])
                     else:
-                        feeder = optimized[1]
-                        flt = self.l_op.compile()
-                    feeder.filter_func = flt
-                    return feeder
+                        first.feeder.filter_func = second.expr.compile()
+                        return first.feeder
             if self.operator == 'or':
-                if all(optimized):
+                # print(optimized)
+                if first.feeder.optimized:
                     # union
-                    return Union(*optimized)
+                    if not second.feeder.optimized:
+                        second.feeder.filter_func = second.expr.compile()
+                        # print(second.expr.source())
+                    return Union(*[o.feeder for o in optimized])
+
+        # full scan
+        return CollectionFeeder(item, collection)
 
 
 class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):
