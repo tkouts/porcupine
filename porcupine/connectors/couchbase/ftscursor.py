@@ -1,4 +1,4 @@
-from couchbase.search import ConjunctionQuery, TermQuery, MatchQuery
+from couchbase.search import ConjunctionQuery, TermQuery, QueryStringQuery
 
 from porcupine.connectors.base.cursors import FTSIndexCursor, FTSIndexIterator
 
@@ -21,7 +21,7 @@ class FTSCursorIterator(FTSIndexIterator):
     async def __aiter__(self):
         cluster = self.index.connector.cluster
         scope_query = TermQuery(self.scope, field='pid')
-        match_query = MatchQuery(self._term)
+        match_query = QueryStringQuery(self._term)
         query = ConjunctionQuery(match_query, scope_query)
         results = cluster.search_query(
             self.index.container_name,
