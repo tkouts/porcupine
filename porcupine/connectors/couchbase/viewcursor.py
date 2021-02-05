@@ -63,13 +63,14 @@ class CursorIterator(SecondaryIndexIterator):
 
         exclude_key = None
         if self._reversed:
-            kwargs['mapkey_range'].reverse()
             kwargs['descending'] = True
-            if is_ranged:
-                if not self._bounds.u_inclusive:
-                    exclude_key = self._bounds.u_bound
-                if not self._bounds.l_inclusive:
-                    kwargs['inclusive_end'] = False
+            if is_ranged or self._bounds is None:
+                kwargs['mapkey_range'].reverse()
+                if self._bounds is not None:
+                    if not self._bounds.u_inclusive:
+                        exclude_key = self._bounds.u_bound
+                    if not self._bounds.l_inclusive:
+                        kwargs['inclusive_end'] = False
         else:
             if is_ranged:
                 if not self._bounds.l_inclusive:
