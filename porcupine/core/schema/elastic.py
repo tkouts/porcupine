@@ -71,6 +71,7 @@ class ElasticSlotsBase:
         '__externals__',
         '__snapshot__',
         '__is_new__',
+        '_score'
     )
 
 
@@ -123,10 +124,11 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         schema = cls.__schema__.values()
         return tuple([data_type for data_type in schema if data_type.unique])
 
-    def __init__(self, dict_storage: Optional[dict] = None):
+    def __init__(self, dict_storage: Optional[dict] = None, _score=None):
         self.__is_new__ = dict_storage is None or 'id' not in dict_storage
         self.__snapshot__ = {}
         self.__externals__ = self.__ext_record__()
+        self._score = _score
 
         if self.__is_new__:
             # new item
@@ -172,6 +174,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             for attr in self.view_attrs()
         }
         dct['_type'] = self.content_class
+        if self._score is not None:
+            dct['_score'] = self._score
         return dct
 
     @property

@@ -1,6 +1,7 @@
 """
 Default database object persistence layer
 """
+from porcupine import context
 from porcupine.core import utils
 
 
@@ -8,7 +9,10 @@ class DefaultPersistence:
     @staticmethod
     def loads(storage):
         content_class = utils.get_content_class(storage.pop('_cc'))
-        return content_class(dict_storage=storage)
+        return content_class(
+            storage,
+            _score=context.item_meta.get(storage['id'])
+        )
 
     @staticmethod
     def dumps(obj):

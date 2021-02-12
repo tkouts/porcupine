@@ -1,16 +1,17 @@
-import contextvars
+from contextvars import ContextVar
 from functools import wraps
 from lru import LRU
 
 from porcupine.core.services import db_connector
 from .log import porcupine_log
 
-ctx_user = contextvars.ContextVar('user', default=None)
-ctx_txn = contextvars.ContextVar('txn', default=None)
-ctx_db_cache = contextvars.ContextVar('db_cache', default=None)
-ctx_visibility_cache = contextvars.ContextVar('visibility_cache', default=None)
-ctx_caches = contextvars.ContextVar('caches', default={})
-ctx_sys = contextvars.ContextVar('__sys__', default=False)
+ctx_user = ContextVar('user', default=None)
+ctx_txn = ContextVar('txn', default=None)
+ctx_db_cache = ContextVar('db_cache')
+ctx_visibility_cache = ContextVar('visibility_cache')
+ctx_caches = ContextVar('caches', default={})
+ctx_sys = ContextVar('__sys__', default=False)
+ctx_item_meta_cache = ContextVar('item_meta', default={})
 
 
 class PContext:
@@ -33,6 +34,10 @@ class PContext:
     @property
     def db_cache(self):
         return ctx_db_cache.get()
+
+    @property
+    def item_meta(self):
+        return ctx_item_meta_cache.get()
 
     @property
     def visibility_cache(self):
@@ -84,8 +89,8 @@ def with_context(identity=None, debug=False):
                     size = len(context.db_cache)
                     hits, misses = context.db_cache.get_stats()
                     porcupine_log.debug(
-                        'Cache Size: {0} Hits: {1} Misses: {2}'
-                        .format(size, hits, misses))
+                        f'Cache Size: {size} Hits: {hits} Misses: {misses}'
+                    )
 
         return context_wrapper
     return decorator
@@ -100,8 +105,7 @@ def context_cacheable(size=100):
         @wraps(co_routine)
         async def cache_wrapper(*args):
             # initialize cache
-            cache_name = '{0}.{1}'.format(co_routine.__module__,
-                                          co_routine.__qualname__)
+            cache_name = f'{co_routine.__module__}.{co_routine.__qualname__}'
             caches = ctx_caches.get()
             if cache_name not in caches:
                 caches[cache_name] = LRU(size)

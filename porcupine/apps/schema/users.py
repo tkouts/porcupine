@@ -19,8 +19,8 @@ class SystemUser(Item):
     Use this identity for performing actions not initiated by users.
     This user has no security restrictions.
     """
-    def __init__(self, dict_storage=None):
-        super().__init__(dict_storage)
+    def __init__(self, dict_storage=None, **kwargs):
+        super().__init__(dict_storage, **kwargs)
         if self.__is_new__:
             # direct assignment of id. don't try this at home!
             self.__storage__.id = 'system'

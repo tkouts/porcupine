@@ -11,8 +11,8 @@ class DeletedItem(GenericItem):
     location = String(immutable=True, required=True)
     name = String(required=True, unique=False)
 
-    def __init__(self, dict_storage=None, deleted_item=None):
-        super().__init__(dict_storage)
+    def __init__(self, dict_storage=None, deleted_item=None, **kwargs):
+        super().__init__(dict_storage, **kwargs)
         if self.__is_new__ and not context.system_override:
             raise TypeError('DeletedItem objects cannot be instantiated')
         if deleted_item is not None:

@@ -54,8 +54,8 @@ class GenericItem(Removable, Elastic):
     name = String(required=True, unique=True)
     description = String(store_as='desc')
 
-    def __init__(self, dict_storage=None):
-        super().__init__(dict_storage)
+    def __init__(self, dict_storage=None, **kwargs):
+        super().__init__(dict_storage, **kwargs)
         self.__effective_acl = None
 
     @property

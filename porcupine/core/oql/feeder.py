@@ -32,9 +32,10 @@ class Feeder:
     priority = 0
     optimized = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, options):
         self.ordered_by = None
         self.reversed = False
+        self.options = options
 
     def __call__(self, statement, scope, v):
         raise NotImplementedError
@@ -48,13 +49,14 @@ class EmptyFeeder(Feeder):
 
 
 class CollectionFeeder(namedlist('CollectionFeeder',
-                                 'item collection reversed filter_func',
+                                 'item collection filter_func',
                                  default=None), Feeder):
     optimized = False
 
-    @property
-    def ordered_by(self):
-        return 'is_collection'
+    def __init__(self, *args, **kwargs):
+        Feeder.__init__(self, kwargs.pop('options', {}))
+        super().__init__(*args, **kwargs)
+        self.ordered_by = 'is_collection'
 
     def __repr__(self):
         return (
@@ -84,15 +86,14 @@ class CollectionFeeder(namedlist('CollectionFeeder',
 class IndexLookup(
         namedlist(
             'IndexLookup',
-            'index_type index_name bounds reversed filter_func',
+            'index_type index_name bounds filter_func',
             default=None
         ), Feeder):
     priority = 1
 
     def __init__(self, *args, **kwargs):
-        self.options = kwargs.pop('options', {})
+        Feeder.__init__(self, kwargs.pop('options', {}))
         super().__init__(*args, **kwargs)
-        Feeder.__init__(self)
         self.ordered_by = self.index_name
 
     @staticmethod
@@ -132,15 +133,18 @@ class FTSIndexLookup(
     priority = 2
 
     def __init__(self, *args, **kwargs):
-        self.options = kwargs.pop('options', {})
+        Feeder.__init__(self, kwargs.pop('options', {}))
         super().__init__(*args, **kwargs)
-        Feeder.__init__(self)
+        self.ordered_by = '_score'
 
     def __call__(self, statement, scope, v):
         fts_index = db_connector().fts_indexes[self.index_type]
         feeder = fts_index.get_cursor(**self.options)
         feeder.set_scope(scope)
         feeder.set_term(self.term(statement, v))
+        if not self.reversed:
+            # default is descending
+            feeder.reverse()
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
@@ -149,8 +153,8 @@ class FTSIndexLookup(
 
 class Intersection(namedlist('Intersection', 'first second'), Feeder):
     def __init__(self, *args, **kwargs):
+        Feeder.__init__(self, {})
         super().__init__(*args, **kwargs)
-        Feeder.__init__(self)
 
     def __call__(self, statement, scope, v):
         first_feeder = self.first(statement, scope, v)
@@ -176,8 +180,8 @@ class Intersection(namedlist('Intersection', 'first second'), Feeder):
 
 class Union(namedlist('Union', 'first second'), Feeder):
     def __init__(self, *args, **kwargs):
+        Feeder.__init__(self, {})
         super().__init__(*args, **kwargs)
-        Feeder.__init__(self)
         self.ordered_by = self.second.ordered_by
 
     def __call__(self, statement, scope, v):

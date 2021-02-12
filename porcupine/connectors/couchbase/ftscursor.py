@@ -1,5 +1,6 @@
 from couchbase.search import ConjunctionQuery, TermQuery, QueryStringQuery
 
+from porcupine import context
 from porcupine.connectors.base.cursors import FTSIndexCursor, FTSIndexIterator
 
 
@@ -28,5 +29,5 @@ class FTSCursorIterator(FTSIndexIterator):
             query
         )
         async for hit in results:
-            # print(hit.id)
+            context.item_meta[hit.id] = hit.score
             yield hit.id
