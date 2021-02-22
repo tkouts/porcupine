@@ -198,7 +198,7 @@ class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
     def set_scope(self, scope):
         self.iterator.set_scope(scope)
 
-    def set(self, v):
+    def set(self, v: list):
         self.iterator.set(v)
 
     def reverse(self):
@@ -214,13 +214,13 @@ class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
 class SecondaryIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
     def __init__(self, index):
         super().__init__(index)
-        self._bounds = None
+        self._bounds = [Range(None, False, None, False)]
         self._reversed = False
         self._scope = None
 
     @property
     def is_ranged(self):
-        return isinstance(self._bounds, Range)
+        return isinstance(self._bounds[-1], Range)
 
     @property
     def bounds(self):
@@ -233,7 +233,7 @@ class SecondaryIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
     def set_scope(self, scope):
         self._scope = scope
 
-    def set(self, v):
+    def set(self, v: list):
         self._bounds = v
 
     def reverse(self):

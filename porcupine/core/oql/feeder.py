@@ -115,7 +115,7 @@ class IndexLookup(
                     bounds.u_bound = self.date_to_utc(bounds.u_bound)
             elif isinstance(bounds, Date):
                 bounds = self.date_to_utc(bounds)
-            feeder.set(bounds)
+            feeder.set([bounds])
         if self.reversed:
             feeder.reverse()
         if self.filter_func is not None:
@@ -162,6 +162,7 @@ class Intersection(namedlist('Intersection', 'first second'), Feeder):
         is_same_index = (
             all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
             and self.first.index_name == self.second.index_name
+            and len(first_feeder.bounds) == len(second_feeder.bounds)
         )
         if is_same_index:
             ranged = next(feeder for feeder in (first_feeder, second_feeder)
@@ -169,11 +170,11 @@ class Intersection(namedlist('Intersection', 'first second'), Feeder):
             if ranged:
                 other = (second_feeder if ranged is first_feeder
                          else first_feeder)
-                inter = ranged.bounds.intersection(other.bounds)
+                inter = ranged.bounds[-1].intersection(other.bounds[-1])
                 # print('INTER', inter)
                 if inter:
-                    first_feeder.set(inter)
-                    return first_feeder
+                    ranged.bounds[-1] = inter
+                    return ranged
                 return EmptyStreamer()
         return first_feeder.intersection(second_feeder)
 
@@ -190,6 +191,7 @@ class Union(namedlist('Union', 'first second'), Feeder):
         is_same_index = (
             all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
             and self.first.index_name == self.second.index_name
+            and len(first_feeder.bounds) == len(second_feeder.bounds)
         )
         if is_same_index:
             ranged = next(feeder for feeder in (first_feeder, second_feeder)
@@ -197,9 +199,9 @@ class Union(namedlist('Union', 'first second'), Feeder):
             if ranged:
                 other = (second_feeder if ranged is first_feeder
                          else first_feeder)
-                union = ranged.bounds.union(other.bounds)
+                union = ranged.bounds[-1].union(other.bounds[-1])
                 # print('UNION', union)
                 if union:
-                    first_feeder.set(union)
-                    return first_feeder
+                    ranged.bounds[-1] = union
+                    return ranged
         return first_feeder.union(second_feeder)

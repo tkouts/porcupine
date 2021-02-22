@@ -44,43 +44,45 @@ class CursorIterator(SecondaryIndexIterator):
             'reduce': self.reduce
         }
 
+        bounds_size = self._bounds is not None and len(self._bounds)
         is_ranged = self.is_ranged
-
-        if self._bounds is None:
-            kwargs['mapkey_range'] = [
-                [self._scope],
-                [self._scope, Query.STRING_RANGE_END]
-            ]
-        elif not is_ranged:
+        if not is_ranged and bounds_size == len(self.index.keys):
             # equality
-            kwargs['key'] = [self._scope, self._bounds]
+            kwargs['key'] = [self._scope] + self._bounds
         else:
             # range
-            kwargs['mapkey_range'] = [
-                [self._scope, self._bounds.l_bound],
-                [self._scope, self._bounds.u_bound or Query.STRING_RANGE_END]
-            ]
+            start_key = [self._scope]
+            end_key = [self._scope]
+            start_key.extend(self._bounds[:-1])
+            end_key.extend(self._bounds[:-1])
+            last = self._bounds[-1]
+            if last.l_bound is not None:
+                start_key.append(last.l_bound)
+            end_key.append(last.u_bound or Query.STRING_RANGE_END)
+            if len(self._bounds) < len(self.index.keys):
+                end_key.append(Query.STRING_RANGE_END)
+
+            kwargs['mapkey_range'] = [start_key, end_key]
 
         exclude_key = None
         if self._reversed:
             kwargs['descending'] = True
-            if is_ranged or self._bounds is None:
+            if 'mapkey_range' in kwargs:
                 kwargs['mapkey_range'].reverse()
-                if self._bounds is not None:
-                    if not self._bounds.u_inclusive:
-                        exclude_key = self._bounds.u_bound
-                    if not self._bounds.l_inclusive:
+                if is_ranged:
+                    if not self._bounds[-1].u_inclusive:
+                        exclude_key = self._bounds[-1].u_bound
+                    if not self._bounds[-1].l_inclusive:
                         kwargs['inclusive_end'] = False
-        else:
-            if is_ranged:
-                if not self._bounds.l_inclusive:
-                    exclude_key = self._bounds.l_bound
-                if not self._bounds.u_inclusive:
-                    kwargs['inclusive_end'] = False
+        elif is_ranged:
+            if not self._bounds[-1].l_inclusive:
+                exclude_key = self._bounds[-1].l_bound
+            if not self._bounds[-1].u_inclusive:
+                kwargs['inclusive_end'] = False
 
         bucket = self.index.connector.bucket
 
-        # print(kwargs)
+        # print(kwargs, exclude_key)
         results = bucket.view_query(
             self.index.container_name,
             self.index.name,
@@ -90,7 +92,8 @@ class CursorIterator(SecondaryIndexIterator):
             if self.reduce:
                 yield result.value
             else:
-                if exclude_key is not None and result.key[1] == exclude_key:
+                if exclude_key is not None \
+                        and result.key[bounds_size] == exclude_key:
                     continue
                 # TODO: return new uncommitted items
                 yield result.id

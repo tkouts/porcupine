@@ -50,14 +50,14 @@ class Container(Item):
         container_views = db_connector().views[Container]
         cursor = container_views['is_collection'].get_cursor()
         cursor.set_scope(self.id)
-        cursor.set(False)
+        cursor.set([False])
         return await cursor.count()
 
     async def containers_count(self):
         container_views = db_connector().views[Container]
         cursor = container_views['is_collection'].get_cursor()
         cursor.set_scope(self.id)
-        cursor.set(True)
+        cursor.set([True])
         return await cursor.count()
 
     async def get_child_by_name(self, name, resolve_shortcut=False):

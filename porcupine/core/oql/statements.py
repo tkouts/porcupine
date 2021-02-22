@@ -116,6 +116,9 @@ class Select(BaseStatement):
 
         streamer = feeder(self, scope, variables)
 
+        if log.level <= logging.DEBUG:
+            log.debug(f'Streamer: {streamer}')
+
         if isinstance(streamer, IdStreamer):
             streamer = streamer.items()
 

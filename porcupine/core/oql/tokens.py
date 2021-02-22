@@ -84,16 +84,22 @@ class Field(String):
         return f'get_field(i, "{self}", s, v)'
 
     @lru_cache(maxsize=None)
-    def _get_indexed_container_type(self, container_type) -> Optional[type]:
+    def _get_indexed_container_type(self, container_type):
         for cls in container_type.mro():
-            if 'indexes' in cls.__dict__ and self in cls.indexes:
-                return cls
-        return None
+            if 'indexes' in cls.__dict__:
+                for attr_set in cls.indexes:
+                    if attr_set == self:
+                        return cls, attr_set
+                    elif isinstance(attr_set, list) and attr_set[0] == self:
+                        return cls, ','.join(attr_set)
+        return None, None
 
     def optimize(self, item, collection, **options):
-        indexed_type = self._get_indexed_container_type(item.__class__)
+        indexed_type, index_name = self._get_indexed_container_type(
+            item.__class__)
         if indexed_type is not None:
-            index_lookup = IndexLookup(indexed_type, self, options=options)
+            index_lookup = IndexLookup(indexed_type, index_name,
+                                       options=options)
             return index_lookup
         return CollectionFeeder(item, collection)
 
@@ -166,7 +172,7 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
             )
             return index_lookup
         log.warn(f'Non indexed FTS lookup on {item.__class__.__name__}')
-        return EmptyFeeder()
+        return EmptyFeeder({})
 
 
 OptimizedExpr = namedlist('OptimizedExpr', 'expr feeder')
@@ -213,7 +219,7 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                 feeder = self.r_op.optimize(item, collection, **options)
                 bounds = self.l_op
 
-            if feeder.optimized:
+            if feeder and feeder.optimized:
                 bounds = bounds.compile()
                 if operator is not None:
                     if operator == '==':
