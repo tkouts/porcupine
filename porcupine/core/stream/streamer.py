@@ -88,6 +88,13 @@ class CombinedIdStreamer(IdStreamer):
             streamer2 |= pipe.id_getter
         super().__init__(self._generator())
 
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'streamer1={self.streamer1}, '
+            f'streamer2={self.streamer2})'
+        )
+
     async def _generator(self):
         yield None
 

@@ -207,6 +207,7 @@ class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
     def __repr__(self):
         return (
             f'{self.__class__.__name__}(scope="{self.iterator.scope}", '
+            f'index={self.index.name}, '
             f'bounds={self.iterator.bounds})'
         )
 
