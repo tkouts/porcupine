@@ -30,6 +30,7 @@ class DynamicRange(namedlist('DynamicRange',
 
 
 class Feeder:
+    __slots__ = 'ordered_by', 'reversed', 'options'
     priority = 0
     optimized = True
 
@@ -50,10 +51,10 @@ class EmptyFeeder(Feeder):
 
 
 class CollectionFeeder(Feeder):
+    __slots__ = 'filter_func'
     optimized = False
 
     def __init__(self, filter_func=None):
-        # Feeder.__init__(self, kwargs.pop('options', {}))
         super().__init__(None)
         self.ordered_by = 'is_collection'
         self.filter_func = filter_func
@@ -80,17 +81,17 @@ class CollectionFeeder(Feeder):
         return feeder
 
 
-class IndexLookup(
-        namedlist(
-            'IndexLookup',
-            'index_type index_name bounds filter_func',
-            default=None
-        ), Feeder):
+class IndexLookup(Feeder):
+    __slots__ = 'index_type', 'index_name', 'bounds', 'filter_func'
     priority = 1
 
-    def __init__(self, *args, **kwargs):
-        Feeder.__init__(self, kwargs.pop('options', {}))
-        super().__init__(*args, **kwargs)
+    def __init__(self, index_type, index_name, bounds=None, filter_func=None,
+                 options=None):
+        super().__init__(options)
+        self.index_type = index_type
+        self.index_name = index_name
+        self.bounds = bounds
+        self.filter_func = filter_func
         self.ordered_by = self.index_name
 
     @staticmethod
@@ -98,6 +99,17 @@ class IndexLookup(
         if isinstance(date, DateTime):
             date = date.in_timezone('UTC')
         return date.isoformat()
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'index_type={repr(self.index_type.__name__)}, '
+            f'index_name={repr(self.index_name)}, '
+            f'bounds={repr(self.bounds)}, '
+            f'reversed={repr(self.reversed)}, '
+            f'filter_func={repr(self.filter_func)}'
+            ')'
+        )
 
     def __call__(self, statement, item, collection, v):
         type_views = db_connector().views[self.index_type]
@@ -121,19 +133,29 @@ class IndexLookup(
         return feeder
 
 
-class FTSIndexLookup(
-        namedlist(
-            'FTSIndexLookup',
-            'index_type field term filter_func',
-            default=None
-        ), Feeder):
+class FTSIndexLookup(Feeder):
+    __slots__ = 'index_type', 'field', 'term', 'filter_func'
     priority = 2
 
-    def __init__(self, *args, **kwargs):
-        Feeder.__init__(self, kwargs.pop('options', {}))
-        super().__init__(*args, **kwargs)
+    def __init__(self, index_type, field, term, filter_func=None, options=None):
+        super().__init__(options)
+        self.index_type = index_type
+        self.field = field
+        self.term = term
+        self.filter_func = filter_func
         self.ordered_by = '_score'
         # self.reversed = True
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'index_type={repr(self.index_type.__name__)}, '
+            f'field={repr(self.field)}, '
+            f'term={repr(self.term)}, '
+            f'reversed={repr(self.reversed)}, '
+            f'filter_func={repr(self.filter_func)}'
+            ')'
+        )
 
     def __call__(self, statement, item, collection, v):
         fts_index = db_connector().fts_indexes[self.index_type]
@@ -149,10 +171,23 @@ class FTSIndexLookup(
         return feeder
 
 
-class Intersection(namedlist('Intersection', 'first second'), Feeder):
-    def __init__(self, *args, **kwargs):
-        Feeder.__init__(self, kwargs.pop('options', None))
-        super().__init__(*args, **kwargs)
+class Intersection(Feeder):
+    __slots__ = ('first', 'second')
+
+    def __init__(self, first, second, options=None):
+        super().__init__(options)
+        self.first = first
+        self.second = second
+        self.ordered_by = second.ordered_by
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'first={repr(self.first)}, '
+            f'second={repr(self.second)}, '
+            f'ordered_by={repr(self.ordered_by)}'
+            ')'
+        )
 
     def __call__(self, statement, item, collection, v):
         first_feeder = self.first(statement, item, collection, v)
@@ -177,11 +212,21 @@ class Intersection(namedlist('Intersection', 'first second'), Feeder):
         return first_feeder.intersection(second_feeder)
 
 
-class Union(namedlist('Union', 'first second'), Feeder):
-    def __init__(self, *args, **kwargs):
-        Feeder.__init__(self, kwargs.pop('options', None))
-        super().__init__(*args, **kwargs)
-        self.ordered_by = self.second.ordered_by
+class Union(Feeder):
+    __slots__ = ('first', 'second')
+
+    def __init__(self, first, second, options=None):
+        super().__init__(options or {})
+        self.first = first
+        self.second = second
+
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'first={repr(self.first)}, '
+            f'second={repr(self.second)}'
+            ')'
+        )
 
     def __call__(self, statement, item, collection, v):
         first_feeder = self.first(statement, item, collection, v)
