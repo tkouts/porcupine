@@ -189,26 +189,27 @@ class BaseIterator(AsyncIterable, metaclass=abc.ABCMeta):
 class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
     @property
     def is_ranged(self):
-        return self.iterator.is_ranged
+        return self._iterator.is_ranged
 
     @property
     def bounds(self):
-        return self.iterator.bounds
+        return self._iterator.bounds
 
     def set_scope(self, scope):
-        self.iterator.set_scope(scope)
+        self._iterator.set_scope(scope)
 
     def set(self, v: list):
-        self.iterator.set(v)
+        self._iterator.set(v)
 
     def reverse(self):
-        self.iterator.reverse()
+        self._iterator.reverse()
 
     def __repr__(self):
         return (
-            f'{self.__class__.__name__}(scope="{self.iterator.scope}", '
-            f'index={self.index.name}, '
-            f'bounds={self.iterator.bounds})'
+            f'{self.__class__.__name__}(scope={repr(self._iterator.scope)}, '
+            f'index={repr(self.index.name)}, '
+            f'bounds={repr(self._iterator.bounds)}, '
+            f'reversed={repr(self.reversed)})'
         )
 
 
@@ -248,22 +249,23 @@ class SecondaryIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
 class FTSIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
     @property
     def is_ranged(self):
-        return self.iterator.is_ranged
+        return self._iterator.is_ranged
 
     @property
     def scope(self):
-        return self.iterator.scope
+        return self._iterator.scope
 
     def set_scope(self, scope):
-        self.iterator.set_scope(scope)
+        self._iterator.set_scope(scope)
 
     def set_term(self, term):
-        self.iterator.set_term(term)
+        self._iterator.set_term(term)
 
     def __repr__(self):
         return (
-            f'{self.__class__.__name__}(scope="{self.iterator.scope}", '
-            f'term={self.iterator.term})'
+            f'{self.__class__.__name__}(scope={repr(self._iterator.scope)}, '
+            f'term={repr(self._iterator.term)}, '
+            f'reversed={repr(self.reversed)})'
         )
 
 

@@ -11,10 +11,10 @@ class Cursor(SecondaryIndexCursor):
     """
     async def count(self):
         if not self.is_ranged:
-            self.iterator.reduce = True
+            self._iterator.reduce = True
             async for count in self:
                 return count
-            self.iterator.reduce = False
+            self._iterator.reduce = False
             return 0
         return await super().count()
 

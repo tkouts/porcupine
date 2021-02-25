@@ -9,24 +9,24 @@ from porcupine.core.stream.operators import reverse
 
 class BaseStreamer(AsyncIterable):
     def __init__(self, iterator: TYPING.STREAMER_ITERATOR_TYPE):
-        self.iterator = iterator
-        self.is_wrapped = False
+        self._iterator = iterator
+        self._is_wrapped = False
+        self.reversed = False
 
     async def __aiter__(self):
-        async with streamcontext(self.iterator) as streamer:
+        iterator = self._iterator
+        if self.reversed:
+            iterator = reverse(iterator)
+        async with streamcontext(iterator) as streamer:
             async for x in streamer:
                 yield x
 
     def __or__(self, p: AsyncIterable):
-        iterator = self.iterator
-        if not self.is_wrapped:
+        iterator = self._iterator
+        if not self._is_wrapped:
             iterator = stream.iterate(iterator)
-            self.is_wrapped = True
-        self.iterator = iterator | p
-        return self
-
-    def reverse(self):
-        self.iterator = reverse(self.iterator)
+            self._is_wrapped = True
+        self._iterator = iterator | p
         return self
 
     def intersection(self, other):
@@ -45,6 +45,9 @@ class BaseStreamer(AsyncIterable):
 class EmptyStreamer(BaseStreamer):
     def __init__(self):
         super().__init__(stream.empty())
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}()'
 
 
 class IdStreamer(BaseStreamer):
