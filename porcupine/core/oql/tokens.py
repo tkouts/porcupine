@@ -6,6 +6,7 @@ from porcupine import log
 from porcupine.exceptions import OqlError
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
+from porcupine.core.oql.feederproxy import Argument, FeederProxy
 
 __all__ = (
     'T_False',
@@ -36,6 +37,10 @@ class Token:
         self.value = value
         self.__lambda = None
 
+    @property
+    def field_lookups(self):
+        return []
+
     def __repr__(self):
         return f'{self.__class__.__name__}({self.value})'
 
@@ -48,8 +53,14 @@ class Token:
     def source(self):
         return repr(self.value)
 
-    def optimize(self, item, collection, **options):
-        return CollectionFeeder(item, collection)
+    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
+        return None
+
+    def optimize(self, item_type, **options) -> Optional[Feeder]:
+        feeder_proxy = self.get_index_lookup(item_type)
+        if feeder_proxy is not None:
+            return feeder_proxy.value(options)
+        return None
 
     def __call__(self, statement, v):
         return self.value
@@ -76,6 +87,10 @@ class Field(String):
     primitive = False
     immutable = False
 
+    @property
+    def field_lookups(self):
+        return [self]
+
     def source(self):
         if '.' in self:
             # nested attribute
@@ -84,24 +99,20 @@ class Field(String):
         return f'get_field(i, "{self}", s, v)'
 
     @lru_cache(maxsize=None)
-    def _get_indexed_container_type(self, container_type):
+    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
         for cls in container_type.mro():
             if 'indexes' in cls.__dict__:
                 for attr_set in cls.indexes:
                     if attr_set == self:
-                        return cls, attr_set
+                        return FeederProxy(IndexLookup,
+                                           index_type=cls,
+                                           index_name=self)
+                        # return cls, attr_set
                     elif isinstance(attr_set, list) and attr_set[0] == self:
-                        return cls, ','.join(attr_set)
-        return None, None
-
-    def optimize(self, item, collection, **options):
-        indexed_type, index_name = self._get_indexed_container_type(
-            item.__class__)
-        if indexed_type is not None:
-            index_lookup = IndexLookup(indexed_type, index_name,
-                                       options=options)
-            return index_lookup
-        return CollectionFeeder(item, collection)
+                        return FeederProxy(IndexLookup,
+                                           index_type=cls,
+                                           index_name=','.join(attr_set))
+        return None
 
 
 class Variable(Token, str):
@@ -152,26 +163,23 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
         return hash(self.field)
 
     @lru_cache(maxsize=None)
-    def _get_indexed_container_type(self, container_type) -> Optional[type]:
+    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
         for cls in container_type.mro():
             if 'full_text_indexes' in cls.__dict__:
                 if self.field == '*' or self in cls.full_text_indexes:
-                    return cls
+                    return FeederProxy(FTSIndexLookup,
+                                       index_type=cls,
+                                       field=self.field,
+                                       term=self.term)
         return None
 
-    def optimize(self, item, collection, **options):
+    def optimize(self, item_type, **options) -> Feeder:
         if not self.term.immutable:
             raise OqlError('FREETEXT term should be immutable')
-        indexed_type = self._get_indexed_container_type(item.__class__)
-        if indexed_type is not None:
-            index_lookup = FTSIndexLookup(
-                indexed_type,
-                self.field,
-                self.term,
-                options=options
-            )
-            return index_lookup
-        log.warn(f'Non indexed FTS lookup on {item.__class__.__name__}')
+        feeder = super().optimize(item_type, **options)
+        if feeder is not None:
+            return feeder
+        log.warn(f'Non indexed FTS lookup on {item_type}')
         return EmptyFeeder({})
 
 
@@ -191,24 +199,36 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
     def immutable(self):
         return self.l_op.immutable and self.r_op.immutable
 
+    @property
+    def field_lookups(self):
+        if self.operator in {'==', '>=', '<=', '>', '<', 'and'}:  # or any([isinstance(op, Field) for x in]):
+        #     return [op for op in (self.r_op, self.l_op)
+        #             if isinstance(op, Field)]
+            return self.r_op.field_lookups + self.l_op.field_lookups
+        return []
+
     def source(self):
         source = f'{self.l_op.source()} {self.operator} {self.r_op.source()}'
         if self.primitive:
             return repr(eval(source))
         return source
 
+    def __hash__(self):
+        return hash(self.source())
+
     def __call__(self, statement, v):
         return self.compile()(None, statement, v)
 
-    def optimize(self, item, collection, **options):
+    @lru_cache(maxsize=None)
+    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
             operator = self.operator
             bounds = None
-            feeder = None
+            feeder_proxy = None
             if self.r_op.immutable:
-                feeder = self.l_op.optimize(item, collection, **options)
+                feeder_proxy = self.l_op.get_index_lookup(container_type)
                 bounds = self.r_op
             elif self.l_op.immutable:
                 # reverse operator
@@ -216,54 +236,62 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                     operator = f'<{operator[1:]}'
                 elif operator.startswith('<'):
                     operator = f'>{operator[1:]}'
-                feeder = self.r_op.optimize(item, collection, **options)
+                feeder_proxy = self.r_op.get_index_lookup(container_type)
                 bounds = self.l_op
 
-            if feeder and feeder.optimized:
+            if feeder_proxy is not None:
                 bounds = bounds.compile()
-                if operator is not None:
-                    if operator == '==':
-                        # equality
-                        feeder.bounds = bounds
-                    elif operator.startswith('>'):
-                        dynamic_range = DynamicRange(bounds)
-                        dynamic_range.l_inclusive = operator == '>='
-                        feeder.bounds = dynamic_range
-                    elif operator.startswith('<'):
-                        dynamic_range = DynamicRange(None, False, bounds)
-                        dynamic_range.u_inclusive = operator == '<='
-                        feeder.bounds = dynamic_range
-                return feeder
+                if operator.startswith('>'):
+                    bounds = DynamicRange(bounds)
+                    bounds.l_inclusive = operator == '>='
+                elif operator.startswith('<'):
+                    bounds = DynamicRange(None, False, bounds)
+                    bounds.u_inclusive = operator == '<='
+                feeder_proxy.set_argument('bounds', bounds)
+                return feeder_proxy
 
         # logical
         is_logical = self.operator in {'and', 'or'}
         if is_logical:
             optimized = [
-                OptimizedExpr(op, op.optimize(item, collection, **options))
+                OptimizedExpr(op, op.get_index_lookup(container_type))
                 for op in (self.l_op, self.r_op)
             ]
-            optimized.sort(key=lambda f: -f.feeder.priority)
+            optimized.sort(
+                key=lambda f: 1 if f.feeder is None else -f.feeder.priority
+            )
             first, second = optimized
             if self.operator == 'and':
+                print(self.field_lookups)
                 # print(optimized)
-                if first.feeder.optimized:
-                    if second.feeder.optimized:
+                if first.feeder is not None:
+                    if second.feeder is not None:
                         # intersection
-                        return Intersection(*[o.feeder for o in optimized])
+                        return FeederProxy(
+                            Intersection,
+                            first=first.feeder,
+                            second=second.feeder
+                        )
                     else:
-                        first.feeder.filter_func = second.expr.compile()
+                        # add filter func
+                        first.feeder.set_argument('filter_func',
+                                                  second.expr.compile())
                         return first.feeder
             if self.operator == 'or':
                 # print(optimized)
-                if first.feeder.optimized:
+                if first.feeder is not None:
                     # union
-                    if not second.feeder.optimized:
-                        second.feeder.filter_func = second.expr.compile()
-                        # print(second.expr.source())
-                    return Union(*[o.feeder for o in optimized])
-
-        # full scan
-        return CollectionFeeder(item, collection)
+                    if second.feeder is None:
+                        second.feeder = FeederProxy(
+                            CollectionFeeder,
+                            filter_func=second.expr.compile
+                        )
+                    return FeederProxy(
+                        Union,
+                        first=first.feeder,
+                        second=second.feeder
+                    )
+        return None
 
 
 class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):

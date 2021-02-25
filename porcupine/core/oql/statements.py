@@ -76,6 +76,7 @@ class Select(BaseStatement):
         }
 
     async def execute(self, variables):
+        debug_log = log.level <= logging.DEBUG
         scope, collection = self.scope(self, variables)
         # get scope
         item = await db.get_item(scope, quiet=False)
@@ -84,12 +85,11 @@ class Select(BaseStatement):
         if isinstance(self.stale, Variable):
             stale = variables[stale]
 
+        feeder = CollectionFeeder()
+
         if self.where_condition is not None:
-            feeder = self.where_condition.optimize(item, collection,
-                                                   stale=stale)
-        else:
-            # full scan
-            feeder = CollectionFeeder(item, collection)
+            feeder = self.where_condition.optimize(item.__class__,
+                                                   stale=stale) or feeder
 
         select_range = None
         if self.range is not None:
@@ -101,8 +101,7 @@ class Select(BaseStatement):
             if order_by == feeder.ordered_by:
                 results_ordered = True
             elif not feeder.optimized:
-                index_lookup = order_by.optimize(item, collection,
-                                                 stale=stale)
+                index_lookup = order_by.optimize(item.__class__, stale=stale)
                 if index_lookup.optimized:
                     feeder = index_lookup
                     results_ordered = True
@@ -111,12 +110,12 @@ class Select(BaseStatement):
         else:
             results_ordered = True
 
-        if log.level <= logging.DEBUG:
+        if debug_log:
             log.debug(f'Feeder: {feeder}, {results_ordered}')
 
-        streamer = feeder(self, scope, variables)
+        streamer = feeder(self, item, collection, variables)
 
-        if log.level <= logging.DEBUG:
+        if debug_log:
             log.debug(f'Streamer: {streamer}')
 
         if isinstance(streamer, IdStreamer):

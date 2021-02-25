@@ -10,6 +10,7 @@ from porcupine.core.stream.streamer import EmptyStreamer
 from porcupine.pipe import filter, chain
 
 __all__ = (
+    'Feeder',
     'DynamicRange',
     'CollectionFeeder',
     'EmptyFeeder',
@@ -37,46 +38,42 @@ class Feeder:
         self.reversed = False
         self.options = options
 
-    def __call__(self, statement, scope, v):
+    def __call__(self, statement, item, collection, v):
         raise NotImplementedError
 
 
 class EmptyFeeder(Feeder):
     priority = 2
 
-    def __call__(self, statement, scope, v):
+    def __call__(self, statement, item, collection, v):
         return EmptyStreamer()
 
 
-class CollectionFeeder(namedlist('CollectionFeeder',
-                                 'item collection filter_func',
-                                 default=None), Feeder):
+class CollectionFeeder(Feeder):
     optimized = False
 
-    def __init__(self, *args, **kwargs):
-        Feeder.__init__(self, kwargs.pop('options', {}))
-        super().__init__(*args, **kwargs)
+    def __init__(self, filter_func=None):
+        # Feeder.__init__(self, kwargs.pop('options', {}))
+        super().__init__(None)
         self.ordered_by = 'is_collection'
+        self.filter_func = filter_func
 
     def __repr__(self):
         return (
             f'{self.__class__.__name__}('
-            f'item={repr(self.item.id)} '
-            f'collection={repr(self.collection)} '
             f'reversed={repr(self.reversed)} '
             f'filter_func={repr(self.filter_func)}'
             ')'
         )
 
-    def __call__(self, statement, scope, v):
-        item = self.item
+    def __call__(self, statement, item, collection, v):
         # TODO: check we have a valid collection
-        if self.collection == 'children':
+        if collection == 'children':
             feeder = item.containers | chain(item.items)
         else:
-            feeder = getattr(item, self.collection)
+            feeder = getattr(item, collection)
         if not self.reversed:
-            feeder.reverse()
+            feeder.reversed = True
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
@@ -102,10 +99,10 @@ class IndexLookup(
             date = date.in_timezone('UTC')
         return date.isoformat()
 
-    def __call__(self, statement, scope, v):
+    def __call__(self, statement, item, collection, v):
         type_views = db_connector().views[self.index_type]
         feeder = type_views[self.index_name].get_cursor(**self.options)
-        feeder.set_scope(scope)
+        feeder.set_scope(item.id)
         if self.bounds is not None:
             bounds = self.bounds(None, statement, v)
             if isinstance(bounds, Range):
@@ -117,7 +114,7 @@ class IndexLookup(
                 bounds = self.date_to_utc(bounds)
             feeder.set([bounds])
         if self.reversed:
-            feeder.reverse()
+            feeder.reversed = True
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
@@ -136,15 +133,16 @@ class FTSIndexLookup(
         Feeder.__init__(self, kwargs.pop('options', {}))
         super().__init__(*args, **kwargs)
         self.ordered_by = '_score'
+        # self.reversed = True
 
-    def __call__(self, statement, scope, v):
+    def __call__(self, statement, item, collection, v):
         fts_index = db_connector().fts_indexes[self.index_type]
         feeder = fts_index.get_cursor(**self.options)
-        feeder.set_scope(scope)
+        feeder.set_scope(item.id)
         feeder.set_term(self.term(statement, v))
         if not self.reversed:
             # default is descending
-            feeder.reverse()
+            feeder.reversed = True
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
@@ -153,12 +151,12 @@ class FTSIndexLookup(
 
 class Intersection(namedlist('Intersection', 'first second'), Feeder):
     def __init__(self, *args, **kwargs):
-        Feeder.__init__(self, {})
+        Feeder.__init__(self, kwargs.pop('options', None))
         super().__init__(*args, **kwargs)
 
-    def __call__(self, statement, scope, v):
-        first_feeder = self.first(statement, scope, v)
-        second_feeder = self.second(statement, scope, v)
+    def __call__(self, statement, item, collection, v):
+        first_feeder = self.first(statement, item, collection, v)
+        second_feeder = self.second(statement, item, collection, v)
         is_same_index = (
             all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
             and self.first.index_name == self.second.index_name
@@ -181,13 +179,13 @@ class Intersection(namedlist('Intersection', 'first second'), Feeder):
 
 class Union(namedlist('Union', 'first second'), Feeder):
     def __init__(self, *args, **kwargs):
-        Feeder.__init__(self, {})
+        Feeder.__init__(self, kwargs.pop('options', None))
         super().__init__(*args, **kwargs)
         self.ordered_by = self.second.ordered_by
 
-    def __call__(self, statement, scope, v):
-        first_feeder = self.first(statement, scope, v)
-        second_feeder = self.second(statement, scope, v)
+    def __call__(self, statement, item, collection, v):
+        first_feeder = self.first(statement, item, collection, v)
+        second_feeder = self.second(statement, item, collection, v)
         is_same_index = (
             all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
             and self.first.index_name == self.second.index_name
