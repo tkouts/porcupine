@@ -9,9 +9,10 @@ class DefaultPersistence:
     @staticmethod
     def loads(storage):
         content_class = utils.get_content_class(storage.pop('_cc'))
+        item_meta = context.item_meta
         return content_class(
             storage,
-            _score=context.item_meta.get(storage['id'])
+            _score=item_meta.get(storage['id'], 0) if item_meta else None
         )
 
     @staticmethod
