@@ -187,6 +187,8 @@ class BaseIterator(AsyncIterable, metaclass=abc.ABCMeta):
 ###############################
 
 class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
+    supports_reversed_iteration = True
+
     @property
     def is_ranged(self):
         return self._iterator.is_ranged
@@ -202,6 +204,7 @@ class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
         self._iterator.set(v)
 
     def reverse(self):
+        super().reverse()
         self._iterator.reverse()
 
     def __repr__(self):
@@ -209,7 +212,7 @@ class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
             f'{self.__class__.__name__}(scope={repr(self._iterator.scope)}, '
             f'index={repr(self.index.name)}, '
             f'bounds={repr(self._iterator.bounds)}, '
-            f'reversed={repr(self.reversed)})'
+            f'reversed={repr(self._reversed)})'
         )
 
 
@@ -239,7 +242,7 @@ class SecondaryIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
         self._bounds = v
 
     def reverse(self):
-        self._reversed = not self._reversed
+        self._reversed = True
 
 
 #########################
@@ -247,9 +250,7 @@ class SecondaryIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
 #########################
 
 class FTSIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
-    @property
-    def is_ranged(self):
-        return self._iterator.is_ranged
+    supports_reversed_iteration = True
 
     @property
     def scope(self):
@@ -261,11 +262,15 @@ class FTSIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
     def set_term(self, term):
         self._iterator.set_term(term)
 
+    def reverse(self):
+        super().reverse()
+        self._iterator.reverse()
+
     def __repr__(self):
         return (
             f'{self.__class__.__name__}(scope={repr(self._iterator.scope)}, '
             f'term={repr(self._iterator.term)}, '
-            f'reversed={repr(self.reversed)})'
+            f'reversed={repr(self._reversed)})'
         )
 
 
@@ -274,6 +279,7 @@ class FTSIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
         super().__init__(index)
         self._term = None
         self._scope = None
+        self._reversed = False
 
     @property
     def term(self):
@@ -288,3 +294,6 @@ class FTSIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
 
     def set_term(self, term):
         self._term = term
+
+    def reverse(self):
+        self._reversed = True

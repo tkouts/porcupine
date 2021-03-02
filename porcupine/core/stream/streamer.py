@@ -8,14 +8,17 @@ from porcupine.core.stream.operators import reverse
 
 
 class BaseStreamer(AsyncIterable):
+    supports_reversed_iteration = False
+    output_ids = True
+
     def __init__(self, iterator: TYPING.STREAMER_ITERATOR_TYPE):
         self._iterator = iterator
         self._is_wrapped = False
-        self.reversed = False
+        self._reversed = False
 
     async def __aiter__(self):
         iterator = self._iterator
-        if self.reversed:
+        if not self.supports_reversed_iteration and self._reversed:
             iterator = reverse(iterator)
         async with streamcontext(iterator) as streamer:
             async for x in streamer:
@@ -28,6 +31,9 @@ class BaseStreamer(AsyncIterable):
             self._is_wrapped = True
         self._iterator = iterator | p
         return self
+
+    def reverse(self):
+        self._reversed = True
 
     def intersection(self, other):
         return IntersectionStreamer(self, other)
@@ -51,7 +57,6 @@ class EmptyStreamer(BaseStreamer):
 
 
 class IdStreamer(BaseStreamer):
-
     def items(self, _multi_fetch=db.get_multi) -> 'ItemStreamer':
         return ItemStreamer(self, _multi_fetch)
 
@@ -72,22 +77,31 @@ class IdStreamer(BaseStreamer):
 
 
 class ItemStreamer(BaseStreamer):
+    supports_reversed_iteration = True
+    output_ids = False
+
     def __init__(self, id_iterator: IdStreamer, multi_fetch):
+        self._id_iterator = id_iterator
         item_iterator = (
-            id_iterator |
+            self._id_iterator |
             pipe.chunks(10) |
             pipe.flatmap(multi_fetch, task_limit=1)
         )
         super().__init__(item_iterator)
 
+    def reverse(self):
+        # print('REVERSE')
+        self._id_iterator.reverse()
+        super().reverse()
+
 
 class CombinedIdStreamer(IdStreamer):
     def __init__(self, streamer1: BaseStreamer, streamer2: BaseStreamer):
         self.streamer1 = streamer1
-        if isinstance(streamer1, ItemStreamer):
+        if not streamer1.output_ids:
             streamer1 |= pipe.id_getter
         self.streamer2 = streamer2
-        if isinstance(streamer2, ItemStreamer):
+        if not streamer2.output_ids:
             streamer2 |= pipe.id_getter
         super().__init__(self._generator())
 
