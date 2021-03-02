@@ -14,6 +14,7 @@ class SecondaryIndexBase(metaclass=abc.ABCMeta):
         self.attrs = attr_list
         self.name = ','.join(attr_list)
 
+        self.attr_list = tuple(attr_list)
         self.keys = []
         self.immutable = True
         for attr_name in attr_list:
