@@ -45,7 +45,7 @@ async def resolve(item, membership) -> int:
     return max(perms)
 
 
-@context_cacheable(1000)
+@context_cacheable(1024)
 async def resolve_membership(group_ids: frozenset) -> set:
     extended_membership = set()
     groups = [r[1] async for r in db_connector().get_multi(group_ids)
