@@ -7,11 +7,11 @@ from .log import porcupine_log
 
 ctx_user = ContextVar('user', default=None)
 ctx_txn = ContextVar('txn', default=None)
+ctx_sys = ContextVar('__sys__', default=False)
 ctx_db_cache = ContextVar('db_cache')
 ctx_visibility_cache = ContextVar('visibility_cache')
-ctx_caches = ContextVar('caches', default={})
-ctx_sys = ContextVar('__sys__', default=False)
-ctx_item_meta_cache = ContextVar('item_meta', default={})
+ctx_caches = ContextVar('caches')
+ctx_item_meta_cache = ContextVar('item_meta')
 
 
 class PContext:
@@ -46,9 +46,10 @@ class PContext:
     @staticmethod
     def prepare():
         connector = db_connector()
-        ctx_txn.set(None)
         ctx_db_cache.set(LRU(connector.cache_size))
-        ctx_visibility_cache.set(LRU(100))
+        ctx_visibility_cache.set(LRU(128))
+        ctx_caches.set({})
+        ctx_item_meta_cache.set({})
 
 
 context = PContext()
@@ -73,7 +74,6 @@ def with_context(identity=None, debug=False):
         """
         @wraps(task)
         async def context_wrapper(*args, **kwargs):
-            # with Context(locals=(context, )):
             connector = db_connector()
             context.prepare()
             user = identity
@@ -91,12 +91,11 @@ def with_context(identity=None, debug=False):
                     porcupine_log.debug(
                         f'Cache Size: {size} Hits: {hits} Misses: {misses}'
                     )
-
         return context_wrapper
     return decorator
 
 
-def context_cacheable(size=100):
+def context_cacheable(size=128):
     """
     Caches the result of a coroutine in the context scope
     :return: asyncio.Task
