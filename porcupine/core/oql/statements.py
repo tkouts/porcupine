@@ -2,7 +2,6 @@ import logging
 from functools import partial
 
 from porcupine import db, log, pipe
-from porcupine.core.stream.streamer import IdStreamer
 from porcupine.core.oql.feeder import CollectionFeeder
 from porcupine.core.oql.tokens import (
     Field,
@@ -85,10 +84,17 @@ class Select(BaseStatement):
         if isinstance(self.stale, Variable):
             stale = variables[stale]
 
+        # default feeder / scan all
         feeder = CollectionFeeder()
+
+        order_by_fields = None
+        if self.order_by and self.order_by.fields:
+            order_by_fields = self.order_by.fields
+        # print(order_by_fields)
 
         if self.where_condition is not None:
             feeder = self.where_condition.optimize(item.__class__,
+                                                   order_by_fields,
                                                    stale=stale) or feeder
 
         select_range = None
@@ -97,15 +103,17 @@ class Select(BaseStatement):
 
         results_ordered = False
         if self.order_by is not None:
-            order_by = self.order_by.expr
-            if order_by == feeder.ordered_by:
+            if feeder.is_ordered_by(order_by_fields):
                 results_ordered = True
             elif not feeder.optimized:
-                index_lookup = order_by.optimize(item.__class__, stale=stale)
-                if index_lookup.optimized:
+                expr = self.order_by.expr
+                index_lookup = expr.optimize(item.__class__,
+                                             order_by_fields,
+                                             stale=stale)
+                if index_lookup is not None:
                     feeder = index_lookup
                     results_ordered = True
-            if self.order_by.desc and not feeder.reversed:
+            if self.order_by.desc:
                 feeder.reversed = True
         else:
             results_ordered = True
@@ -118,7 +126,7 @@ class Select(BaseStatement):
         if debug_log:
             log.debug(f'Streamer: {streamer}')
 
-        if isinstance(streamer, IdStreamer):
+        if streamer.output_ids:
             streamer = streamer.items()
 
         if feeder.optimized and collection in {'items', 'containers'}:

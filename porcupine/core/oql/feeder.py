@@ -1,3 +1,4 @@
+import itertools
 from typing import Iterable
 from functools import partial
 
@@ -30,21 +31,24 @@ class DynamicRange(namedlist('DynamicRange',
 
 
 class Feeder:
-    __slots__ = 'ordered_by', 'reversed', 'options'
-    priority = 0
+    __slots__ = 'reversed', 'options'
     optimized = True
+    default_priority = 0
 
     def __init__(self, options):
-        self.ordered_by = None
         self.reversed = False
         self.options = options
+
+    @staticmethod
+    def is_ordered_by(field_list):
+        return field_list is None
 
     def __call__(self, statement, item, collection, v):
         raise NotImplementedError
 
 
 class EmptyFeeder(Feeder):
-    priority = 2
+    default_priority = 2
 
     def __call__(self, statement, item, collection, v):
         return EmptyStreamer()
@@ -54,15 +58,18 @@ class CollectionFeeder(Feeder):
     __slots__ = 'filter_func'
     optimized = False
 
-    def __init__(self, filter_func=None):
-        super().__init__(None)
-        self.ordered_by = 'is_collection'
+    def __init__(self, filter_func=None, options=None):
+        super().__init__(options)
         self.filter_func = filter_func
+
+    @staticmethod
+    def is_ordered_by(field_list):
+        return field_list == ('is_collection', )
 
     def __repr__(self):
         return (
             f'{self.__class__.__name__}('
-            f'reversed={repr(self.reversed)} '
+            f'reversed={repr(self.reversed)}, '
             f'filter_func={repr(self.filter_func)}'
             ')'
         )
@@ -70,11 +77,11 @@ class CollectionFeeder(Feeder):
     def __call__(self, statement, item, collection, v):
         # TODO: check we have a valid collection
         if collection == 'children':
-            feeder = item.containers | chain(item.items)
+            feeder = item.items | chain(item.containers)
         else:
             feeder = getattr(item, collection)
-        if not self.reversed:
-            feeder.reversed = True
+        if self.reversed:
+            feeder.reverse()
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
@@ -82,8 +89,8 @@ class CollectionFeeder(Feeder):
 
 
 class IndexLookup(Feeder):
-    __slots__ = 'index_type', 'index_name', 'bounds', 'filter_func'
-    priority = 1
+    __slots__ = 'index_type', 'index_name', 'bounds', 'filter_func', 'index'
+    default_priority = 1
 
     def __init__(self, index_type, index_name, bounds=None, filter_func=None,
                  options=None):
@@ -92,7 +99,13 @@ class IndexLookup(Feeder):
         self.index_name = index_name
         self.bounds = bounds
         self.filter_func = filter_func
-        self.ordered_by = self.index_name
+        self.index = db_connector().views[index_type][index_name]
+
+    def is_ordered_by(self, field_list):
+        if field_list is not None:
+            return field_list in itertools.combinations(self.index.attr_list,
+                                                        len(field_list))
+        return True
 
     @staticmethod
     def date_to_utc(date: Date):
@@ -112,30 +125,32 @@ class IndexLookup(Feeder):
         )
 
     def __call__(self, statement, item, collection, v):
-        type_views = db_connector().views[self.index_type]
-        feeder = type_views[self.index_name].get_cursor(**self.options)
-        feeder.set_scope(item.id)
+        streamer = self.index.get_cursor(**self.options)
+        streamer.set_scope(item.id)
         if self.bounds is not None:
-            bounds = self.bounds(None, statement, v)
-            if isinstance(bounds, Range):
-                if isinstance(bounds.l_bound, Date):
-                    bounds.l_bound = self.date_to_utc(bounds.l_bound)
-                if isinstance(bounds.u_bound, Date):
-                    bounds.u_bound = self.date_to_utc(bounds.u_bound)
-            elif isinstance(bounds, Date):
-                bounds = self.date_to_utc(bounds)
-            feeder.set([bounds])
+            bounds = []
+            for b in self.bounds:
+                boundary = b(None, statement, v)
+                if isinstance(boundary, Range):
+                    if isinstance(boundary.l_bound, Date):
+                        boundary.l_bound = self.date_to_utc(boundary.l_bound)
+                    if isinstance(boundary.u_bound, Date):
+                        boundary.u_bound = self.date_to_utc(boundary.u_bound)
+                elif isinstance(boundary, Date):
+                    boundary = self.date_to_utc(boundary)
+                bounds.append(boundary)
+            streamer.set(bounds)
         if self.reversed:
-            feeder.reversed = True
+            streamer.reverse()
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
-            feeder = feeder.items() | filter(flt)
-        return feeder
+            streamer = streamer.items() | filter(flt)
+        return streamer
 
 
 class FTSIndexLookup(Feeder):
-    __slots__ = 'index_type', 'field', 'term', 'filter_func'
-    priority = 2
+    __slots__ = 'index_type', 'field', 'term', 'filter_func', 'index'
+    default_priority = 2
 
     def __init__(self, index_type, field, term, filter_func=None, options=None):
         super().__init__(options)
@@ -143,8 +158,11 @@ class FTSIndexLookup(Feeder):
         self.field = field
         self.term = term
         self.filter_func = filter_func
-        self.ordered_by = '_score'
-        # self.reversed = True
+        self.index = db_connector().fts_indexes[index_type]
+
+    @staticmethod
+    def is_ordered_by(field_list):
+        return field_list == ('_score', )
 
     def __repr__(self):
         return (
@@ -158,13 +176,11 @@ class FTSIndexLookup(Feeder):
         )
 
     def __call__(self, statement, item, collection, v):
-        fts_index = db_connector().fts_indexes[self.index_type]
-        feeder = fts_index.get_cursor(**self.options)
+        feeder = self.index.get_cursor(**self.options)
         feeder.set_scope(item.id)
         feeder.set_term(self.term(statement, v))
-        if not self.reversed:
-            # default is descending
-            feeder.reversed = True
+        if self.reversed:
+            feeder.reverse()
         if self.filter_func is not None:
             flt = partial(self.filter_func, s=statement, v=v)
             feeder = feeder.items() | filter(flt)
@@ -172,33 +188,38 @@ class FTSIndexLookup(Feeder):
 
 
 class Intersection(Feeder):
-    __slots__ = ('first', 'second')
+    __slots__ = 'first', 'second'
 
     def __init__(self, first, second, options=None):
         super().__init__(options)
         self.first = first
         self.second = second
-        self.ordered_by = second.ordered_by
+
+    def is_ordered_by(self, field_list):
+        return self.second.is_ordered_by(field_list)
 
     def __repr__(self):
         return (
             f'{self.__class__.__name__}('
             f'first={repr(self.first)}, '
-            f'second={repr(self.second)}, '
-            f'ordered_by={repr(self.ordered_by)}'
+            f'second={repr(self.second)}'
             ')'
         )
+
+    @property
+    def feeders(self):
+        return self.first, self.second
 
     def __call__(self, statement, item, collection, v):
         first_feeder = self.first(statement, item, collection, v)
         second_feeder = self.second(statement, item, collection, v)
         is_same_index = (
-            all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
+            all([isinstance(f, IndexLookup) for f in self.feeders])
             and self.first.index_name == self.second.index_name
             and len(first_feeder.bounds) == len(second_feeder.bounds)
         )
         if is_same_index:
-            ranged = next(feeder for feeder in (first_feeder, second_feeder)
+            ranged = next(feeder for feeder in self.feeders
                           if feeder.is_ranged)
             if ranged:
                 other = (second_feeder if ranged is first_feeder
@@ -209,11 +230,13 @@ class Intersection(Feeder):
                     ranged.bounds[-1] = inter
                     return ranged
                 return EmptyStreamer()
+        if self.reversed:
+            second_feeder.reverse()
         return first_feeder.intersection(second_feeder)
 
 
 class Union(Feeder):
-    __slots__ = ('first', 'second')
+    __slots__ = 'first', 'second'
 
     def __init__(self, first, second, options=None):
         super().__init__(options or {})
@@ -228,16 +251,20 @@ class Union(Feeder):
             ')'
         )
 
+    @property
+    def feeders(self):
+        return self.first, self.second
+
     def __call__(self, statement, item, collection, v):
         first_feeder = self.first(statement, item, collection, v)
         second_feeder = self.second(statement, item, collection, v)
         is_same_index = (
-            all([isinstance(f, IndexLookup) for f in (self.first, self.second)])
+            all([isinstance(f, IndexLookup) for f in self.feeders])
             and self.first.index_name == self.second.index_name
             and len(first_feeder.bounds) == len(second_feeder.bounds)
         )
         if is_same_index:
-            ranged = next(feeder for feeder in (first_feeder, second_feeder)
+            ranged = next(feeder for feeder in self.feeders
                           if feeder.is_ranged)
             if ranged:
                 other = (second_feeder if ranged is first_feeder

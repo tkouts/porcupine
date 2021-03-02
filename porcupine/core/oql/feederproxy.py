@@ -1,4 +1,4 @@
-from porcupine.core.oql.feeder import Feeder
+from porcupine.core.oql.feeder import Feeder, FTSIndexLookup
 
 
 class Argument:
@@ -24,8 +24,15 @@ class FeederProxy(Argument):
         }
 
     @property
-    def priority(self):
-        return self._feeder_type.priority
+    def default_priority(self):
+        return self._feeder_type.default_priority
+
+    @property
+    def is_fts_feeder(self):
+        return self._feeder_type is FTSIndexLookup
+
+    def is_ordered_by(self, field_list):
+        return self.value(None).is_ordered_by(field_list)
 
     def set_argument(self, name: str, v):
         self._kwargs[name] = v if type(v) is FeederProxy else Argument(v)

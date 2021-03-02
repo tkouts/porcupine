@@ -6,7 +6,7 @@ from porcupine import log
 from porcupine.exceptions import OqlError
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
-from porcupine.core.oql.feederproxy import Argument, FeederProxy
+from porcupine.core.oql.feederproxy import FeederProxy
 
 __all__ = (
     'T_False',
@@ -53,11 +53,12 @@ class Token:
     def source(self):
         return repr(self.value)
 
-    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
+    def get_index_lookup(self, container_type,
+                         order_by) -> Optional[FeederProxy]:
         return None
 
-    def optimize(self, item_type, **options) -> Optional[Feeder]:
-        feeder_proxy = self.get_index_lookup(item_type)
+    def optimize(self, item_type, order_by, **options) -> Optional[Feeder]:
+        feeder_proxy = self.get_index_lookup(item_type, order_by)
         if feeder_proxy is not None:
             return feeder_proxy.value(options)
         return None
@@ -98,8 +99,9 @@ class Field(String):
             return f'get_nested_field(i, "{path[0]}", {path[1:]})'
         return f'get_field(i, "{self}", s, v)'
 
-    @lru_cache(maxsize=None)
-    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
+    @lru_cache(maxsize=1024)
+    def get_index_lookup(self, container_type,
+                         order_by) -> Optional[FeederProxy]:
         for cls in container_type.mro():
             if 'indexes' in cls.__dict__:
                 for attr_set in cls.indexes:
@@ -162,8 +164,9 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
     def __hash__(self):
         return hash(self.field)
 
-    @lru_cache(maxsize=None)
-    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
+    @lru_cache(maxsize=1024)
+    def get_index_lookup(self, container_type,
+                         order_by) -> Optional[FeederProxy]:
         for cls in container_type.mro():
             if 'full_text_indexes' in cls.__dict__:
                 if self.field == '*' or self in cls.full_text_indexes:
@@ -171,16 +174,13 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
                                        index_type=cls,
                                        field=self.field,
                                        term=self.term)
-        return None
+        log.warn(f'Non indexed FTS lookup on {container_type.__name__}')
+        return FeederProxy(EmptyFeeder)
 
-    def optimize(self, item_type, **options) -> Feeder:
+    def optimize(self, item_type, order_by, **options) -> Feeder:
         if not self.term.immutable:
             raise OqlError('FREETEXT term should be immutable')
-        feeder = super().optimize(item_type, **options)
-        if feeder is not None:
-            return feeder
-        log.warn(f'Non indexed FTS lookup on {item_type}')
-        return EmptyFeeder({})
+        return super().optimize(item_type, order_by, **options)
 
 
 OptimizedExpr = namedlist('OptimizedExpr', 'expr feeder')
@@ -219,8 +219,9 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
     def __call__(self, statement, v):
         return self.compile()(None, statement, v)
 
-    @lru_cache(maxsize=None)
-    def get_index_lookup(self, container_type) -> Optional[FeederProxy]:
+    @lru_cache(maxsize=1024)
+    def get_index_lookup(self, container_type,
+                         order_by) -> Optional[FeederProxy]:
         # comparison
         is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
         if is_comparison:
@@ -228,7 +229,8 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
             bounds = None
             feeder_proxy = None
             if self.r_op.immutable:
-                feeder_proxy = self.l_op.get_index_lookup(container_type)
+                feeder_proxy = self.l_op.get_index_lookup(container_type,
+                                                          order_by)
                 bounds = self.r_op
             elif self.l_op.immutable:
                 # reverse operator
@@ -236,7 +238,8 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                     operator = f'<{operator[1:]}'
                 elif operator.startswith('<'):
                     operator = f'>{operator[1:]}'
-                feeder_proxy = self.r_op.get_index_lookup(container_type)
+                feeder_proxy = self.r_op.get_index_lookup(container_type,
+                                                          order_by)
                 bounds = self.l_op
 
             if feeder_proxy is not None:
@@ -247,18 +250,19 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                 elif operator.startswith('<'):
                     bounds = DynamicRange(None, False, bounds)
                     bounds.u_inclusive = operator == '<='
-                feeder_proxy.set_argument('bounds', bounds)
+                feeder_proxy.set_argument('bounds', [bounds])
                 return feeder_proxy
 
         # logical
         is_logical = self.operator in {'and', 'or'}
         if is_logical:
             optimized = [
-                OptimizedExpr(op, op.get_index_lookup(container_type))
+                OptimizedExpr(op, op.get_index_lookup(container_type, order_by))
                 for op in (self.l_op, self.r_op)
             ]
             optimized.sort(
-                key=lambda f: 1 if f.feeder is None else -f.feeder.priority
+                key=lambda f: 1 if f.feeder is None
+                else -f.feeder.default_priority
             )
             first, second = optimized
             if self.operator == 'and':
@@ -267,10 +271,12 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                 if first.feeder is not None:
                     if second.feeder is not None:
                         # intersection
+                        if first.feeder.is_ordered_by(order_by):
+                            optimized.reverse()
                         return FeederProxy(
                             Intersection,
-                            first=first.feeder,
-                            second=second.feeder
+                            first=optimized[0].feeder,
+                            second=optimized[1].feeder
                         )
                     else:
                         # add filter func
@@ -279,18 +285,24 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                         return first.feeder
             if self.operator == 'or':
                 # print(optimized)
-                if first.feeder is not None:
-                    # union
-                    if second.feeder is None:
-                        second.feeder = FeederProxy(
-                            CollectionFeeder,
-                            filter_func=second.expr.compile
-                        )
+                if first.feeder is not None and second.feeder is not None:
                     return FeederProxy(
                         Union,
                         first=first.feeder,
                         second=second.feeder
                     )
+                # check for fts feeder
+                for opt in optimized:
+                    if opt.feeder is not None and opt.feeder.is_fts_feeder:
+                        other = first if opt is second else second
+                        return FeederProxy(
+                            Union,
+                            first=opt.feeder,
+                            second=FeederProxy(
+                                CollectionFeeder,
+                                filter_func=other.expr.compile()
+                            )
+                        )
         return None
 
 
@@ -327,7 +339,14 @@ class DynamicSlice(namedlist('DynamicSlice', 'low high')):
 
 
 FieldSpec = namedlist('FieldSpec', 'expr alias')
-OrderBy = namedlist('OrderBy', 'expr desc')
+
+
+class OrderBy(namedlist('OrderBy', 'expr desc')):
+    @property
+    def fields(self) -> Optional[tuple]:
+        if isinstance(self.expr, Field):
+            return (self.expr, )
+        return None
 
 
 def is_expression(t):
