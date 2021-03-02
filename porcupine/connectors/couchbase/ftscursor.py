@@ -1,4 +1,9 @@
-from couchbase.search import ConjunctionQuery, TermQuery, QueryStringQuery
+from couchbase.search import (
+    ConjunctionQuery,
+    TermQuery,
+    QueryStringQuery,
+    SearchOptions
+)
 
 from porcupine import context
 from porcupine.connectors.base.cursors import FTSIndexCursor, FTSIndexIterator
@@ -26,7 +31,10 @@ class FTSCursorIterator(FTSIndexIterator):
         query = ConjunctionQuery(match_query, scope_query)
         results = cluster.search_query(
             self.index.container_name,
-            query
+            query,
+            SearchOptions(
+                sort=['-_score'] if self._reversed else ['_score']
+            )
         )
         async for hit in results:
             context.item_meta[hit.id] = hit.score
