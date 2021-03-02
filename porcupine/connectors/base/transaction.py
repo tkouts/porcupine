@@ -8,7 +8,7 @@ from porcupine.core import utils
 from porcupine.core.utils import date
 from porcupine.core.context import ctx_txn
 from porcupine.core.services import get_service
-from porcupine.core.context import system_override, with_context, context
+from porcupine.core.context import system_override, context_user, context
 
 
 class Transaction:
@@ -408,21 +408,23 @@ class Transaction:
 
         ctx_txn.set(None)
 
-    @with_context(server.system_user)
-    async def _exec_post_handler(self, handler: str, items: list, actor):
-        tasks = [getattr(item, handler)(actor) for item in items]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        errors = [result if isinstance(result, Exception) else None
-                  for result in results]
-        if any(errors):
-            message = 'Uncaught exception in post {0} handler of type {1}\n{2}'
-            for i, error in enumerate(errors):
-                if error is not None:
-                    log.error(message.format(
-                        handler.split('_')[-1],
-                        items[i].content_class,
-                        error
-                    ))
+    @staticmethod
+    async def _exec_post_handler(handler: str, items: list, actor):
+        async with context_user(server.system_user):
+            tasks = [getattr(item, handler)(actor) for item in items]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            errors = [result if isinstance(result, Exception) else None
+                      for result in results]
+            if any(errors):
+                message = \
+                    'Uncaught exception in post {0} handler of type {1}\n{2}'
+                for i, error in enumerate(errors):
+                    if error is not None:
+                        log.error(message.format(
+                            handler.split('_')[-1],
+                            items[i].content_class,
+                            error
+                        ))
 
     async def abort(self) -> None:
         """
