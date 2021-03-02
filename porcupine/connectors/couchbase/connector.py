@@ -90,7 +90,7 @@ class Couchbase(BaseConnector):
         self.bucket = self.cluster.bucket(self.bucket_name)
         await self.bucket.on_connect()
 
-    @context_cacheable(size=1000)
+    @context_cacheable(size=1024)
     async def key_exists(self, key) -> bool:
         try:
             await self.bucket.retrieve_in(key, 'dl')
