@@ -6,7 +6,7 @@ from porcupine.core import utils
 from porcupine.core.utils.collections import FrozenDict
 from porcupine.exceptions import DBAlreadyExists
 from porcupine.connectors.base.transaction import Transaction
-from porcupine.connectors.base.persist import DefaultPersistence
+from porcupine.connectors.base import persist
 
 
 class BaseConnector(metaclass=abc.ABCMeta):
@@ -14,7 +14,7 @@ class BaseConnector(metaclass=abc.ABCMeta):
     TransactionType = Transaction
     IndexType = None
     FTSIndexType = None
-    persist = DefaultPersistence
+    persist = persist
     supports_ttl = True
 
     # Sub Document Mutation Codes
