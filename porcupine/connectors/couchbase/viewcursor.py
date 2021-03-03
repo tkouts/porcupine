@@ -38,7 +38,6 @@ class CursorIterator(SecondaryIndexIterator):
         self.stale = stale
 
     async def __aiter__(self):
-        # print(self.index.name, self.stale)
         kwargs = {
             'stale': self.stale,
             'reduce': self.reduce
@@ -56,9 +55,15 @@ class CursorIterator(SecondaryIndexIterator):
             start_key.extend(self._bounds[:-1])
             end_key.extend(self._bounds[:-1])
             last = self._bounds[-1]
-            if last.l_bound is not None:
-                start_key.append(last.l_bound)
-            end_key.append(last.u_bound or Query.STRING_RANGE_END)
+
+            if is_ranged:
+                if last.l_bound is not None:
+                    start_key.append(last.l_bound)
+                end_key.append(last.u_bound or Query.STRING_RANGE_END)
+            else:
+                start_key.append(last)
+                end_key.append(last)
+
             if len(self._bounds) < len(self.index.keys):
                 end_key.append(Query.STRING_RANGE_END)
 
