@@ -45,16 +45,17 @@ class CursorIterator(SecondaryIndexIterator):
 
         bounds_size = self._bounds is not None and len(self._bounds)
         is_ranged = self.is_ranged
+        last = self._bounds[-1].value
         if not is_ranged and bounds_size == len(self.index.keys):
             # equality
-            kwargs['key'] = [self._scope] + self._bounds
+            kwargs['key'] = [self._scope] + [b.value for b in self._bounds]
         else:
             # range
             start_key = [self._scope]
             end_key = [self._scope]
-            start_key.extend(self._bounds[:-1])
-            end_key.extend(self._bounds[:-1])
-            last = self._bounds[-1]
+            fixed_values = [b.value for b in self._bounds[:-1]]
+            start_key.extend(fixed_values)
+            end_key.extend(fixed_values)
 
             if is_ranged:
                 if last.l_bound is not None:
@@ -75,14 +76,14 @@ class CursorIterator(SecondaryIndexIterator):
             if 'mapkey_range' in kwargs:
                 kwargs['mapkey_range'].reverse()
                 if is_ranged:
-                    if not self._bounds[-1].u_inclusive:
-                        exclude_key = self._bounds[-1].u_bound
-                    if not self._bounds[-1].l_inclusive:
+                    if not last.u_inclusive:
+                        exclude_key = last.u_bound
+                    if not last.l_inclusive:
                         kwargs['inclusive_end'] = False
         elif is_ranged:
-            if not self._bounds[-1].l_inclusive:
-                exclude_key = self._bounds[-1].l_bound
-            if not self._bounds[-1].u_inclusive:
+            if not last.l_inclusive:
+                exclude_key = last.l_bound
+            if not last.u_inclusive:
                 kwargs['inclusive_end'] = False
 
         bucket = self.index.connector.bucket

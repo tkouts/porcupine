@@ -5,6 +5,7 @@ from porcupine.view import view
 from porcupine.core.datatypes.system import Items, Containers
 from porcupine.core.services import db_connector
 from porcupine.core import utils
+from porcupine.connectors.base.bounds import FixedBoundary
 from .item import Item
 from .shortcut import Shortcut
 
@@ -50,14 +51,14 @@ class Container(Item):
         container_views = db_connector().views[Container]
         cursor = container_views['is_collection'].get_cursor()
         cursor.set_scope(self.id)
-        cursor.set([False])
+        cursor.set([FixedBoundary(False)])
         return await cursor.count()
 
     async def containers_count(self):
         container_views = db_connector().views[Container]
         cursor = container_views['is_collection'].get_cursor()
         cursor.set_scope(self.id)
-        cursor.set([True])
+        cursor.set([FixedBoundary(True)])
         return await cursor.count()
 
     async def get_child_by_name(self, name, resolve_shortcut=False):
