@@ -12,12 +12,12 @@ DEFAULTS = {
 
 
     # DATABASE
-    'DB_IF': 'porcupine.connectors.Couchbase',
+    'DB_IF': 'porcupine.connectors.couchbase.connector.Couchbase',
     'DB_HOST': 'localhost',
     'DB_NAME': 'porcupine',
     'DB_USER': 'porcupine',
     'DB_PASSWORD': '',
-    'DB_CACHE_SIZE': 1000,
+    'DB_CACHE_SIZE': 1024,
     # how many times a transaction is retried
     # before an error is raised
     'DB_TXN_MAX_RETRIES': 16,
