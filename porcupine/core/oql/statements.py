@@ -21,10 +21,14 @@ class BaseStatement:
 
 class Select(BaseStatement):
     __slots__ = (
-        'scope', 'select_list',
-        'where_condition', 'order_by',
-        'range', 'computed_fields',
-        'where_compiled', 'order_by_compiled',
+        'select_list',
+        'computed_fields',
+        'scope',
+        'where_condition',
+        'where_compiled',
+        'order_by',
+        'order_by_compiled',
+        'range',
         'stale'
     )
 
@@ -139,17 +143,18 @@ class Select(BaseStatement):
             flt = partial(self.where_compiled, s=self, v=variables)
             streamer |= pipe.filter(flt)
 
-        if select_range is not None and results_ordered:
-            # print('premature range')
-            streamer |= pipe.getitem(select_range)
+        if results_ordered:
+            if select_range is not None:
+                # print('premature range')
+                streamer |= pipe.getitem(select_range)
+        else:
+            if self.order_by is not None:
+                key = partial(self.order_by_compiled, s=self, v=variables)
+                streamer |= pipe.key_sort(key, _reverse=self.order_by.desc)
 
-        if self.order_by is not None and not results_ordered:
-            key = partial(self.order_by_compiled, s=self, v=variables)
-            streamer |= pipe.key_sort(key, _reverse=self.order_by.desc)
-
-        if select_range is not None and not results_ordered:
-            # print('mature range')
-            streamer |= pipe.getitem(select_range)
+            if select_range is not None:
+                # print('mature range')
+                streamer |= pipe.getitem(select_range)
 
         if self.select_list:
             field_extractor = partial(self.extract_fields, v=variables)
