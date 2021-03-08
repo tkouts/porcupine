@@ -1,12 +1,13 @@
 from typing import Optional, Callable
+from functools import lru_cache, partial
 from namedlist import namedlist
-from functools import lru_cache
 
 from porcupine import log
 from porcupine.exceptions import OqlError
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
 from porcupine.core.oql.feederproxy import FeederProxy
+from porcupine.core.oql.optimizers import FieldLookup, conjunction_optimizer
 
 __all__ = (
     'T_False',
@@ -32,17 +33,18 @@ __all__ = (
 class Token:
     primitive = True
     immutable = True
+    is_field_lookup = False
 
     def __init__(self, value, *_args, **_kwargs):
         self.value = value
         self.__lambda = None
 
     @property
-    def field_lookups(self):
-        return []
+    def field_lookup(self) -> Optional[FieldLookup]:
+        return None
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.value})'
+        return f'{self.__class__.__name__}({repr(self.value)})'
 
     def compile(self) -> Callable:
         if self.__lambda is None:
@@ -53,14 +55,13 @@ class Token:
     def source(self):
         return repr(self.value)
 
-    def get_index_lookup(self, container_type,
-                         order_by) -> Optional[FeederProxy]:
+    def get_index_lookup(self, container_type, order_by) -> Optional[partial]:
         return None
 
     def optimize(self, item_type, order_by, **options) -> Optional[Feeder]:
         feeder_proxy = self.get_index_lookup(item_type, order_by)
         if feeder_proxy is not None:
-            return feeder_proxy.value(options)
+            return feeder_proxy(options=options)
         return None
 
     def __call__(self, statement, v):
@@ -87,10 +88,11 @@ class String(Token, str):
 class Field(String):
     primitive = False
     immutable = False
+    is_field_lookup = True
 
     @property
-    def field_lookups(self):
-        return [self]
+    def field_lookup(self) -> Optional[FieldLookup]:
+        return FieldLookup(self)
 
     def source(self):
         if '.' in self:
@@ -100,21 +102,8 @@ class Field(String):
         return f'get_field(i, "{self}", s, v)'
 
     @lru_cache(maxsize=1024)
-    def get_index_lookup(self, container_type,
-                         order_by) -> Optional[FeederProxy]:
-        for cls in container_type.mro():
-            if 'indexes' in cls.__dict__:
-                for attr_set in cls.indexes:
-                    if attr_set == self:
-                        return FeederProxy(IndexLookup,
-                                           index_type=cls,
-                                           index_name=self)
-                        # return cls, attr_set
-                    elif isinstance(attr_set, list) and attr_set[0] == self:
-                        return FeederProxy(IndexLookup,
-                                           index_type=cls,
-                                           index_name=','.join(attr_set))
-        return None
+    def get_index_lookup(self, container_type, order_by) -> Optional[partial]:
+        return conjunction_optimizer([self], container_type, order_by)
 
 
 class Variable(Token, str):
@@ -165,17 +154,18 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
         return hash(self.field)
 
     @lru_cache(maxsize=1024)
-    def get_index_lookup(self, container_type,
-                         order_by) -> Optional[FeederProxy]:
+    def get_index_lookup(self, container_type, order_by) -> Optional[partial]:
         for cls in container_type.mro():
             if 'full_text_indexes' in cls.__dict__:
                 if self.field == '*' or self in cls.full_text_indexes:
-                    return FeederProxy(FTSIndexLookup,
-                                       index_type=cls,
-                                       field=self.field,
-                                       term=self.term)
+                    return FeederProxy.factory(
+                        FTSIndexLookup,
+                        cls,
+                        self.field,
+                        self.term
+                    )
         log.warn(f'Non indexed FTS lookup on {container_type.__name__}')
-        return FeederProxy(EmptyFeeder)
+        return FeederProxy.factory(EmptyFeeder)
 
     def optimize(self, item_type, order_by, **options) -> Feeder:
         if not self.term.immutable:
@@ -200,12 +190,51 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
         return self.l_op.immutable and self.r_op.immutable
 
     @property
-    def field_lookups(self):
-        if self.operator in {'==', '>=', '<=', '>', '<', 'and'}:  # or any([isinstance(op, Field) for x in]):
-        #     return [op for op in (self.r_op, self.l_op)
-        #             if isinstance(op, Field)]
-            return self.r_op.field_lookups + self.l_op.field_lookups
-        return []
+    def is_field_lookup(self):
+        if self.is_comparison and (self.r_op.immutable or self.l_op.immutable):
+            return self.r_op.is_field_lookup or self.l_op.is_field_lookup
+
+    @property
+    def operands(self):
+        return self.l_op, self.r_op
+
+    def explode(self):
+        tokens = []
+        for operand in self.operands:
+            if isinstance(operand, Expression) and \
+                    operand.operator == self.operator:
+                tokens.extend(operand.explode())
+            else:
+                tokens.append(operand)
+        return tokens
+
+    @property
+    def field_lookup(self) -> Optional[FieldLookup]:
+        if self.is_field_lookup:
+            if self.r_op.immutable:
+                field_lookup = self.l_op.field_lookup
+                field_lookup.operator = self.operator
+                field_lookup.expr = self.r_op
+                return field_lookup
+            elif self.l_op.immutable:
+                field_lookup = self.r_op.field_lookup
+                operator = self.operator
+                # reverse operator
+                if operator.startswith('>'):
+                    operator = f'<{operator[1:]}'
+                elif operator.startswith('<'):
+                    operator = f'>{operator[1:]}'
+                field_lookup.operator = operator
+                field_lookup.expr = self.l_op
+                return field_lookup
+
+    @property
+    def is_comparison(self):
+        return self.operator in {'==', '>=', '<=', '>', '<'}
+
+    @property
+    def is_logical(self):
+        return self.operator in {'and', 'or'}
 
     def source(self):
         source = f'{self.l_op.source()} {self.operator} {self.r_op.source()}'
@@ -220,87 +249,45 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
         return self.compile()(None, statement, v)
 
     @lru_cache(maxsize=1024)
-    def get_index_lookup(self, container_type,
-                         order_by) -> Optional[FeederProxy]:
-        # comparison
-        is_comparison = self.operator in {'==', '>=', '<=', '>', '<'}
-        if is_comparison:
-            operator = self.operator
-            bounds = None
-            feeder_proxy = None
-            if self.r_op.immutable:
-                feeder_proxy = self.l_op.get_index_lookup(container_type,
-                                                          order_by)
-                bounds = self.r_op
-            elif self.l_op.immutable:
-                # reverse operator
-                if operator.startswith('>'):
-                    operator = f'<{operator[1:]}'
-                elif operator.startswith('<'):
-                    operator = f'>{operator[1:]}'
-                feeder_proxy = self.r_op.get_index_lookup(container_type,
-                                                          order_by)
-                bounds = self.l_op
-
-            if feeder_proxy is not None:
-                bounds = bounds.compile()
-                if operator.startswith('>'):
-                    bounds = DynamicRange(bounds)
-                    bounds.l_inclusive = operator == '>='
-                elif operator.startswith('<'):
-                    bounds = DynamicRange(None, False, bounds)
-                    bounds.u_inclusive = operator == '<='
-                feeder_proxy.set_argument('bounds', [bounds])
-                return feeder_proxy
+    def get_index_lookup(self, container_type, order_by) -> Optional[partial]:
+        # field lookup
+        if self.is_field_lookup:
+            return conjunction_optimizer([self], container_type, order_by)
 
         # logical
-        is_logical = self.operator in {'and', 'or'}
-        if is_logical:
-            optimized = [
-                OptimizedExpr(op, op.get_index_lookup(container_type, order_by))
-                for op in (self.l_op, self.r_op)
-            ]
-            optimized.sort(
-                key=lambda f: 1 if f.feeder is None
-                else -f.feeder.default_priority
-            )
-            first, second = optimized
+        if self.is_logical:
             if self.operator == 'and':
-                print(self.field_lookups)
-                # print(optimized)
-                if first.feeder is not None:
-                    if second.feeder is not None:
-                        # intersection
-                        if first.feeder.is_ordered_by(order_by):
-                            optimized.reverse()
-                        return FeederProxy(
-                            Intersection,
-                            first=optimized[0].feeder,
-                            second=optimized[1].feeder
-                        )
-                    else:
-                        # add filter func
-                        first.feeder.set_argument('filter_func',
-                                                  second.expr.compile())
-                        return first.feeder
+                tokens = self.explode()
+                # print('EXPLODE:', tokens)
+                return conjunction_optimizer(tokens, container_type, order_by)
             if self.operator == 'or':
+                # optimize operands
+                optimized = [
+                    OptimizedExpr(op,
+                                  op.get_index_lookup(container_type, order_by))
+                    for op in self.operands
+                ]
+                optimized.sort(
+                    key=lambda f: 1 if f.feeder is None
+                    else -f.feeder.func.default_priority
+                )
+                first, second = optimized
                 # print(optimized)
                 if first.feeder is not None and second.feeder is not None:
-                    return FeederProxy(
+                    return FeederProxy.factory(
                         Union,
-                        first=first.feeder,
-                        second=second.feeder
+                        first.feeder,
+                        second.feeder
                     )
-                # check for fts feeder
-                for opt in optimized:
-                    if opt.feeder is not None and opt.feeder.is_fts_feeder:
-                        other = first if opt is second else second
-                        return FeederProxy(
+                elif first.feeder is not None:
+                    # check for fts feeder
+                    if first.feeder.func.is_of_type(FTSIndexLookup):
+                        return FeederProxy.factory(
                             Union,
-                            first=opt.feeder,
-                            second=FeederProxy(
+                            first.feeder,
+                            FeederProxy.factory(
                                 CollectionFeeder,
-                                filter_func=other.expr.compile()
+                                filter_func=second.expr.compile()
                             )
                         )
         return None
