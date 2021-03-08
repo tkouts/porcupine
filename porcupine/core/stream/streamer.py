@@ -47,6 +47,9 @@ class BaseStreamer(AsyncIterable):
             n += 1
         return n
 
+    def items(self, _multi_fetch=db.get_multi) -> 'ItemStreamer':
+        return ItemStreamer(self, _multi_fetch)
+
 
 class EmptyStreamer(BaseStreamer):
     def __init__(self):
@@ -57,9 +60,6 @@ class EmptyStreamer(BaseStreamer):
 
 
 class IdStreamer(BaseStreamer):
-    def items(self, _multi_fetch=db.get_multi) -> 'ItemStreamer':
-        return ItemStreamer(self, _multi_fetch)
-
     async def get_item_by_id(self,
                              item_id: TYPING.ITEM_ID,
                              quiet=True) -> TYPING.ANY_ITEM_CO:
@@ -80,7 +80,7 @@ class ItemStreamer(BaseStreamer):
     supports_reversed_iteration = True
     output_ids = False
 
-    def __init__(self, id_iterator: IdStreamer, multi_fetch):
+    def __init__(self, id_iterator: BaseStreamer, multi_fetch):
         self._id_iterator = id_iterator
         item_iterator = (
             self._id_iterator |
