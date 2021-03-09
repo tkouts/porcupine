@@ -2,12 +2,15 @@ from typing import Optional, Callable
 from functools import lru_cache, partial
 from namedlist import namedlist
 
-from porcupine import log
 from porcupine.exceptions import OqlError
 from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feeder import *
-from porcupine.core.oql.feederproxy import FeederProxy
-from porcupine.core.oql.optimizers import FieldLookup, conjunction_optimizer
+from porcupine.core.oql.optimizers import (
+    FieldLookup,
+    fts_token_optimizer,
+    conjunction_optimizer,
+    disjunction_optimizer,
+)
 
 __all__ = (
     'T_False',
@@ -154,26 +157,13 @@ class FreeText(namedlist('FreeText', 'field term'), Token):
         return hash(self.field)
 
     @lru_cache(maxsize=1024)
-    def get_index_lookup(self, container_type, order_by) -> Optional[partial]:
-        for cls in container_type.mro():
-            if 'full_text_indexes' in cls.__dict__:
-                if self.field == '*' or self in cls.full_text_indexes:
-                    return FeederProxy.factory(
-                        FTSIndexLookup,
-                        cls,
-                        self.field,
-                        self.term
-                    )
-        log.warn(f'Non indexed FTS lookup on {container_type.__name__}')
-        return FeederProxy.factory(EmptyFeeder)
+    def get_index_lookup(self, container_type, order_by) -> partial:
+        return fts_token_optimizer(self, container_type)
 
     def optimize(self, item_type, order_by, **options) -> Feeder:
         if not self.term.immutable:
             raise OqlError('FREETEXT term should be immutable')
         return super().optimize(item_type, order_by, **options)
-
-
-OptimizedExpr = namedlist('OptimizedExpr', 'expr feeder')
 
 
 class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
@@ -256,41 +246,11 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
 
         # logical
         if self.is_logical:
+            tokens = self.explode()
             if self.operator == 'and':
-                tokens = self.explode()
-                # print('EXPLODE:', tokens)
                 return conjunction_optimizer(tokens, container_type, order_by)
             if self.operator == 'or':
-                # optimize operands
-                optimized = [
-                    OptimizedExpr(op,
-                                  op.get_index_lookup(container_type, order_by))
-                    for op in self.operands
-                ]
-                optimized.sort(
-                    key=lambda f: 1 if f.feeder is None
-                    else -f.feeder.func.default_priority
-                )
-                first, second = optimized
-                # print(optimized)
-                if first.feeder is not None and second.feeder is not None:
-                    return FeederProxy.factory(
-                        Union,
-                        first.feeder,
-                        second.feeder
-                    )
-                elif first.feeder is not None:
-                    # check for fts feeder
-                    if first.feeder.func.is_of_type(FTSIndexLookup):
-                        return FeederProxy.factory(
-                            Union,
-                            first.feeder,
-                            FeederProxy.factory(
-                                CollectionFeeder,
-                                filter_func=second.expr.compile()
-                            )
-                        )
-        return None
+                return disjunction_optimizer(tokens, container_type, order_by)
 
 
 class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):

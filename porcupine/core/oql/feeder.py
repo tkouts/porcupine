@@ -122,15 +122,14 @@ class IndexLookup(Feeder):
 
 
 class FTSIndexLookup(Feeder):
-    __slots__ = 'index_type', 'field', 'term', 'index'
+    __slots__ = 'index', 'field', 'term', 'index'
     default_priority = 2
 
-    def __init__(self, index_type, field, term, options=None, filter_func=None):
+    def __init__(self, index, field, term, options=None, filter_func=None):
         super().__init__(options, filter_func)
-        self.index_type = index_type
         self.field = field
         self.term = term
-        self.index = db_connector().fts_indexes[index_type]
+        self.index = index
 
     @staticmethod
     def is_ordered_by(field_list):
@@ -139,7 +138,7 @@ class FTSIndexLookup(Feeder):
     def __repr__(self):
         return (
             f'{self.__class__.__name__}('
-            f'index_type={repr(self.index_type.__name__)}, '
+            f'index_type={repr(self.index.container_type.__name__)}, '
             f'field={repr(self.field)}, '
             f'term={repr(self.term)}, '
             f'reversed={repr(self.reversed)}, '
@@ -175,33 +174,35 @@ class Intersection(Feeder):
         )
 
     def get_streamer(self, statement, item, collection, v):
-        feeders = [f(statement, item, collection, v) for f in self.feeders]
+        streamers = [f(statement, item, collection, v) for f in self.feeders]
         if self.reversed:
-            feeders[-1].reverse()
-        feeder = feeders[0]
-        for f in feeders[1:]:
-            feeder = feeder.intersection(f)
-        return feeder
+            streamers[-1].reverse()
+        streamer = streamers[0]
+        for f in streamers[1:]:
+            streamer = streamer.intersection(f)
+        return streamer
 
 
 class Union(Feeder):
-    __slots__ = 'first', 'second'
+    __slots__ = 'feeders'
 
-    def __init__(self, first, second, options=None, filter_func=None):
+    def __init__(self, *feeders, options=None, filter_func=None):
         super().__init__(options, filter_func)
-        self.first = first
-        self.second = second
+        self.feeders = feeders
 
     def __repr__(self):
         return (
             f'{self.__class__.__name__}('
-            f'first={repr(self.first)}, '
-            f'second={repr(self.second)}, '
+            f'feeders={repr(self.feeders)}, '
             f'filter_func={repr(self.filter_func)}'
             ')'
         )
 
     def get_streamer(self, statement, item, collection, v):
-        first_feeder = self.first(statement, item, collection, v)
-        second_feeder = self.second(statement, item, collection, v)
-        return first_feeder.union(second_feeder)
+        streamers = [f(statement, item, collection, v) for f in self.feeders]
+        if self.reversed:
+            streamers[-1].reverse()
+        streamer = streamers[0]
+        for f in streamers[1:]:
+            streamer = streamer.union(f)
+        return streamer

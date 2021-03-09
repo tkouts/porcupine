@@ -3,12 +3,21 @@ from collections import defaultdict
 from functools import lru_cache, partial
 from typing import Optional
 
+from porcupine import log
+from porcupine.core.oql.runtime import environment
 from porcupine.core.oql.feederproxy import FeederProxy
-from porcupine.core.oql.feeder import IndexLookup, Intersection
+from porcupine.core.oql.feeder import (
+    EmptyFeeder,
+    IndexLookup,
+    FTSIndexLookup,
+    Intersection,
+    Union,
+    CollectionFeeder
+)
 from porcupine.core.oql.boundproxies import (
     BoundProxyBase,
     FixedBoundaryProxy,
-    RangedBoundaryProxy
+    RangedBoundaryProxy,
 )
 from porcupine.core.services import db_connector
 
@@ -55,6 +64,40 @@ def get_all_indexes(container_type) -> tuple:
         if 'indexes' in cls.__dict__:
             indexes.extend(db.views[cls].values())
     return tuple(indexes)
+
+
+@lru_cache(maxsize=128)
+def get_all_fts_indexes(container_type) -> tuple:
+    fts_indexes = []
+    db = db_connector()
+    for cls in container_type.mro():
+        if 'full_text_indexes' in cls.__dict__:
+            fts_indexes.append(db.fts_indexes[cls])
+    return tuple(fts_indexes)
+
+
+def fts_token_optimizer(token, container_type) -> partial:
+    available_indexes = []
+    for index in get_all_fts_indexes(container_type):
+        if token.field == '*' or token.field in index.attr_list:
+            available_indexes.append(index)
+            if token.field != '*':
+                # one is enough if field is in index
+                break
+    if available_indexes:
+        feeder_proxies = [
+            FeederProxy.factory(FTSIndexLookup, index, token.field, token.term)
+            for index in available_indexes
+        ]
+        if len(feeder_proxies) == 1:
+            return feeder_proxies[0]
+        else:
+            return FeederProxy.factory(
+                Union,
+                *feeder_proxies
+            )
+    log.warn(f'Non indexed FTS lookup on {container_type.__name__}')
+    return FeederProxy.factory(EmptyFeeder)
 
 
 def conjunction_optimizer(tokens,
@@ -151,3 +194,47 @@ def conjunction_optimizer(tokens,
 
     print('Rest:', rest)
     print('-' * 80)
+
+
+class DisjunctionToken:
+    __slots__ = 'token', 'feeder'
+
+    def __init__(self, token, feeder):
+        self.token = token
+        self.feeder = feeder
+
+
+def disjunction_optimizer(tokens,
+                          container_type, order_by) -> Optional[partial]:
+    dis_tokens = [
+        DisjunctionToken(
+            token,
+            token.get_index_lookup(container_type, order_by)
+        )
+        for token in tokens
+    ]
+    dis_tokens.sort(
+        key=lambda f: -1 if f.feeder is None
+        else f.feeder.func.default_priority
+    )
+
+    # add optimized tokens
+    feeder_proxies = []
+    while dis_tokens and dis_tokens[-1].feeder is not None:
+        feeder_proxies.append(dis_tokens.pop().feeder)
+
+    # check if we have any tokens left
+    if dis_tokens:
+        # build filter_func
+        sources = [token.token.source() for token in dis_tokens]
+        filter_func = eval(f'lambda i, s, v: {" or ".join(sources)}',
+                           environment)
+        feeder_proxies.append(FeederProxy.factory(
+            CollectionFeeder,
+            filter_func=filter_func
+        ))
+    # print(feeder_proxies)
+    return FeederProxy.factory(
+        Union,
+        *feeder_proxies
+    )
