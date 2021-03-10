@@ -102,7 +102,6 @@ def fts_token_optimizer(token, container_type) -> partial:
 
 def conjunction_optimizer(tokens,
                           container_type, order_by) -> Optional[partial]:
-    print('-' * 80)
     field_lookups = []
     rest = []
     for token in tokens:
@@ -112,7 +111,6 @@ def conjunction_optimizer(tokens,
         else:
             rest.append(token)
 
-    print(field_lookups)
     fields_map = defaultdict(list)
     for lookup in field_lookups:
         fields_map[lookup.field].append(lookup)
@@ -124,7 +122,6 @@ def conjunction_optimizer(tokens,
     for index in indexes:
         match_length = min(len(fields_map), len(index.attr_list))
         match_fields = index.attr_list[:match_length]
-        # print('---', list(field_names), match_fields)
         for mutation in itertools.permutations(field_names,
                                                match_length):
             partial_match = []
@@ -137,7 +134,6 @@ def conjunction_optimizer(tokens,
     feeder_proxies = []
     if index_matches:
         index_matches.sort(key=lambda m: -len(m[0]))
-        # print(index_matches)
         for match, index in index_matches:
             if all([f in fields_map for f in match]):
                 lookups = [fields_map[f] for f in match]
@@ -170,10 +166,8 @@ def conjunction_optimizer(tokens,
                             bounds=bounds
                         )
                     )
-
                     for field in match[:len(valid_field_lookups)]:
                         del fields_map[field]
-                    # print('Indexed:', lookups)
 
     # add rest optimizations, i.e. fts lookups
     for token in rest:
@@ -181,19 +175,15 @@ def conjunction_optimizer(tokens,
         if index_lookup is not None:
             feeder_proxies.append(index_lookup)
 
-    # print(feeder_proxies)
     if feeder_proxies:
         if len(feeder_proxies) == 1:
             return feeder_proxies[0]
         else:
-            # TODO: sort feeders by order_by
+            feeder_proxies.sort(key=lambda f: f.func.is_ordered_by(order_by))
             return FeederProxy.factory(
                 Intersection,
                 *feeder_proxies
             )
-
-    print('Rest:', rest)
-    print('-' * 80)
 
 
 class DisjunctionToken:
@@ -217,15 +207,23 @@ def disjunction_optimizer(tokens,
         key=lambda f: -1 if f.feeder is None
         else f.feeder.func.default_priority
     )
+    first_feeder = dis_tokens[0].feeder
+    last_feeder = dis_tokens[-1].feeder
 
-    # add optimized tokens
-    feeder_proxies = []
-    while dis_tokens and dis_tokens[-1].feeder is not None:
-        feeder_proxies.append(dis_tokens.pop().feeder)
-
-    # check if we have any tokens left
-    if dis_tokens:
-        # build filter_func
+    if first_feeder is not None:
+        # all optimized
+        return FeederProxy.factory(
+            Union,
+            *[t.feeder for t in dis_tokens]
+        )
+    elif last_feeder.func.is_of_type(FTSIndexLookup):
+        # add fts feeders
+        feeder_proxies = []
+        while last_feeder is not None \
+                and last_feeder.func.is_of_type(FTSIndexLookup):
+            feeder_proxies.append(dis_tokens.pop().feeder)
+            last_feeder = dis_tokens[-1].feeder
+        # build filter_func for remaining tokens
         sources = [token.token.source() for token in dis_tokens]
         filter_func = eval(f'lambda i, s, v: {" or ".join(sources)}',
                            environment)
@@ -233,8 +231,7 @@ def disjunction_optimizer(tokens,
             CollectionFeeder,
             filter_func=filter_func
         ))
-    # print(feeder_proxies)
-    return FeederProxy.factory(
-        Union,
-        *feeder_proxies
-    )
+        return FeederProxy.factory(
+            Union,
+            *feeder_proxies
+        )
