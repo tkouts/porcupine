@@ -46,7 +46,20 @@ class FTSIndex(FTSIndexBase):
             )
         )
         for key in self.keys:
-            type_params['properties'][key] = dict(
+            # split key
+            type_mapping = type_params
+            keys = key.split('.')
+            for nested_key in keys[:-1]:
+                type_mapping = type_mapping['properties'].setdefault(
+                    nested_key,
+                    dict(
+                        enabled=True,
+                        dynamic=False,
+                        properties={}
+                    )
+                )
+            # add
+            type_mapping['properties'][keys[-1]] = dict(
                 enabled=True,
                 dynamic=False,
                 fields=[dict(
