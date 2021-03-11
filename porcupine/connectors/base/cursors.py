@@ -51,8 +51,8 @@ class SecondaryIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
         self._iterator.set(v)
 
     def reverse(self):
-        super().reverse()
         self._iterator.reverse()
+        return super().reverse()
 
     def __repr__(self):
         return (
@@ -110,8 +110,8 @@ class FTSIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
         self._iterator.set_term(term)
 
     def reverse(self):
-        super().reverse()
         self._iterator.reverse()
+        return super().reverse()
 
     def __repr__(self):
         return (

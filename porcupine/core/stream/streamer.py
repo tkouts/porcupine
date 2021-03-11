@@ -34,6 +34,7 @@ class BaseStreamer(AsyncIterable):
 
     def reverse(self):
         self._reversed = True
+        return self
 
     def intersection(self, other):
         return IntersectionStreamer(self, other)
@@ -90,9 +91,8 @@ class ItemStreamer(BaseStreamer):
         super().__init__(item_iterator)
 
     def reverse(self):
-        # print('REVERSE')
         self._id_iterator.reverse()
-        super().reverse()
+        return super().reverse()
 
 
 class CombinedIdStreamer(IdStreamer):
