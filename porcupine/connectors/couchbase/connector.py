@@ -12,8 +12,10 @@ from couchbase.exceptions import (
     PathNotFoundException,
     DocumentExistsException,
     NotStoredException,
-    NetworkException
+    NetworkException,
+    TimeoutException
 )
+from couchbase.management.views import View
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.management.search import SearchIndex
 from couchbase_core.transcoder import FMT_AUTO, FMT_UTF8
@@ -142,8 +144,12 @@ class Couchbase(BaseConnector):
     def delete_multi(self, deletions):
         return self.bucket.remove_multi(deletions, quiet=True)
 
-    def touch_multi(self, touches):
-        return self.bucket.touch_multi(touches)
+    async def touch_multi(self, touches):
+        try:
+            await self.bucket.touch_multi(touches)
+        except TimeoutException as e:
+            # print('timeout', e)
+            pass
 
     def mutate_in(self, item_id: str, mutations_dict: dict):
         mutations = []
@@ -214,7 +220,8 @@ class Couchbase(BaseConnector):
 
         # get current indexes
         for design_doc in views_mgr.get_all_design_documents(namespace):
-            old_indexes.add(design_doc.name)
+            if design_doc.name != '_system':
+                old_indexes.add(design_doc.name)
 
         # create views
         dd_doc_options = dict(
@@ -231,10 +238,21 @@ class Couchbase(BaseConnector):
             for index in indexes.values():
                 design_doc.add_view(index.name, index.get_view())
             new_indexes.add(dd_name)
-            views_mgr.upsert_design_document(
-                design_doc,
-                namespace
-            )
+            views_mgr.upsert_design_document(design_doc, namespace)
+
+        # add system views
+        design_doc = DesignDocumentWithOptions('_system', {}, {})
+        design_doc.add_view('collection_docs', View("""
+            function(d, m) {
+                var id = m.id
+                if (m.type == "base64" && !id.startsWith("_")
+                    && id.lastIndexOf("/") > -1)
+                {
+                    emit(m.id, m.type);
+                }
+            }
+        """))
+        views_mgr.upsert_design_document(design_doc, namespace)
 
         # remove unused
         for_removal = old_indexes - new_indexes
