@@ -7,11 +7,11 @@ from porcupine.core import utils
 
 def loads(storage):
     content_class = utils.get_content_class(storage.pop('_cc'))
-    item_meta = context.item_meta
-    return content_class(
-        storage,
-        _score=item_meta.get(storage['id'], 0)
-    )
+    item_meta_cache = context.item_meta
+    item_meta = {}
+    if not content_class.is_composite:
+        item_meta['_score'] = item_meta_cache.get(storage['id'], 0)
+    return content_class(storage, **item_meta)
 
 
 def dumps(obj):
