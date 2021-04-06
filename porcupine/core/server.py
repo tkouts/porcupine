@@ -18,7 +18,7 @@ class RequestWithSession(Request):
 
 class PorcupineServer(Sanic):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, name='porcupine')
         self.router.server = self
         self.config.update(DEFAULTS)
         self.load_environment_config('PORCUPINE_', preserve_prefix=False)
