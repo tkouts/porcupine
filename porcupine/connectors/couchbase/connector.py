@@ -147,7 +147,7 @@ class Couchbase(BaseConnector):
     async def touch_multi(self, touches):
         try:
             await self.bucket.touch_multi(touches)
-        except TimeoutException as e:
+        except TimeoutException:
             # print('timeout', e)
             pass
 
