@@ -35,7 +35,7 @@ setup(
         'lru-dict==1.1.6',
         'namedlist==1.7',
         'cbor==1.0.0',
-        'pendulum==2.0.5',
+        'pendulum==2.1.2',
         'orjson==3.4.5',
         'aiofiles==0.6.0',
         'aiostream==0.3.1',
