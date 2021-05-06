@@ -1,7 +1,6 @@
 import asyncio
 import random
 import orjson
-# from functools import partial
 
 import couchbase_core.experimental
 from couchbase.cluster import PasswordAuthenticator
