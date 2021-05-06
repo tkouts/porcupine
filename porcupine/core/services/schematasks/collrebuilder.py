@@ -31,9 +31,7 @@ class CollectionReBuilder(CollectionMaintenanceTask):
             current_size += key_size
 
         # add remaining
-        if chunk:
-            rebuilt_chunks.append(' '.join(chunk))
-
+        rebuilt_chunks.append(' '.join(chunk))
         first, rest = rebuilt_chunks[0], rebuilt_chunks[1:]
 
         insertions = {}
