@@ -1,7 +1,6 @@
 import itertools
 from functools import partial
 
-from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import EmptyStreamer
 from porcupine.pipe import filter, chain
 from porcupine.connectors.base.bounds import EMPTY
