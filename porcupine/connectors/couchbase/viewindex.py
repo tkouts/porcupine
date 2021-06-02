@@ -1,3 +1,4 @@
+import json
 from couchbase.management.views import View
 
 from porcupine.connectors.base.indexes import SecondaryIndexBase
@@ -26,9 +27,20 @@ class Index(SecondaryIndexBase):
                 [f"'{cls.__name__}'" for cls in self.all_types]
             )
             type_check = f'[{subclasses}].includes(d._pcc)'
-        formatted_keys = [
-            f'd.{key}' for key in self.keys
-        ]
+
+        formatted_keys = []
+        for index, key in enumerate(self.keys):
+            keys = key.split('.')
+            master_key, nested_keys = keys[0], keys[1:]
+            key_getter = (
+                f'"{master_key}" in d ? '
+                f'd.{master_key} : '
+                f'{json.dumps(self.defaults[index])}'
+            )
+            if nested_keys:
+                key_getter = f'({key_getter}).{".".join(nested_keys)}'
+            formatted_keys.append(key_getter)
+
         return View(
             str.format(map_func, ', '.join(formatted_keys), type_check),
             reduce='_count'

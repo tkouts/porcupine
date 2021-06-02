@@ -16,11 +16,13 @@ class SecondaryIndexBase(metaclass=abc.ABCMeta):
 
         self.attr_list = tuple(attr_list)
         self.keys = []
+        self.defaults = []
         self.immutable = True
         for attr_name in attr_list:
             if attr_name in self.system_attrs:
                 # system attribute
                 self.keys.append(self.system_attrs[attr_name])
+                self.defaults.append(None)
             else:
                 # gather data types
                 data_types = set()
@@ -41,16 +43,24 @@ class SecondaryIndexBase(metaclass=abc.ABCMeta):
                     )
                 data_types.update(container_data_types)
 
-                # make sure all storage keys are the same
+                # make sure all storage keys are the same and have same defaults
                 storage_keys = [dt.storage_key for dt in data_types]
+                defaults = [dt.default for dt in data_types]
                 if len(storage_keys) > 1 and len(set(storage_keys)) > 1:
                     raise SchemaError(
                         f'Index {attr_name} references data types '
                         'with diverse storage keys'
                     )
+                if len(defaults) > 1 and len(set(defaults)) > 1:
+                    raise SchemaError(
+                        f'Index {attr_name} references data types '
+                        'with diverse default values'
+                    )
+                self.defaults.append(defaults[0])
                 self.keys.append('.'.join([storage_keys[0]] + attr_path[1:]))
                 self.immutable = self.immutable and \
                     all([dt.immutable for dt in data_types])
+
         self.container_type = container_type
         self.all_types = self.get_all_subclasses([container_type])
 
