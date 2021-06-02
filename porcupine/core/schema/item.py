@@ -41,7 +41,8 @@ class GenericItem(Removable, Elastic):
     created = DateTime(readonly=True, store_as='cr')
     expires_at = Integer(None, immutable=True, allow_none=True,
                          protected=True, store_as='exp')
-    owner = String(required=True, readonly=True, store_as='own')
+    owner = String(required=True, default=None, allow_none=True,
+                   readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
     modified = DateTime(required=True, readonly=True, store_as='md')
     p_type = String(readonly=True, protected=True, store_as='_pcc')
