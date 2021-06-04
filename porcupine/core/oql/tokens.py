@@ -145,7 +145,7 @@ class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):
         return environment[self.func](None, *args)
 
 
-class FreeText(namedlist('FreeText', 'field term'), Token):
+class FreeText(namedlist('FreeText', 'term field type'), Token):
     primitive = False
     immutable = False
 

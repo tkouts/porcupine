@@ -1,6 +1,7 @@
 from couchbase.search import (
     ConjunctionQuery,
     TermQuery,
+    PrefixQuery,
     QueryStringQuery,
     SearchOptions
 )
@@ -27,8 +28,11 @@ class FTSCursorIterator(FTSIndexIterator):
     async def __aiter__(self):
         cluster = self.index.connector.cluster
         scope_query = TermQuery(self.scope, field='pid')
-        match_query = QueryStringQuery(self._term)
-        query = ConjunctionQuery(match_query, scope_query)
+        if self._type == 'prefix':
+            term_query = PrefixQuery(self._term)
+        else:
+            term_query = QueryStringQuery(self._term)
+        query = ConjunctionQuery(term_query, scope_query)
         chunk_size = 20
         skip = 0
         options = SearchOptions(

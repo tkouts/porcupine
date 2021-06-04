@@ -262,7 +262,11 @@ class OqlParser(Parser):
 
     @_('FREETEXT "(" expr ")"')
     def expr(self, p):
-        return FreeText('*', p.expr)
+        return FreeText(p.expr, '*', 'query')
+
+    @_('FREETEXT "(" expr "," NAME ")"')
+    def expr(self, p):
+        return FreeText(p.expr, '*', p.NAME)
 
     @_('"(" expr ")"')
     def expr(self, p):

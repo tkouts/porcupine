@@ -109,6 +109,9 @@ class FTSIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
     def set_term(self, term):
         self._iterator.set_term(term)
 
+    def set_type(self, typ):
+        self._iterator.set_type(typ)
+
     def reverse(self):
         self._iterator.reverse()
         return super().reverse()
@@ -117,6 +120,7 @@ class FTSIndexCursor(BaseCursor, metaclass=abc.ABCMeta):
         return (
             f'{self.__class__.__name__}(scope={repr(self._iterator.scope)}, '
             f'term={repr(self._iterator.term)}, '
+            f'type={repr(self._iterator.type)}, '
             f'reversed={repr(self._reversed)})'
         )
 
@@ -126,6 +130,7 @@ class FTSIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
         super().__init__(index)
         self._term = None
         self._scope = None
+        self._type = 'query'
         self._reversed = False
 
     @property
@@ -136,11 +141,18 @@ class FTSIndexIterator(BaseIterator, metaclass=abc.ABCMeta):
     def scope(self):
         return self._scope
 
+    @property
+    def type(self):
+        return self._type
+
     def set_scope(self, scope):
         self._scope = scope
 
     def set_term(self, term):
         self._term = term
+
+    def set_type(self, typ):
+        self._type = typ
 
     def reverse(self):
         self._reversed = True

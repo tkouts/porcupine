@@ -121,14 +121,16 @@ class IndexLookup(Feeder):
 
 
 class FTSIndexLookup(Feeder):
-    __slots__ = 'index', 'field', 'term', 'index'
+    __slots__ = 'index', 'term', 'field', 'query_type'
     default_priority = 2
 
-    def __init__(self, index, field, term, options=None, filter_func=None):
+    def __init__(self, index, term, field, query_type,
+                 options=None, filter_func=None):
         super().__init__(options, filter_func)
-        self.field = field
-        self.term = term
         self.index = index
+        self.term = term
+        self.field = field
+        self.query_type = query_type
 
     @staticmethod
     def is_ordered_by(field_list):
@@ -138,8 +140,9 @@ class FTSIndexLookup(Feeder):
         return (
             f'{self.__class__.__name__}('
             f'index_type={repr(self.index.container_type.__name__)}, '
-            f'field={repr(self.field)}, '
             f'term={repr(self.term)}, '
+            f'field={repr(self.field)}, '
+            f'type={repr(self.query_type)}, '
             f'reversed={repr(self.reversed)}, '
             f'filter_func={repr(self.filter_func)}'
             ')'
@@ -149,6 +152,7 @@ class FTSIndexLookup(Feeder):
         feeder = self.index.get_cursor(**self.options)
         feeder.set_scope(item.id)
         feeder.set_term(self.term(statement, v))
+        feeder.set_type(self.query_type)
         if self.reversed:
             feeder.reverse()
         return feeder

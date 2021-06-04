@@ -86,7 +86,13 @@ def fts_token_optimizer(token, container_type) -> partial:
                 break
     if available_indexes:
         feeder_proxies = [
-            FeederProxy.factory(FTSIndexLookup, index, token.field, token.term)
+            FeederProxy.factory(
+                FTSIndexLookup,
+                index,
+                token.term,
+                token.field,
+                token.type
+            )
             for index in available_indexes
         ]
         if len(feeder_proxies) == 1:
