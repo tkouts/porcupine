@@ -30,7 +30,7 @@ class OqlLexer(Lexer):
 
     functions = {'len', 'slice', 'hasattr', 'datetime', 'date'}
 
-    literals = {'=', '+', '-', '*', '/', '(', ')', '.', ','}
+    literals = {'=', '+', '-', '*', '/', '(', ')', '.', ',', ':'}
 
     ignore = ' \t\r'
 
@@ -66,7 +66,7 @@ class OqlLexer(Lexer):
         t.value = None
         return t
 
-    @_(r'\$[A-Za-z_][\w]*')
+    @_(r'\$[A-Za-z_][\w]*(?:\.[A-Za-z_][\w]*)*')
     def VAR(self, t):
         t.value = t.value[1:]
         return t
@@ -205,11 +205,11 @@ class OqlParser(Parser):
     def scope(self, p):
         return Scope(Variable(p.VAR), 'children')
 
-    @_('NAME "." NAME')
+    @_('NAME ":" NAME')
     def scope(self, p):
-        return Scope(String(p[0]), p[2])
+        return Scope(String(p.name0), p.name1)
 
-    @_('VAR "." NAME')
+    @_('VAR ":" NAME')
     def scope(self, p):
         return Scope(Variable(p.VAR), p.NAME)
 

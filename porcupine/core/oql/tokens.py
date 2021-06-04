@@ -116,10 +116,10 @@ class Variable(Token, str):
         return f'{self.__class__.__name__}({self})'
 
     def source(self):
-        return f'get_var(v, "{self}")'
+        return f'get_var(v, {self.split(".")})'
 
     def __call__(self, statement, v):
-        return environment['get_var'](v, self)
+        return environment['get_var'](v, self.split('.'))
 
 
 class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):

@@ -23,11 +23,14 @@ def get_nested_field(item, field, path):
     return attr
 
 
-def get_var(var_map, var_name):
+def get_var(var_map, var_path):
     try:
-        return var_map[var_name]
+        var = var_map[var_path[0]]
+        for key in var_path[1:]:
+            var = var[key]
+        return var
     except KeyError:
-        raise OqlError(f'Unknown variable "{var_name}"')
+        raise OqlError(f'Unknown variable "{".".join(var_path)}"')
 
 
 environment = {
