@@ -46,7 +46,7 @@ class FTSCursorIterator(FTSIndexIterator):
             returned = 0
             async for hit in results:
                 returned += 1
-                print(hit.id)
+                # print(hit.id)
                 context.item_meta[hit.id] = hit.score
                 yield hit.id
             skip += chunk_size
