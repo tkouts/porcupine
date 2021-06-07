@@ -203,6 +203,19 @@ class Couchbase(BaseConnector):
                 raise exceptions.NotFound(f'Key {key} is removed')
         return True, return_value
 
+    def config(self):
+        config = self.server.config
+        return {
+            'views': {
+                'v_update_interval':
+                    int(config.COUCH_VIEWS_UPDATE_INTERVAL),
+                'v_update_min_changes':
+                    int(config.COUCH_VIEWS_UPDATE_MIN_CHANGES),
+                'v_replica_update_min_changes':
+                    int(config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES)
+            }
+        }
+
     # indexes
     async def prepare_indexes(self):
         log.info('Preparing indexes')
@@ -223,14 +236,7 @@ class Couchbase(BaseConnector):
                 old_indexes.add(design_doc.name)
 
         # create views
-        dd_doc_options = dict(
-            updateInterval=int(
-                config.COUCH_VIEWS_UPDATE_INTERVAL),
-            updateMinChanges=int(
-                config.COUCH_VIEWS_UPDATE_MIN_CHANGES),
-            replicaUpdateMinChanges=int(
-                config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES)
-        )
+        dd_doc_options = self.config()['views']
         for container_type, indexes in self.views.items():
             dd_name = container_type.__name__
             design_doc = DesignDocumentWithOptions(dd_name, {}, dd_doc_options)
