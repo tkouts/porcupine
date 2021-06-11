@@ -219,7 +219,6 @@ class Couchbase(BaseConnector):
     # indexes
     async def prepare_indexes(self):
         log.info('Preparing indexes')
-        config = self.server.config
         cluster = self._get_cluster(_async=False)
         bucket = cluster.bucket(self.bucket_name)
         views_mgr = bucket.view_indexes()
