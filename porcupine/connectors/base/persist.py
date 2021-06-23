@@ -1,12 +1,20 @@
 """
 Default database object persistence layer
 """
-from porcupine import context
+import json
+from porcupine import context, log
 from porcupine.core import utils
 
 
 def loads(storage):
-    content_class = utils.get_content_class(storage.pop('_cc'))
+    try:
+        content_class = utils.get_content_class(storage['_cc'])
+    except KeyError:
+        log.error(
+            'Unable to determine content class of document \n'
+            f'{json.dumps(storage, indent=4)}'
+        )
+        raise
     item_meta_cache = context.item_meta
     item_meta = {}
     if not content_class.is_composite:
