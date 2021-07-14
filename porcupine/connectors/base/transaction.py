@@ -83,10 +83,10 @@ class Transaction:
         if item.id in self._items:
             self.connector.raise_exists(item.id)
 
-        await item.on_create()
-
         ttl = await item.ttl
         self._items[item.id] = ttl, item
+
+        await item.on_create()
 
         # execute data types on_create handlers
         for data_type in item.__schema__.values():
