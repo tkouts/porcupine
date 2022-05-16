@@ -2,7 +2,7 @@ import asyncio
 import random
 import orjson
 
-import couchbase_core.experimental
+import couchbase_core
 from couchbase.cluster import PasswordAuthenticator
 import couchbase.subdocument as sub_doc
 from couchbase.exceptions import (
@@ -40,7 +40,6 @@ def json_dumps(obj):
     return orjson.dumps(obj, default=default_json_encoder).decode()
 
 
-couchbase_core.experimental.enable()
 couchbase_core.set_json_converters(
     json_dumps,
     orjson.loads

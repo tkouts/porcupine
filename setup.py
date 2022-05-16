@@ -37,7 +37,7 @@ setup(
         'namedlist==1.8',
         'cbor==1.0.0',
         'pendulum==2.1.2',
-        'orjson==3.5.3',
+        'orjson==3.6.8',
         'aiofiles==0.6.0',
         'aiostream==0.3.1',
         'aiocron==1.3',
