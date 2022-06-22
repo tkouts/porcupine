@@ -338,9 +338,10 @@ class Transaction:
         # print('SD', self._sd)
         if self._sd:
             for item_id, mutations in self._sd.items():
-                task = connector.mutate_in(item_id, mutations)
-                if isawaitable(task):
-                    tasks.append(task)
+                if item_id not in deletions:
+                    task = connector.mutate_in(item_id, mutations)
+                    if isawaitable(task):
+                        tasks.append(task)
 
         # appends
         auto_splits = []
@@ -350,11 +351,12 @@ class Transaction:
             rnd = random.random()
             appends = {}
             for k, v in self._appends.items():
-                append = ''.join(v)
-                appends[k] = append
-                possibility = len(append) / split_threshold
-                if rnd <= possibility * 1.8:
-                    auto_splits.append((k, self._touches.get(k)))
+                if k not in deletions:
+                    append = ''.join(v)
+                    appends[k] = append
+                    possibility = len(append) / split_threshold
+                    if rnd <= possibility * 1.8:
+                        auto_splits.append((k, self._touches.get(k)))
 
             task = connector.append_multi(appends)
             if isawaitable(task):
