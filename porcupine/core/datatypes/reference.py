@@ -71,7 +71,7 @@ class Reference1(String, Acceptable):
             return ItemReference(value)
 
     async def on_create(self, instance, value):
-        super().on_create(instance, value)
+        await super().on_create(instance, value)
         if value:
             ref_item = await db_connector().get(value)
             if ref_item is None:
@@ -86,7 +86,7 @@ class Reference1(String, Acceptable):
         return await self.on_create(instance, value)
 
     async def on_delete(self, instance, value):
-        super().on_delete(instance, value)
+        await super().on_delete(instance, value)
         if value and self.cascade_delete:
             ref_item = await db_connector().get(value)
             if ref_item:
@@ -94,7 +94,7 @@ class Reference1(String, Acceptable):
                     await ref_item.remove()
 
     async def on_recycle(self, instance, value):
-        super().on_recycle(instance, value)
+        await super().on_recycle(instance, value)
         if value and self.cascade_delete:
             ref_item = await db_connector().get(value)
             if ref_item:
@@ -105,7 +105,7 @@ class Reference1(String, Acceptable):
                     await context.txn.recycle(ref_item)
 
     async def on_restore(self, instance, value):
-        super().on_recycle(instance, value)
+        await super().on_recycle(instance, value)
         if value and self.cascade_delete:
             ref_item = await db_connector().get(value)
             if ref_item:
@@ -208,7 +208,7 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
                 async for ref_item in collection.items():
                     await ref_item.remove()
 
-        super().on_delete(instance, value)
+        await super().on_delete(instance, value)
 
         previous_chunk = self.current_chunk(instance) - 1
         if previous_chunk > -1:
@@ -224,7 +224,7 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
                 previous_chunk -= 1
 
     async def on_recycle(self, instance, value):
-        super().on_recycle(instance, value)
+        await super().on_recycle(instance, value)
         collection = self.__get__(instance, None)
         if self.cascade_delete:
             with system_override():
@@ -235,7 +235,7 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
                     await context.txn.recycle(ref_item)
 
     async def on_restore(self, instance, value):
-        super().on_restore(instance, value)
+        await super().on_restore(instance, value)
         collection = self.__get__(instance, None)
         if self.cascade_delete:
             with system_override():

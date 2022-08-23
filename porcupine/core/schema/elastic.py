@@ -40,10 +40,10 @@ class ElasticMeta(type):
                         if isinstance(attr, ReferenceN):
                             field_spec.append(
                                 utils.get_active_chunk_key(attr.storage_key))
-                    if cls.is_composite and attr.unique:
-                        raise TypeError(f'Data type "{attr.name}" '
-                                        f'of composite "{cls.__name__}" '
-                                        'cannot be unique')
+                    # if cls.is_composite and attr.unique:
+                    #     raise TypeError(f'Data type "{attr.name}" '
+                    #                     f'of composite "{cls.__name__}" '
+                    #                     'cannot be unique')
             except AttributeError:
                 continue
         cls.__schema__ = schema

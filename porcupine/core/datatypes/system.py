@@ -163,15 +163,6 @@ class Deleted(Counter):
         super().__init__(readonly=True, protected=True, store_as='dl',
                          lock_on_update=True)
 
-    async def on_change(self, instance, value, old_value):
-        super().on_change(instance, value, old_value)
-        if value and not old_value:
-            # recycled
-            remove_uniques(instance)
-        elif not value and old_value:
-            # restored
-            await add_uniques(instance)
-
     @contract(accepts=bool)
     @db.transactional()
     async def put(self, instance, request):
@@ -190,8 +181,7 @@ class ParentId(String):
                          store_as='pid')
 
     async def on_create(self, instance, value):
-        super().on_create(instance, value)
-        await add_uniques(instance)
+        await super().on_create(instance, value)
         instance.reset_effective_acl()
 
     async def on_change(self, instance, value, old_value):
@@ -199,10 +189,6 @@ class ParentId(String):
         remove_uniques(instance)
         await add_uniques(instance)
         instance.reset_effective_acl()
-
-    def on_delete(self, instance, value):
-        super().on_delete(instance, value)
-        remove_uniques(instance)
 
     @contract(accepts=str)
     @db.transactional()

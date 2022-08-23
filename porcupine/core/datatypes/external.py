@@ -55,7 +55,7 @@ class Blob(DataType):
         pass
 
     async def on_create(self, instance, value):
-        super().on_create(instance, value)
+        await super().on_create(instance, value)
         if value is not None:
             context.txn.insert_external(self.key_for(instance), value,
                                         await instance.ttl)
