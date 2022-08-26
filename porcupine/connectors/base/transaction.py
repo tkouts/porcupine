@@ -91,9 +91,7 @@ class Transaction:
         # execute data types on_create handlers
         for data_type in item.__schema__.values():
             try:
-                _ = data_type.on_create(item, data_type.get_value(item))
-                if isawaitable(_):
-                    await _
+                await data_type.on_create(item, data_type.get_value(item))
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
 
@@ -111,12 +109,11 @@ class Transaction:
                 if data_type.should_lock:
                     locks.append(data_type)
                 try:
-                    _ = data_type.on_change(
+                    await data_type.on_change(
                         item,
                         new_value,
-                        data_type.get_value(item, snapshot=False))
-                    if isawaitable(_):
-                        await _
+                        data_type.get_value(item, snapshot=False)
+                    )
                 except exceptions.AttributeSetError as e:
                     raise exceptions.InvalidUsage(str(e))
 
@@ -159,9 +156,7 @@ class Transaction:
         data_types = item.__schema__.values()
         # execute data types on_delete handlers
         for dt in data_types:
-            _ = dt.on_delete(item, dt.get_value(item))
-            if isawaitable(_):
-                await _
+            await dt.on_delete(item, dt.get_value(item))
 
         self._deletions[item.id] = item
 
@@ -170,9 +165,7 @@ class Transaction:
 
         # execute data types on_recycle handlers
         for dt in data_types:
-            _ = dt.on_recycle(item, dt.get_value(item))
-            if isawaitable(_):
-                await _
+            await dt.on_recycle(item, dt.get_value(item))
 
         if item.is_collection:
             with system_override():
@@ -185,9 +178,7 @@ class Transaction:
 
         # execute data types on_restore handlers
         for dt in data_types:
-            _ = dt.on_restore(item, dt.get_value(item))
-            if isawaitable(_):
-                await _
+            await dt.on_restore(item, dt.get_value(item))
 
         if item.is_collection:
             with system_override():
