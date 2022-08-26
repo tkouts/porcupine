@@ -105,7 +105,7 @@ class Reference1(String, Acceptable):
                     await context.txn.recycle(ref_item)
 
     async def on_restore(self, instance, value):
-        await super().on_recycle(instance, value)
+        await super().on_restore(instance, value)
         if value and self.cascade_delete:
             ref_item = await db_connector().get(value)
             if ref_item:
