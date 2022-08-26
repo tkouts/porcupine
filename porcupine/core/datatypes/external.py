@@ -66,9 +66,9 @@ class Blob(DataType):
             context.txn.put_external(self.key_for(instance), value,
                                      await instance.ttl)
         else:
-            self.on_delete(instance, value)
+            await self.on_delete(instance, value)
 
-    def on_delete(self, instance, value):
+    async def on_delete(self, instance, value):
         context.txn.delete_external(self.key_for(instance))
 
 
