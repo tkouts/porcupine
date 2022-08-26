@@ -100,7 +100,7 @@ class AtomicMap(AsyncSetter, Dictionary):
             for map_value in value.values():
                 self.validate_map_value(map_value)
 
-    def on_change(self, instance, value, old_value):
+    async def on_change(self, instance, value, old_value):
         self.validate(value)
         if not instance.__is_new__:
             connector = db_connector()
