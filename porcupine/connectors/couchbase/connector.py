@@ -206,11 +206,11 @@ class Couchbase(BaseConnector):
         config = self.server.config
         return {
             'views': {
-                'v_update_interval':
+                'updateInterval':
                     int(config.COUCH_VIEWS_UPDATE_INTERVAL),
-                'v_update_min_changes':
+                'updateMinChanges':
                     int(config.COUCH_VIEWS_UPDATE_MIN_CHANGES),
-                'v_replica_update_min_changes':
+                'replicaUpdateMinChanges':
                     int(config.COUCH_VIEWS_REPLICA_UPDATE_MIN_CHANGES)
             }
         }
