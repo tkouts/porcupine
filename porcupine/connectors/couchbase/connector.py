@@ -270,7 +270,10 @@ class Couchbase(BaseConnector):
 
         # get current indexes
         existing_indexes = {}
-        current_fts_indexes = search_mgr.get_all_indexes() or {}
+        try:
+            current_fts_indexes = search_mgr.get_all_indexes()
+        except TypeError:
+            current_fts_indexes = {}
         for fts_index in current_fts_indexes:
             if fts_index['sourceName'] == self.bucket_name:
                 old_fts_indexes.add(fts_index['name'])
