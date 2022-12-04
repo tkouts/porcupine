@@ -270,7 +270,8 @@ class Couchbase(BaseConnector):
 
         # get current indexes
         existing_indexes = {}
-        for fts_index in search_mgr.get_all_indexes():
+        current_fts_indexes = search_mgr.get_all_indexes() or {}
+        for fts_index in current_fts_indexes:
             if fts_index['sourceName'] == self.bucket_name:
                 old_fts_indexes.add(fts_index['name'])
                 existing_indexes[fts_index['name']] = fts_index
