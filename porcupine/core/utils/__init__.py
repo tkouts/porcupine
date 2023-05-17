@@ -2,13 +2,13 @@
 Porcupine utilities package
 """
 import cbor
-import functools
 import hashlib
 import random
 import re
 from typing import Union
 
 import mmh3
+from methodtools import lru_cache
 
 from porcupine.core.context import context
 from porcupine.core.utils.collections import WriteOnceDict
@@ -49,7 +49,7 @@ def get_content_class(name: str):
     return ELASTIC_MAP[name]
 
 
-@functools.lru_cache(maxsize=None)
+@lru_cache(maxsize=None)
 def get_rto_by_name(name: str):
     """
     This function returns a runtime object by name.
@@ -132,7 +132,7 @@ def get_descriptor_by_storage_key(cls, key: str):
     return locate_descriptor_by_storage_key(cls, key)
 
 
-@functools.lru_cache(maxsize=None)
+@lru_cache(maxsize=None)
 def locate_descriptor_by_storage_key(cls, key):
     for desc in cls.__schema__.values():
         if desc.storage_key == key:

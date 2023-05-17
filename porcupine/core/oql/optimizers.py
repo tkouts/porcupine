@@ -1,7 +1,9 @@
 import itertools
 from collections import defaultdict
-from functools import lru_cache, partial
+from functools import partial
 from typing import Optional
+
+from methodtools import lru_cache
 
 from porcupine import log
 from porcupine.core.oql.runtime import environment

@@ -33,7 +33,7 @@ setup(
         'sanic==19.6.0',
         'couchbase==3.0.10',
         'PyYAML==5.1.1',
-        'lru-dict==1.1.6',
+        'lru-dict==1.1.8',
         'namedlist==1.8',
         'cbor==1.0.0',
         'pendulum==2.1.2',
@@ -45,6 +45,7 @@ setup(
         'validate-email==1.3',
         'sly==0.3',
         'sortedcontainers==2.1.0',
+        'methodtools==0.4.7',
     ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',

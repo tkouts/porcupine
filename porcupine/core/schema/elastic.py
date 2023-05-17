@@ -1,6 +1,6 @@
 import asyncio
 import copy
-import functools
+from methodtools import lru_cache
 from typing import ClassVar, Type, Optional
 
 from porcupine.hinting import TYPING
@@ -110,16 +110,16 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         await new_item.apply_patch(dct, camel_to_snake)
         return new_item
 
+    @lru_cache(maxsize=None)
     @classmethod
-    @functools.lru_cache(maxsize=None)
     def view_attrs(cls):
         schema = cls.__schema__.values()
         return tuple([data_type.name for data_type in schema
                      if not data_type.protected
                      and data_type.storage == '__storage__'])
 
+    @lru_cache(maxsize=None)
     @classmethod
-    @functools.lru_cache(maxsize=None)
     def unique_data_types(cls):
         schema = cls.__schema__.values()
         return tuple([data_type for data_type in schema if data_type.unique])

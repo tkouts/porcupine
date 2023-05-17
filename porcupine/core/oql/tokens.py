@@ -1,5 +1,7 @@
 from typing import Optional, Callable
-from functools import lru_cache, partial
+from functools import partial
+
+from methodtools import lru_cache
 from namedlist import namedlist
 
 from porcupine.exceptions import OqlError
