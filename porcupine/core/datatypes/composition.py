@@ -36,7 +36,7 @@ class EmbeddedCollection(ItemCollection):
 
     async def add(self, *composites: TYPING.COMPOSITE_CO):
         await super().add(*composites)
-        composite_path = get_path(self._desc, self._inst)
+        composite_path = get_path(self._desc, self._inst())
         for composite in composites:
             if not composite.__is_new__:
                 raise TypeError('Can only add new items to composition')
@@ -176,11 +176,11 @@ class EmbeddedItem(AsyncSetterValue):
                                 '{0}'.format(self._desc.name))
             # set composite path
             with system_override():
-                composite.path = get_path(self._desc, self._inst)
+                composite.path = get_path(self._desc, self._inst())
 
     async def item(self, quiet=True) -> TYPING.COMPOSITE_CO:
         composite = None
-        value = self._desc.get_value(self._inst)
+        value = self._desc.get_value(self._inst())
         if value is not None:
             if isinstance(value, str):
                 _, composite_id = value.split(':')
@@ -191,7 +191,7 @@ class EmbeddedItem(AsyncSetterValue):
         return composite
 
     def to_json(self):
-        value = self._desc.get_value(self._inst)
+        value = self._desc.get_value(self._inst())
         if isinstance(value, str):
             return value.split(':')[1]
         return value.id

@@ -46,7 +46,7 @@ class Acl(AtomicMap):
 
 class ChildrenCollection(ItemCollection):
     async def add(self, *items: TYPING.ANY_ITEM_CO):
-        parent = self._inst
+        parent = self._inst()
         parent_id = parent.id
         user = context.user
         shortcut = get_content_class('Shortcut')
@@ -80,7 +80,7 @@ class ChildrenCollection(ItemCollection):
             await context.txn.delete(item)
 
     def is_consistent(self, item):
-        return self._inst.id == item.parent_id
+        return self._inst().id == item.parent_id
 
 
 class Children(ReferenceN):

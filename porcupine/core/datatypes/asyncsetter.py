@@ -1,4 +1,5 @@
 import abc
+import weakref
 
 from porcupine import exceptions
 from porcupine.core.context import context
@@ -11,10 +12,10 @@ class AsyncSetterValue:
                  descriptor: TYPING.DT_CO,
                  instance: TYPING.ANY_ITEM_CO):
         self._desc = descriptor
-        self._inst = instance
+        self._inst = weakref.ref(instance)
 
     async def reset(self, value):
-        descriptor, instance = self._desc, self._inst
+        descriptor, instance = self._desc, self._inst()
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
         context.txn.reset_mutations(instance,

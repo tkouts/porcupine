@@ -75,7 +75,8 @@ class Container(Item):
         @rtype: L{GenericItem}
         """
         child_id = await db_connector().get_raw(
-                utils.get_key_of_unique(self.id, 'name', name))
+            utils.get_key_of_unique(self.id, 'name', name)
+        )
         if child_id:
             item = await db.get_item(child_id)
             if resolve_shortcut and isinstance(item, Shortcut):

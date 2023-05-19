@@ -114,7 +114,7 @@ class Relator1(Reference1, RelatorBase):
 
 class RelatorCollection(ItemCollection):
     def is_consistent(self, item):
-        descriptor, inst = self._desc, self._inst
+        descriptor, inst = self._desc, self._inst()
         rel_attr = getattr(item, descriptor.rel_attr, None)
         if rel_attr:
             if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
@@ -124,11 +124,11 @@ class RelatorCollection(ItemCollection):
 
     async def add(self, *items):
         await super().add(*items)
-        await self._desc.add_reference(self._inst, *items)
+        await self._desc.add_reference(self._inst(), *items)
 
     async def remove(self, *items):
         await super().remove(*items)
-        await self._desc.remove_reference(self._inst, *items)
+        await self._desc.remove_reference(self._inst(), *items)
 
 
 class RelatorN(ReferenceN, RelatorBase):

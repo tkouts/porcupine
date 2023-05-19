@@ -67,6 +67,7 @@ class ElasticMeta(type):
 
 class ElasticSlotsBase:
     __slots__ = (
+        '__weakref__',
         '__storage__',
         '__externals__',
         '__snapshot__',

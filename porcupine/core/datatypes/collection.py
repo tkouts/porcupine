@@ -1,6 +1,8 @@
-from lru import LRU
 from typing import AsyncIterable
 from functools import partial
+import weakref
+
+from lru import LRU
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions, pipe
@@ -90,10 +92,10 @@ class CollectionIterator(AsyncIterable):
                  descriptor: TYPING.DT_CO,
                  instance: TYPING.ANY_ITEM_CO):
         self._desc = descriptor
-        self._inst = instance
+        self._inst = weakref.ref(instance)
 
     async def __aiter__(self) -> TYPING.ITEM_ID:
-        descriptor, instance = self._desc, self._inst
+        descriptor, instance = self._desc, self._inst()
         dirtiness = 0.0
         storage = instance.__externals__
         current_value = getattr(storage, descriptor.storage_key)
@@ -176,16 +178,16 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
 
     @property
     def is_fetched(self) -> bool:
-        return getattr(self._inst.__externals__,
+        return getattr(self._inst().__externals__,
                        self._desc.storage_key) is not UNSET
 
     @property
     def ttl(self):
-        return self._inst.ttl
+        return self._inst().ttl
 
     @property
     def key(self):
-        return self._desc.key_for(self._inst)
+        return self._desc.key_for(self._inst())
 
     @staticmethod
     def is_consistent(_):
@@ -207,7 +209,7 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
-            descriptor, instance = self._desc, self._inst
+            descriptor, instance = self._desc, self._inst()
             if not await descriptor.can_add(instance, *items):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
@@ -222,7 +224,7 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
-            descriptor, instance = self._desc, self._inst
+            descriptor, instance = self._desc, self._inst()
             if not await descriptor.can_remove(instance, *items):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
@@ -233,7 +235,7 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
                 context.txn.append(collection_key, f' -{item_id}', ttl)
 
     async def reset(self, value: list) -> None:
-        descriptor, instance = self._desc, self._inst
+        descriptor, instance = self._desc, self._inst()
         # remove collection appends
         context.txn.reset_key_append(descriptor.key_for(instance))
         if not self.is_fetched:

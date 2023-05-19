@@ -15,7 +15,7 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         AsyncSetterValue.__init__(self, descriptor, instance)
 
     async def set(self, key: str, value):
-        descriptor, instance = self._desc, self._inst
+        descriptor, instance = self._desc, self._inst()
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
         descriptor.validate_map_value(value)
@@ -28,7 +28,7 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
                                value)
 
     async def delete(self, key: str):
-        descriptor, instance = self._desc, self._inst
+        descriptor, instance = self._desc, self._inst()
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
         await instance.touch()
