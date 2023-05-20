@@ -3,8 +3,7 @@ Migration manager service
 """
 import asyncio
 from functools import wraps
-
-from namedlist import namedlist
+from dataclasses import make_dataclass
 
 from porcupine import log
 from porcupine.exceptions import DBAlreadyExists
@@ -13,7 +12,7 @@ from . import db_connector
 from .service import AbstractService
 
 
-Migration = namedlist('Migration', 'func running')
+Migration = make_dataclass('Migration', ['func', 'running'])
 
 
 class MigrationManager(AbstractService):

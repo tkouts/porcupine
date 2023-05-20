@@ -1,5 +1,5 @@
 from unittest.mock import sentinel
-from namedlist import namedlist
+from dataclasses import make_dataclass
 
 
 EMPTY = sentinel.Empty
@@ -94,7 +94,8 @@ class FixedBoundary(BaseBoundary):
         return EMPTY
 
 
-Range = namedlist('Range', 'l_bound l_inclusive u_bound, u_inclusive')
+Range = make_dataclass('Range',
+                       ['l_bound', 'l_inclusive', 'u_bound', 'u_inclusive'])
 
 
 class RangedBoundary(BaseBoundary):

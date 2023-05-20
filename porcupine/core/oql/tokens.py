@@ -1,8 +1,8 @@
-from typing import Optional, Callable
+from typing import Optional, Callable, ClassVar, List
 from functools import partial
+from dataclasses import make_dataclass
 
 from methodtools import lru_cache
-from namedlist import namedlist
 
 from porcupine.exceptions import OqlError
 from porcupine.core.oql.runtime import environment
@@ -36,9 +36,9 @@ __all__ = (
 
 
 class Token:
-    primitive = True
-    immutable = True
-    is_field_lookup = False
+    primitive: ClassVar[bool] = True
+    immutable: ClassVar[bool] = True
+    is_field_lookup: ClassVar[bool] = False
 
     def __init__(self, value, *_args, **_kwargs):
         self.value = value
@@ -91,9 +91,9 @@ class String(Token, str):
 
 
 class Field(String):
-    primitive = False
-    immutable = False
-    is_field_lookup = True
+    primitive: ClassVar[bool] = False
+    immutable: ClassVar[bool] = False
+    is_field_lookup: ClassVar[bool] = True
 
     @property
     def field_lookup(self) -> Optional[FieldLookup]:
@@ -112,7 +112,7 @@ class Field(String):
 
 
 class Variable(Token, str):
-    primitive = False
+    primitive: ClassVar[bool] = False
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self})'
@@ -124,8 +124,10 @@ class Variable(Token, str):
         return environment['get_var'](v, self.split('.'))
 
 
-class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):
+class FunctionCall(make_dataclass('FunctionCall', ['func', 'args']), Token):
     primitive = False
+    args: List[Token]
+    func: str
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -147,9 +149,12 @@ class FunctionCall(namedlist('FunctionCall', 'func, args'), Token):
         return environment[self.func](None, *args)
 
 
-class FreeText(namedlist('FreeText', 'term field type'), Token):
-    primitive = False
-    immutable = False
+class FreeText(make_dataclass('FreeText', ['term', 'field', 'type']), Token):
+    primitive: ClassVar[bool] = False
+    immutable: ClassVar[bool] = False
+    term: Token
+    field: str
+    type: str
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -168,7 +173,13 @@ class FreeText(namedlist('FreeText', 'term field type'), Token):
         return super().optimize(item_type, order_by, **options)
 
 
-class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
+class Expression(
+        make_dataclass('Expression', ['l_op', 'operator', 'r_op']),
+        Token):
+    l_op: Token
+    r_op: Token
+    operator: str
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         Token.__init__(self, None)
@@ -255,7 +266,12 @@ class Expression(namedlist('Expression', 'l_op operator r_op'), Token):
                 return disjunction_optimizer(tokens, container_type, order_by)
 
 
-class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):
+class UnaryExpression(
+        make_dataclass('UnaryExpression', ['operator', 'operand']),
+        Token):
+    operator: str
+    operand: Token
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         Token.__init__(self, None)
@@ -276,25 +292,33 @@ class UnaryExpression(namedlist('UnaryExpression', 'operator operand'), Token):
         return source
 
 
-class Scope(namedlist('Scope', 'target collection')):
+class Scope(make_dataclass('Scope', ['target', 'collection'])):
+    target: Token
+    collection: str
+
     def __call__(self, statement, v):
         return self.target(None, statement, v), self.collection
 
 
-class DynamicSlice(namedlist('DynamicSlice', 'low high')):
+class DynamicSlice(make_dataclass('DynamicSlice', ['low', 'high'])):
+    low: Token
+    high: Token
+
     def __call__(self, statement, v):
         return slice(self.low(None, statement, v) - 1,
                      self.high(None, statement, v))
 
 
-FieldSpec = namedlist('FieldSpec', 'expr alias')
+FieldSpec = make_dataclass('FieldSpec', ['expr', 'alias'])
 
 
-class OrderBy(namedlist('OrderBy', 'expr desc')):
+class OrderBy(make_dataclass('OrderBy', ['expr', 'desc'])):
+    expr: Token
+
     @property
     def fields(self) -> Optional[tuple]:
         if isinstance(self.expr, Field):
-            return (self.expr, )
+            return self.expr,
         return None
 
 

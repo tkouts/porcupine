@@ -3,8 +3,8 @@ Scheduler service
 """
 import asyncio
 from functools import partial, wraps
+from dataclasses import make_dataclass
 
-from namedlist import namedlist
 from aiocron import crontab
 
 from porcupine import log
@@ -14,7 +14,7 @@ from . import db_connector
 from .service import AbstractService
 
 
-Task = namedlist('Task', 'func running')
+Task = make_dataclass('Task', ['func', 'running'])
 
 spec_aliases = {
     '@yearly': '0 0 1 1 *',

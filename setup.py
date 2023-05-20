@@ -34,7 +34,6 @@ setup(
         'couchbase==3.0.10',
         'PyYAML==5.1.1',
         'lru-dict==1.1.8',
-        'namedlist==1.8',
         'cbor==1.0.0',
         'pendulum==2.1.2',
         'orjson==3.6.8',
