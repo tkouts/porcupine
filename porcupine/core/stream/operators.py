@@ -58,3 +58,4 @@ async def locate(source, item):
         async for x in streamer:
             if x == item:
                 yield x
+                return
