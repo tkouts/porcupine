@@ -204,7 +204,8 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
         get_multi = partial(db.get_multi, _coll=self)
         items = super().items(_multi_fetch=get_multi)
         if resolve_shortcuts:
-            items = items | pipe.map(self._shortcut_resolver) | pipe.if_not_none
+            items |= pipe.map(self._shortcut_resolver)
+            items |= pipe.if_not_none()
         return items
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
