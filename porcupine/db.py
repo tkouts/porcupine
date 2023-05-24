@@ -2,7 +2,7 @@ import asyncio
 import copy
 import time
 from functools import wraps
-from typing import AsyncIterator, Optional
+from typing import Optional, AsyncIterable
 
 from sanic import Blueprint
 from sanic.request import Request
@@ -107,8 +107,7 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
             raise exceptions.NotFound(
                 'The resource {0} does not exist'.format(item_id))
 
-
-async def get_multi(ids: TYPING.ID_LIST, _coll=None) -> AsyncIterator[
+async def get_multi(ids: TYPING.ID_LIST, _coll=None)-> AsyncIterable[
         Optional[TYPING.ANY_ITEM_CO]]:
     if ids:
         user = context.user
