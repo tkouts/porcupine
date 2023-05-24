@@ -1,3 +1,5 @@
+from typing import Awaitable
+
 from sanic.response import json
 
 from porcupine import db, exceptions, pipe
@@ -89,22 +91,22 @@ class Container(Item):
             return None
         return item
 
-    async def get_children(self, skip=0, take=None,
-                           resolve_shortcuts=False) -> list:
+    def get_children(self, skip=0, take=None,
+                           resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns all the children of the container.
 
         @rtype: list
         """
-        feeder = self.containers.items() | pipe.chain(
+        children = self.containers.items() | pipe.chain(
             self.items.items(resolve_shortcuts=resolve_shortcuts)
         )
         if skip or take:
-            feeder |= pipe.skip_and_take(skip, take)
-        return [i async for i in feeder]
+            children |= pipe.skip_and_take(skip, take)
+        return children.list()
 
-    async def get_items(self, skip=0, take=None,
-                        resolve_shortcuts=False) -> list:
+    def get_items(self, skip=0, take=None,
+                        resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns the children that are not containers.
 
@@ -113,9 +115,9 @@ class Container(Item):
         items = self.items.items(resolve_shortcuts=resolve_shortcuts)
         if skip or take:
             items |= pipe.skip_and_take(skip, take)
-        return [i async for i in items]
+        return items.list()
 
-    async def get_containers(self, skip=0, take=None) -> list:
+    def get_containers(self, skip=0, take=None) -> Awaitable[list]:
         """
         This method returns the children that are containers.
 
@@ -124,7 +126,7 @@ class Container(Item):
         containers = self.containers.items()
         if skip or take:
             containers |= pipe.skip_and_take(skip, take)
-        return [i async for i in containers]
+        return containers.list()
 
     async def has_items(self) -> bool:
         """
@@ -132,9 +134,7 @@ class Container(Item):
 
         @rtype: bool
         """
-        async for _ in self.items.items():
-            return True
-        return False
+        return not await self.items.items().is_empty()
 
     async def has_containers(self) -> bool:
         """
@@ -142,9 +142,7 @@ class Container(Item):
 
         @rtype: bool
         """
-        async for _ in self.containers.items():
-            return True
-        return False
+        return not await self.containers.items().is_empty()
 
     # permissions providers
     can_append = Item.can_update

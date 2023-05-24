@@ -160,4 +160,4 @@ class Select(BaseStatement):
             field_extractor = partial(self.extract_fields, v=variables)
             streamer |= pipe.map(field_extractor)
 
-        return [result async for result in streamer]
+        return await streamer.list()
