@@ -31,8 +31,8 @@ setup(
     install_requires=[
         'chardet==3.0.4',
         'sanic==19.6.0',
-        'couchbase==3.0.10',
-        'PyYAML==5.1.1',
+        'couchbase==4.1.4',
+        'PyYAML==5.4.1',
         'lru-dict==1.1.8',
         'cbor==1.0.0',
         'pendulum==2.1.2',
