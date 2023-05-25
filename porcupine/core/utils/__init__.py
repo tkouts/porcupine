@@ -18,7 +18,8 @@ VALID_ID_CHARS = [
     chr(x) for x in
     list(range(ord('a'), ord('z'))) +
     list(range(ord('A'), ord('Z'))) +
-    list(range(ord('0'), ord('9')))]
+    list(range(ord('0'), ord('9')))
+]
 
 ELASTIC_MAP = WriteOnceDict()
 
@@ -114,12 +115,11 @@ def get_active_chunk_key(collection_name: str) -> str:
 
 def get_collection_key(item_id: str, collection_name: str,
                        chunk_no: int) -> str:
-    return '{0}/{1}/{2}'.format(item_id, collection_name, chunk_no)
+    return f'{item_id}/{collection_name}/{chunk_no}'
 
 
 def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
-    return '{0}>{1}>{2}'.format(parent_id, attr_name,
-                                hash_series(attr_value, using='mmh3'))
+    return f'{parent_id}>{attr_name}>{hash_series(attr_value, using="mmh3")}'
 
 
 def get_composite_path(parent_path: str, comp_name: str) -> str:
