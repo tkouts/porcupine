@@ -31,12 +31,6 @@ def default_json_encoder(obj):
         return obj.to_json()
 
 
-def chunks(l, n):
-    """Yield successive n-sized chunks from l."""
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
-
-
 def generate_oid(length: int = 8) -> str:
     """
     Generates a random Object ID string.
@@ -102,15 +96,15 @@ def hash_series(*args, using='md5') -> Union[str, int]:
 
 
 def get_attribute_lock_key(item_id: str, attr_name: str) -> str:
-    return 'lck_{0}_{1}'.format(item_id, attr_name)
+    return f'lck_{item_id}_{attr_name}'  # .format(item_id, attr_name)
 
 
 def get_blob_key(item_id: str, blob_name: str) -> str:
-    return '{0}/{1}'.format(item_id, blob_name)
+    return f'{item_id}/{blob_name}'  # .format(item_id, blob_name)
 
 
 def get_active_chunk_key(collection_name: str) -> str:
-    return '{0}_'.format(collection_name)
+    return f'{collection_name}_'  # .format(collection_name)
 
 
 def get_collection_key(item_id: str, collection_name: str,
@@ -123,7 +117,7 @@ def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
 
 
 def get_composite_path(parent_path: str, comp_name: str) -> str:
-    return '{0}.{1}'.format(parent_path, comp_name)
+    return f'{parent_path}.{comp_name}'  # .format(parent_path, comp_name)
 
 
 def get_descriptor_by_storage_key(cls, key: str):
