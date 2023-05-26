@@ -24,7 +24,7 @@ class BaseStreamer(AsyncIterable):
         self._operators.append(p)
         return self
 
-    def list(self):
+    def list(self) -> list:
         return stream.list(self.get_streamer())
 
     def get_streamer(self, _reverse=True):
@@ -45,7 +45,7 @@ class BaseStreamer(AsyncIterable):
     def union(self, other):
         return UnionStreamer(self, other)
 
-    async def count(self):
+    async def count(self) -> int:
         streamer = self.get_streamer(_reverse=False)
         streamer |= pipe.count()
         return await streamer
@@ -84,9 +84,13 @@ class IdStreamer(BaseStreamer):
             raise exceptions.NotFound(f'The resource {item_id} does not exist')
 
     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
-        streamer = self.get_streamer(_reverse=False) | pipe.locate(item_id)
+        has_item = (
+            self.get_streamer(_reverse=False)
+            | pipe.map(lambda x: x == item_id)
+            | pipe.until(lambda x: x is True)
+        )
         try:
-            return await streamer is not None
+            await has_item
         except StreamEmpty:
             return False
 
@@ -97,9 +101,9 @@ class ItemStreamer(BaseStreamer):
 
     def __init__(self, id_streamer: BaseStreamer, multi_fetch):
         super().__init__(id_streamer)
+        # self._operators.append(pipe.map(db.get_item))
         self._operators.append(pipe.chunks(40))
         self._operators.append(pipe.concatmap(multi_fetch, task_limit=4))
-
 
     def reverse(self):
         self._iterator.reverse()

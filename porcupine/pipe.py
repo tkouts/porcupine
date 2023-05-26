@@ -19,12 +19,12 @@ concat = pipe.concat
 concatmap = pipe.concatmap
 switchmap = pipe.switchmap
 starmap = pipe.starmap
+until = pipe.until
 print = pipe.print
 
 key_sort = operators.key_sort.pipe
 reverse = operators.reverse.pipe
 sort = operators.sort.pipe
-locate = operators.locate.pipe
 
 
 def id_getter():

@@ -42,12 +42,3 @@ async def reverse(source):
     result = await stream.list(source)
     for x in reversed(result):
         yield x
-
-
-@operator(pipable=True)
-async def locate(source, item):
-    async with source.stream() as streamer:
-        async for x in streamer:
-            if x == item:
-                yield x
-                return
