@@ -45,12 +45,14 @@ class MigrationManager(AbstractService):
         async def migration_runner():
             db_key = f'_migration_{func_id}'
             try:
-                await self.__connector.insert_multi({db_key: 'running'})
+                await self.__connector.insert_raw(db_key, 'running',
+                                                  fmt='string')
             except DBAlreadyExists:
                 # already running or run
                 # if running wait for migration to complete or fail
                 while True:
-                    status = await self.__connector.get_raw(db_key)
+                    status = await self.__connector.get_raw(db_key,
+                                                            fmt='string')
                     if status == 'running':
                         await asyncio.sleep(1)
                     else:
@@ -63,11 +65,11 @@ class MigrationManager(AbstractService):
             try:
                 await wrapped()
             except BaseException:
-                await self.__connector.delete_multi([db_key])
+                await self.__connector.delete(db_key)
                 raise
 
             self.__migrations[func_id].running = False
-            await self.__connector.upsert_multi({db_key: 'completed'})
+            await self.__connector.upsert_raw(db_key, 'completed', fmt='string')
 
         return migration_runner
 

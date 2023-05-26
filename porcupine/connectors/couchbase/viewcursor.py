@@ -1,4 +1,6 @@
-from couchbase_core.views.params import *
+from couchbase.views import ViewScanConsistency, ViewOrdering
+from couchbase.options import ViewOptions
+
 from porcupine.connectors.base.cursors import (
     SecondaryIndexCursor,
     SecondaryIndexIterator
@@ -21,7 +23,7 @@ class Cursor(SecondaryIndexCursor):
     def get_iterator(self):
         return CursorIterator(
             self.index,
-            self.options.get('stale', STALE_UPDATE_AFTER)
+            self.options.get('stale', ViewScanConsistency.UPDATE_AFTER)
         )
 
     def close(self):
@@ -38,10 +40,10 @@ class CursorIterator(SecondaryIndexIterator):
         self.stale = stale
 
     async def __aiter__(self):
-        kwargs = {
-            'stale': self.stale,
-            'reduce': self.reduce
-        }
+        kwargs = ViewOptions(
+            scan_consistency=self.stale,
+            reduce=self.reduce,
+        )
 
         bounds_size = self._bounds is not None and len(self._bounds)
         is_ranged = self.is_ranged
@@ -60,19 +62,19 @@ class CursorIterator(SecondaryIndexIterator):
             if is_ranged:
                 if last.l_bound is not None:
                     start_key.append(last.l_bound)
-                end_key.append(last.u_bound or Query.STRING_RANGE_END)
+                end_key.append(last.u_bound)
             else:
                 start_key.append(last)
                 end_key.append(last)
 
             if len(self._bounds) < len(self.index.keys):
-                end_key.append(Query.STRING_RANGE_END)
+                end_key.append(None)
 
             kwargs['mapkey_range'] = [start_key, end_key]
 
         exclude_key = None
         if self._reversed:
-            kwargs['descending'] = True
+            kwargs['order'] = ViewOrdering.DESCENDING
             if 'mapkey_range' in kwargs:
                 kwargs['mapkey_range'].reverse()
                 if is_ranged:

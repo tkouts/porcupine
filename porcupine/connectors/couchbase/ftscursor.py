@@ -3,8 +3,8 @@ from couchbase.search import (
     TermQuery,
     PrefixQuery,
     QueryStringQuery,
-    SearchOptions
 )
+from couchbase.options import SearchOptions
 
 from porcupine import context
 from porcupine.connectors.base.cursors import FTSIndexCursor, FTSIndexIterator
@@ -34,10 +34,10 @@ class FTSCursorIterator(FTSIndexIterator):
             term_query = QueryStringQuery(self._term)
         query = ConjunctionQuery(term_query, scope_query)
         chunk_size = 20
-        skip = 0
         options = SearchOptions(
             sort=['-_score'] if self._reversed else ['_score'],
-            limit=chunk_size
+            limit=chunk_size,
+            skip=0
         )
         returned = chunk_size
         while returned == chunk_size:
@@ -45,7 +45,6 @@ class FTSCursorIterator(FTSIndexIterator):
                 self.index.container_name,
                 query,
                 options,
-                skip=skip
             )
             returned = 0
             async for hit in results:
@@ -53,4 +52,4 @@ class FTSCursorIterator(FTSIndexIterator):
                 # print(hit.id)
                 context.item_meta[hit.id] = hit.score
                 yield hit.id
-            skip += chunk_size
+            options['skip'] += chunk_size

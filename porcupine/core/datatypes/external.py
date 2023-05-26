@@ -29,7 +29,7 @@ class Blob(DataType):
 
     async def fetch(self, instance):
         connector = db_connector()
-        value = await connector.get_external(self.key_for(instance))
+        value = await connector.get(self.key_for(instance), fmt='bytes')
         storage = getattr(instance, self.storage)
         setattr(storage, self.name, value)
         return value

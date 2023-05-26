@@ -76,8 +76,9 @@ class Container(Item):
                  else None.
         @rtype: L{GenericItem}
         """
-        child_id = await db_connector().get_raw(
-            utils.get_key_of_unique(self.id, 'name', name)
+        child_id = await db_connector().get(
+            utils.get_key_of_unique(self.id, 'name', name),
+            fmt='string'
         )
         if child_id:
             item = await db.get_item(child_id)
@@ -92,7 +93,7 @@ class Container(Item):
         return item
 
     def get_children(self, skip=0, take=None,
-                           resolve_shortcuts=False) -> Awaitable[list]:
+                     resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns all the children of the container.
 
@@ -106,7 +107,7 @@ class Container(Item):
         return children.list()
 
     def get_items(self, skip=0, take=None,
-                        resolve_shortcuts=False) -> Awaitable[list]:
+                  resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns the children that are not containers.
 

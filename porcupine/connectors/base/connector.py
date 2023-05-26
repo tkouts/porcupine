@@ -1,8 +1,9 @@
 import abc
 from collections import defaultdict
 
+from aiostream import stream, pipe
+
 from porcupine import context
-from porcupine.core import utils
 from porcupine.core.utils.collections import FrozenDict
 from porcupine.exceptions import DBAlreadyExists
 from porcupine.connectors.base.transaction import Transaction
@@ -30,11 +31,13 @@ class BaseConnector(metaclass=abc.ABCMeta):
             container_id, attr_name, _ = key.split('>')
             raise DBAlreadyExists(
                 f'A resource having the same {attr_name} '
-                f'in {container_id} already exists')
+                f'in {container_id} already exists'
+            )
         else:
             # item
             raise DBAlreadyExists(
-                f'A resource having an ID of {key} already exists')
+                f'A resource having an ID of {key} already exists'
+            )
 
     def __init__(self, server):
         # configuration
@@ -84,60 +87,39 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def connect(self):
         raise NotImplementedError
 
-    async def get(self, object_id, quiet=True):
+    async def get(self, object_id, fmt='json', quiet=True):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
         item = context.db_cache.get(object_id)
         if item is None:
-            item = await self.get_raw(object_id, quiet=quiet)
-            if item is not None:
+            item = await self.get_raw(object_id, fmt=fmt, quiet=quiet)
+            if item is not None and fmt == 'json':
                 item = self.persist.loads(item)
             context.db_cache[object_id] = item
         return item
 
     async def get_multi(self, object_ids):
-        loads = self.persist.loads
-        if object_ids:
-            if len(object_ids) > self.multi_fetch_chunk_size:
-                # split in chunks
-                chunks = utils.chunks(object_ids, self.multi_fetch_chunk_size)
-            else:
-                chunks = [object_ids]
+        streamer = stream.iterate(object_ids)
+        streamer |= pipe.map(self.get, task_limit=self.multi_fetch_chunk_size)
+        streamer |= pipe.zip(stream.iterate(object_ids))
+        async with streamer.stream() as s:
+            async for item, item_id in s:
+                yield item_id, item
 
-            for chunk in chunks:
-                fetched = {}
-                for item_id in chunk:
-                    if context.txn is not None and item_id in context.txn:
-                        fetched[item_id] = context.txn[item_id]
-                    item = context.db_cache.get(item_id)
-                    if item is not None:
-                        fetched[item_id] = context.db_cache[item_id]
-                db_fetch_keys = [item_id for item_id in chunk
-                                 if item_id not in fetched]
-                db_fetch = {}
-                if db_fetch_keys:
-                    db_fetch = await self.get_multi_raw(db_fetch_keys)
-                for item_id in chunk:
-                    if item_id in fetched:
-                        yield item_id, fetched[item_id]
-                    else:
-                        raw_item = db_fetch[item_id]
-                        if raw_item is None:
-                            context.db_cache[item_id] = None
-                            yield item_id, None
-                        else:
-                            item = loads(raw_item)
-                            context.db_cache[item_id] = item
-                            yield item_id, item
+    async def insert_multi(self, insertions: dict, ttl=None):
+        raise NotImplementedError
 
-    async def get_external(self, ext_id):
-        if context.txn is not None and ext_id in context.txn:
-            return context.txn[ext_id]
-        elif ext_id in context.db_cache:
-            return context.db_cache[ext_id]
-        ext = await self.get_raw(ext_id)
-        context.db_cache[ext_id] = ext
-        return ext
+    def upsert_multi(self, upsertions, ttl=None):
+        raise NotImplementedError
+
+    def delete_multi(self, deletions):
+        raise NotImplementedError
+
+    def touch_multi(self, touches):
+        raise NotImplementedError
+
+    def append_multi(self, appends):
+        raise NotImplementedError
 
     async def exists(self, key):
         if context.txn is not None and key in context.txn:
@@ -153,34 +135,23 @@ class BaseConnector(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_raw(self, key, quiet=True):
+    async def get_raw(self, key, fmt='json', quiet=True):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_multi_raw(self, keys):
+    async def insert_raw(self, key, value, ttl=None, fmt='json'):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def insert_multi(self, insertions, ttl=None) -> list:
+    async def upsert_raw(self, key, value, ttl=None, fmt='json'):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def upsert_multi(self, upsertions, ttl=None):
+    def delete(self, key):
         raise NotImplementedError
-
-    @abc.abstractmethod
-    def delete_multi(self, deletions):
-        raise NotImplementedError
-
-    def touch_multi(self, touches):
-        pass
 
     @abc.abstractmethod
     def mutate_in(self, item_id, mutations_dict: dict):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def append_multi(self, appends):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -203,10 +174,6 @@ class BaseConnector(metaclass=abc.ABCMeta):
 
     def get_fts_index(self, container_type, attrs):
         return self.FTSIndexType(self, container_type, attrs)
-
-    # management
-    # def config(self):
-    #     return {}
 
     @abc.abstractmethod
     async def truncate(self, **options):

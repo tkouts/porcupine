@@ -2,22 +2,25 @@ import asyncio
 import random
 import orjson
 
-import couchbase_core
-from couchbase.cluster import PasswordAuthenticator
+from acouchbase.cluster import Cluster
+from couchbase.auth import PasswordAuthenticator
+from couchbase.options import GetOptions, InsertOptions, ClusterOptions
+from couchbase.transcoder import RawJSONTranscoder, RawStringTranscoder, RawBinaryTranscoder
 import couchbase.subdocument as sub_doc
 from couchbase.exceptions import (
     DocumentNotFoundException,
-    DocumentNotJsonException,
+    #DocumentNotJsonException,
     PathNotFoundException,
     DocumentExistsException,
-    NotStoredException,
-    NetworkException,
+    #NotStoredException,
+    HTTPException,
+    #NetworkException,
     TimeoutException
 )
 from couchbase.management.views import View
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.management.search import SearchIndex
-from couchbase_core.transcoder import FMT_AUTO, FMT_UTF8
+from couchbase.constants import FMT_UTF8
 
 from porcupine import exceptions, log
 from porcupine.core.context import context_cacheable
@@ -29,21 +32,28 @@ from porcupine.connectors.couchbase.viewindex import Index
 from porcupine.connectors.couchbase.ftsindex import FTSIndex
 
 # SDK patch for fixing async appends
-from couchbase_core.client import Client
-# noinspection PyProtectedMember
-if 'append' not in Client._MEMCACHED_OPERATIONS:
-    # noinspection PyProtectedMember
-    Client._MEMCACHED_OPERATIONS = Client._MEMCACHED_OPERATIONS + ('append', )
+# from couchbase_core.client import Client
+# # noinspection PyProtectedMember
+# if 'append' not in Client._MEMCACHED_OPERATIONS:
+#     # noinspection PyProtectedMember
+#     Client._MEMCACHED_OPERATIONS = Client._MEMCACHED_OPERATIONS + ('append', )
+
+
+json_transcoder = RawJSONTranscoder()
+string_transcoder = RawStringTranscoder()
+bytes_transcoder = RawBinaryTranscoder()
+
+
+def get_transcoder(fmt):
+    if fmt == 'json':
+        return json_transcoder
+    elif fmt == 'string':
+        return string_transcoder
+    return bytes_transcoder
 
 
 def json_dumps(obj):
     return orjson.dumps(obj, default=default_json_encoder).decode()
-
-
-couchbase_core.set_json_converters(
-    json_dumps,
-    orjson.loads
-)
 
 
 class Couchbase(BaseConnector):
@@ -54,6 +64,7 @@ class Couchbase(BaseConnector):
         super().__init__(server)
         self.cluster = None
         self.bucket = None
+        self.collection = None
 
     @property
     def protocol(self):
@@ -71,17 +82,14 @@ class Couchbase(BaseConnector):
     def password(self):
         return self.server.config.DB_PASSWORD
 
-    def _get_cluster(self, _async=True):
-        if _async:
-            from acouchbase.cluster import Cluster
-        else:
-            from couchbase.cluster import Cluster
+    def _get_cluster(self):
         hosts = self.server.config.DB_HOST.split(',')
         random.shuffle(hosts)
         connection_string = f'{self.protocol}://{",".join(hosts)}'
+        auth = PasswordAuthenticator(self.user_name, self.password)
         cluster = Cluster(
             connection_string,
-            authenticator=PasswordAuthenticator(self.user_name, self.password)
+            ClusterOptions(auth)
         )
         return cluster
 
@@ -89,65 +97,57 @@ class Couchbase(BaseConnector):
         self.cluster = self._get_cluster()
         self.bucket = self.cluster.bucket(self.bucket_name)
         await self.bucket.on_connect()
+        self.collection = self.bucket.default_collection()
 
     @context_cacheable(size=1024)
     async def key_exists(self, key) -> bool:
-        try:
-            await self.bucket.retrieve_in(key, 'dl')
-        except DocumentNotFoundException:
-            return False
-        except (DocumentNotJsonException, PathNotFoundException):
-            pass
-        return True
+        return await self.collection.exists(key)
 
-    async def get_raw(self, key, quiet=True):
+    async def get_raw(self, key, fmt='json', quiet=True):
+        transcoder = get_transcoder(fmt)
         try:
-            result = await self.bucket.get(key, quiet=quiet)
-        except NetworkException:
+            result = await self.collection.get(
+                key,
+                GetOptions(transcoder=transcoder),
+            )
+        except HTTPException:
             # getting from replica
-            result = await self.bucket.rget(key, quiet=quiet)
+            result = await self.collection.rget(key, quiet=quiet)
         except DocumentNotFoundException:
-            raise exceptions.NotFound(
-                'The resource {0} does not exist'.format(key))
+            if quiet:
+                return None
+            else:
+                raise exceptions.NotFound(
+                    'The resource {0} does not exist'.format(key))
+        if fmt == 'json' and result.value is not None:
+            return orjson.loads(result.value)
         return result.value
 
-    async def get_multi_raw(self, keys):
+    async def insert_raw(self, key, value, ttl=None, fmt='json'):
+        transcoder = get_transcoder(fmt)
+        if fmt == 'json':
+            value = json_dumps(value)
         try:
-            multi = await self.bucket.get_multi(keys, quiet=True)
-        except NetworkException:
-            # getting from replicas
-            multi = await self.bucket.rget_multi(keys, quiet=True)
-        return {key: multi[key].value for key in multi}
+            await self.collection.insert(
+                key, value,
+                InsertOptions(transcoder=transcoder),
+                ttl=ttl or 0
+            )
+        except DocumentExistsException:
+            self.raise_exists(key)
 
-    async def insert_multi(self, insertions: dict, ttl=None) -> list:
-        try:
-            await self.bucket.insert_multi(insertions,
-                                           ttl=ttl or 0,
-                                           format=FMT_AUTO)
-        except DocumentExistsException as e:
-            existing_key = e.key
-            inserted = [key for key, result in e.all_results.items()
-                        if result.success]
-            # rollback
-            if inserted:
-                await self.delete_multi(inserted)
-            self.raise_exists(existing_key)
-        return list(insertions.keys())
+    async def upsert_raw(self, key, value, ttl=None, fmt='json'):
+        transcoder = get_transcoder(fmt)
+        if fmt == 'json':
+            value = json_dumps(value)
+        await self.collection.upsert(
+            key, value,
+            InsertOptions(transcoder=transcoder),
+            ttl=ttl or 0
+        )
 
-    def upsert_multi(self, upsertions, ttl=None):
-        return self.bucket.upsert_multi(upsertions,
-                                        ttl=ttl or 0,
-                                        format=FMT_AUTO)
-
-    def delete_multi(self, deletions):
-        return self.bucket.remove_multi(deletions, quiet=True)
-
-    async def touch_multi(self, touches):
-        try:
-            await self.bucket.touch_multi(touches)
-        except TimeoutException:
-            # print('timeout', e)
-            pass
+    async def delete(self, key):
+        await self.collection.remove(key, quiet=True)
 
     def mutate_in(self, item_id: str, mutations_dict: dict):
         mutations = []
@@ -163,24 +163,6 @@ class Couchbase(BaseConnector):
                 mutations.append(sub_doc.remove(path))
         return self.bucket.mutate_in(item_id, mutations)
 
-    async def append_multi(self, appends):
-        while appends:
-            try:
-                await self.bucket.append_multi(appends, format=FMT_UTF8)
-            except NotStoredException as e:
-                inserts = {}
-                for key, result in e.all_results.items():
-                    if result.success:
-                        del appends[key]
-                    else:
-                        inserts[key] = ''
-                try:
-                    await self.bucket.insert_multi(inserts, format=FMT_UTF8)
-                except DocumentExistsException:
-                    pass
-            else:
-                break
-
     async def swap_if_not_modified(self, key, xform, ttl=None):
         try:
             result = await self.bucket.get(key)
@@ -194,8 +176,7 @@ class Couchbase(BaseConnector):
             try:
                 await self.bucket.replace(key, new_value,
                                           cas=result.cas,
-                                          ttl=ttl or 0,
-                                          format=FMT_AUTO)
+                                          ttl=ttl or 0)
             except DocumentExistsException:
                 return False, None
             except DocumentNotFoundException:
@@ -218,8 +199,8 @@ class Couchbase(BaseConnector):
     # indexes
     async def prepare_indexes(self):
         log.info('Preparing indexes')
-        cluster = self._get_cluster(_async=False)
-        bucket = cluster.bucket(self.bucket_name)
+        cluster = self.cluster
+        bucket = self.bucket
         views_mgr = bucket.view_indexes()
 
         old_indexes = set()
@@ -229,7 +210,7 @@ class Couchbase(BaseConnector):
         namespace = DesignDocumentNamespace.PRODUCTION
 
         # get current indexes
-        for design_doc in views_mgr.get_all_design_documents(namespace):
+        for design_doc in await views_mgr.get_all_design_documents(namespace):
             if design_doc.name != '_system':
                 old_indexes.add(design_doc.name)
 
@@ -241,7 +222,7 @@ class Couchbase(BaseConnector):
             for index in indexes.values():
                 design_doc.add_view(index.name, index.get_view())
             new_indexes.add(dd_name)
-            views_mgr.upsert_design_document(design_doc, namespace)
+            await views_mgr.upsert_design_document(design_doc, namespace)
 
         # add system views
         design_doc = DesignDocumentWithOptions('_system', {}, {})
@@ -255,13 +236,13 @@ class Couchbase(BaseConnector):
                 }
             }
         """))
-        views_mgr.upsert_design_document(design_doc, namespace)
+        await views_mgr.upsert_design_document(design_doc, namespace)
 
         # remove unused
         for_removal = old_indexes - new_indexes
         for design in for_removal:
             log.info(f'Dropping view index {design}')
-            views_mgr.drop_design_document(design, namespace)
+            await views_mgr.drop_design_document(design, namespace)
 
         search_mgr = cluster.search_indexes()
 
@@ -271,13 +252,13 @@ class Couchbase(BaseConnector):
         # get current indexes
         existing_indexes = {}
         try:
-            current_fts_indexes = search_mgr.get_all_indexes()
+            current_fts_indexes = await search_mgr.get_all_indexes()
         except TypeError:
             current_fts_indexes = {}
         for fts_index in current_fts_indexes:
-            if fts_index['sourceName'] == self.bucket_name:
-                old_fts_indexes.add(fts_index['name'])
-                existing_indexes[fts_index['name']] = fts_index
+            if fts_index.source_name == self.bucket_name:
+                old_fts_indexes.add(fts_index.name)
+                existing_indexes[fts_index.name] = fts_index
 
         # create FTS indexes
         for container_type, index in self.indexes['fts'].items():
@@ -287,26 +268,26 @@ class Couchbase(BaseConnector):
             # check if we need to create/update
             existing_index = existing_indexes.get(search_index_name)
             should_rebuild = existing_index is not None and \
-                existing_index['params'] != index_params
+                existing_index.params != index_params
 
             if existing_index is None or should_rebuild:
                 if should_rebuild:
                     log.info(f'Rebuilding FTS index {search_index_name}')
-                    search_mgr.drop_index(search_index_name)
+                    await search_mgr.drop_index(search_index_name)
 
                 search_index = SearchIndex(
                     name=search_index_name,
                     source_name=self.bucket_name,
                     params=index_params
                 )
-                search_mgr.upsert_index(search_index)
+                await search_mgr.upsert_index(search_index)
             new_fts_indexes.add(search_index_name)
 
         # remove old indexes
         for_removal = old_fts_indexes - new_fts_indexes
         for search_index in for_removal:
             log.info(f'Dropping FTS index {search_index}')
-            search_mgr.drop_index(search_index)
+            await search_mgr.drop_index(search_index)
 
     async def truncate(self, **options):
         ...

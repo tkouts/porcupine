@@ -53,7 +53,7 @@ class CollectionResolver:
         while True:
             chunk_key = get_collection_key(self.item_id, self.collection_name,
                                            chunk_no)
-            chunk = await connector.get_raw(chunk_key)
+            chunk = await connector.get_raw(chunk_key, fmt='string')
             if chunk is None:
                 break
             yield chunk
