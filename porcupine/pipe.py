@@ -17,16 +17,19 @@ flatten = pipe.flatten
 takelast = pipe.takelast
 concat = pipe.concat
 concatmap = pipe.concatmap
+switchmap = pipe.switchmap
+starmap = pipe.starmap
 print = pipe.print
 
 key_sort = operators.key_sort.pipe
 reverse = operators.reverse.pipe
 sort = operators.sort.pipe
-count = operators.count.pipe
 locate = operators.locate.pipe
+
 
 def id_getter():
     return map(lambda i: i.id)
+
 
 def if_not_none():
     return filter(lambda i: i is not None)
@@ -39,3 +42,10 @@ def skip_and_take(skp=0, tk=None):
     else:
         end = None
     return getitem(slice(start, end))
+
+
+def count():
+    def _count(i, _):
+        i += 1
+        return i
+    return reduce(_count, initializer=0)

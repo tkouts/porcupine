@@ -1,5 +1,5 @@
 from typing import Callable
-from aiostream import operator
+from aiostream import operator, stream
 from sortedcontainers import SortedKeyList, SortedList
 
 
@@ -36,20 +36,12 @@ async def key_sort(source, key: Callable, _reverse: bool = False):
         for i in sorted_list:
             yield i
 
-@operator(pipable=True)
-async def reverse(source):
-    async with source.stream() as streamer:
-        result = [x async for x in streamer]
-        for x in reversed(result):
-            yield x
 
 @operator(pipable=True)
-async def count(source):
-    counter = 0
-    async with source.stream() as streamer:
-        async for _ in streamer:
-            counter +=1
-    yield counter
+async def reverse(source):
+    result = await stream.list(source)
+    for x in reversed(result):
+        yield x
 
 
 @operator(pipable=True)
