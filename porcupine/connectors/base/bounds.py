@@ -101,8 +101,8 @@ Range = make_dataclass('Range',
 class RangedBoundary(BaseBoundary):
     is_fixed = False
 
-    def __init__(self, l_bound=None, l_inclusive=False,
-                 u_bound=None, u_inclusive=False):
+    def __init__(self, l_bound=None, l_inclusive=True,
+                 u_bound=None, u_inclusive=True):
         value = Range(l_bound, l_inclusive, u_bound, u_inclusive)
         super().__init__(value)
 
