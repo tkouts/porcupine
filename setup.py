@@ -40,7 +40,7 @@ setup(
         'aiofiles==0.6.0',
         'aiostream==0.4.5',
         'aiocron==1.3',
-        'mmh3==2.5.1',
+        'mmh3==4.0.0',
         'validate-email==1.3',
         'sly==0.3',
         'sortedcontainers==2.1.0',
