@@ -23,15 +23,9 @@ import couchbase.subdocument as sub_doc
 from couchbase.exceptions import (
     CouchbaseException,
     DocumentNotFoundException,
-    # DocumentNotJsonException,
-    # PathNotFoundException,
     DocumentExistsException,
     CASMismatchException,
-    # NotStoredException,
     HTTPException,
-    # NetworkException,
-    # TODO: see where timeout was used in previous version
-    # TimeoutException,
 )
 from couchbase.management.views import View
 from couchbase.management.views import DesignDocumentNamespace
