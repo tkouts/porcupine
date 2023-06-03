@@ -166,7 +166,7 @@ class RelatorN(ReferenceN, RelatorBase):
 
     @property
     def storage_info(self):
-        return '{0}:{1}'.format(self.storage_info_prefix, self.rel_attr)
+        return f'{self.storage_info_prefix}:{self.rel_attr}'
 
     async def on_create(self, instance, value):
         added, _ = await super().on_create(instance, value)

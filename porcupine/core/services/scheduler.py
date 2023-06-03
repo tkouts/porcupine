@@ -10,6 +10,7 @@ from aiocron import crontab
 from porcupine import log
 from porcupine.exceptions import DBAlreadyExists
 from porcupine.core.context import with_context
+from porcupine.connectors.mutations import Formats
 from . import db_connector
 from .service import AbstractService
 
@@ -57,7 +58,8 @@ class Scheduler(AbstractService):
         async def scheduled_task():
             db_key = f'_task_{func_id}'
             try:
-                await self.__connector.insert_multi({db_key: ''})
+                await self.__connector.insert_raw(db_key, b'',
+                                                  fmt=Formats.BINARY)
             except DBAlreadyExists:
                 # already running by another process
                 return
@@ -70,7 +72,7 @@ class Scheduler(AbstractService):
                 )
             finally:
                 self.__cron_tabs[func_id].running = False
-                await self.__connector.delete_multi([db_key])
+                await self.__connector.delete(db_key)
 
         return scheduled_task
 

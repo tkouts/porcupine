@@ -15,7 +15,7 @@ class Conflict(SanicException):
     status_code = 409
 
 
-class DBDeadlockError(ServerError):
+class DBDeadlockError(Conflict):
     pass
 
 
@@ -27,7 +27,22 @@ class OqlError(ServerError):
     pass
 
 
-class DBAlreadyExists(Conflict):
+class DBError(Exception):
+    def __init__(self, message='', mutation=None):
+        super().__init__(message)
+        self.mutation = mutation
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}(cause={self.__cause__} "
+            f"mutation={self.mutation})"
+        )
+
+    def __str__(self):
+        return self.__repr__()
+
+
+class DBAlreadyExists(DBError, Conflict):
     pass
 
 
@@ -46,9 +61,9 @@ class UnprocessableEntity(SanicException):
 class ContainmentError(TypeError):
     def __init__(self, target_item, attribute, source_item):
         super().__init__(
-            "Attribute '{0}' of '{1}' does not accept objects of '{2}'".format(
-                attribute, target_item.__class__.__name__,
-                source_item.content_class))
+            f"Attribute '{attribute}' of '{target_item.__class__.__name__}' "
+            f"does not accept objects of '{source_item.content_class}'"
+        )
 
 
 AttributeSetError = (AttributeError, ValueError, TypeError)

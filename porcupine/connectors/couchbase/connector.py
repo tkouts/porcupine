@@ -1,26 +1,41 @@
 import asyncio
 import random
-import orjson
+import time
+from datetime import timedelta
 
+import orjson
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.options import GetOptions, InsertOptions, ClusterOptions
-from couchbase.transcoder import RawJSONTranscoder, RawStringTranscoder, RawBinaryTranscoder
+from couchbase.options import (
+    ClusterOptions,
+    GetOptions,
+    InsertOptions,
+    UpsertOptions,
+    MutateInOptions,
+    ReplaceOptions,
+)
+from couchbase.transcoder import (
+    RawJSONTranscoder,
+    RawStringTranscoder,
+    RawBinaryTranscoder,
+)
 import couchbase.subdocument as sub_doc
 from couchbase.exceptions import (
+    CouchbaseException,
     DocumentNotFoundException,
-    #DocumentNotJsonException,
-    PathNotFoundException,
+    # DocumentNotJsonException,
+    # PathNotFoundException,
     DocumentExistsException,
-    #NotStoredException,
+    CASMismatchException,
+    # NotStoredException,
     HTTPException,
-    #NetworkException,
-    TimeoutException
+    # NetworkException,
+    # TODO: see where timeout was used in previous version
+    # TimeoutException,
 )
 from couchbase.management.views import View
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.management.search import SearchIndex
-from couchbase.constants import FMT_UTF8
 
 from porcupine import exceptions, log
 from porcupine.core.context import context_cacheable
@@ -30,26 +45,14 @@ from porcupine.connectors.couchbase.management.views import \
     DesignDocumentWithOptions
 from porcupine.connectors.couchbase.viewindex import Index
 from porcupine.connectors.couchbase.ftsindex import FTSIndex
-
-# SDK patch for fixing async appends
-# from couchbase_core.client import Client
-# # noinspection PyProtectedMember
-# if 'append' not in Client._MEMCACHED_OPERATIONS:
-#     # noinspection PyProtectedMember
-#     Client._MEMCACHED_OPERATIONS = Client._MEMCACHED_OPERATIONS + ('append', )
+from porcupine.connectors.mutations import Formats, SubDocument
 
 
-json_transcoder = RawJSONTranscoder()
-string_transcoder = RawStringTranscoder()
-bytes_transcoder = RawBinaryTranscoder()
-
-
-def get_transcoder(fmt):
-    if fmt == 'json':
-        return json_transcoder
-    elif fmt == 'string':
-        return string_transcoder
-    return bytes_transcoder
+transcoders = {
+    Formats.JSON: RawJSONTranscoder(),
+    Formats.STRING: RawStringTranscoder(),
+    Formats.BINARY: RawBinaryTranscoder(),
+}
 
 
 def json_dumps(obj):
@@ -101,16 +104,17 @@ class Couchbase(BaseConnector):
 
     @context_cacheable(size=1024)
     async def key_exists(self, key) -> bool:
-        return await self.collection.exists(key)
+        result = await self.collection.exists(key)
+        return result.exists
 
-    async def get_raw(self, key, fmt='json', quiet=True):
-        transcoder = get_transcoder(fmt)
+    async def get_raw(self, key, fmt=Formats.JSON, quiet=True):
         try:
             result = await self.collection.get(
                 key,
-                GetOptions(transcoder=transcoder),
+                GetOptions(transcoder=transcoders[fmt]),
             )
         except HTTPException:
+            # TODO: fix replica reads
             # getting from replica
             result = await self.collection.rget(key, quiet=quiet)
         except DocumentNotFoundException:
@@ -119,53 +123,97 @@ class Couchbase(BaseConnector):
             else:
                 raise exceptions.NotFound(
                     'The resource {0} does not exist'.format(key))
-        if fmt == 'json' and result.value is not None:
+        except CouchbaseException as e:
+            raise exceptions.DBError from e
+        if fmt is Formats.JSON and result.value is not None:
             return orjson.loads(result.value)
         return result.value
 
-    async def insert_raw(self, key, value, ttl=None, fmt='json'):
-        transcoder = get_transcoder(fmt)
-        if fmt == 'json':
+    async def insert_raw(self, key, value, ttl=None, fmt=Formats.JSON):
+        if fmt is Formats.JSON:
             value = json_dumps(value)
+        options = InsertOptions(transcoder=transcoders[fmt])
+        if ttl is not None:
+            if isinstance(ttl, int):
+                ttl = timedelta(seconds=ttl - time.time())
+            options['expiry'] = ttl
+        # print(key, ttl)
         try:
-            await self.collection.insert(
-                key, value,
-                InsertOptions(transcoder=transcoder),
-                ttl=ttl or 0
-            )
-        except DocumentExistsException:
-            self.raise_exists(key)
+            await self.collection.insert(key, value, options)
+        except DocumentExistsException as e:
+            self.raise_exists(key, e)
+        except CouchbaseException as e:
+            raise exceptions.DBError from e
 
-    async def upsert_raw(self, key, value, ttl=None, fmt='json'):
-        transcoder = get_transcoder(fmt)
-        if fmt == 'json':
+    async def upsert_raw(self, key, value, ttl=None, fmt=Formats.JSON):
+        if fmt is Formats.JSON:
             value = json_dumps(value)
-        await self.collection.upsert(
-            key, value,
-            InsertOptions(transcoder=transcoder),
-            ttl=ttl or 0
+        options = UpsertOptions(
+            transcoder=transcoders[fmt],
+            preserve_expiry=True,
         )
+        if ttl is not None:
+            if isinstance(ttl, int):
+                ttl = timedelta(seconds=ttl - time.time())
+            options['expiry'] = ttl
+        try:
+            await self.collection.upsert(key, value, options)
+        except CouchbaseException as e:
+            raise exceptions.DBError from e
+
+    async def append_raw(self, key, value, ttl=None, fmt=Formats.STRING):
+        binary_collection = self.collection.binary()
+        try:
+            await binary_collection.append(key, value)
+        except DocumentNotFoundException:
+            try:
+                await self.insert_raw(key, value, ttl, fmt)
+            except exceptions.DBAlreadyExists:
+                # another coro created the document
+                try:
+                    await binary_collection.append(key, value)
+                except CouchbaseException as e:
+                    raise exceptions.DBError from e
+            except CouchbaseException as e:
+                raise exceptions.DBError from e
+        except CouchbaseException as e:
+            raise exceptions.DBError from e
 
     async def delete(self, key):
-        await self.collection.remove(key, quiet=True)
+        try:
+            await self.collection.remove(key)
+        except DocumentNotFoundException:
+            pass
+        except CouchbaseException as e:
+            raise exceptions.DBError from e
 
-    def mutate_in(self, item_id: str, mutations_dict: dict):
+    async def mutate_in(self, item_id: str, mutations_dict: dict):
         mutations = []
+        mutate_options = MutateInOptions(
+            preserve_expiry=True
+        )
         for path, mutation in mutations_dict.items():
             mutation_type, value = mutation
-            if mutation_type == self.SUB_DOC_UPSERT_MUT:
+            if mutation_type is SubDocument.UPSERT:
                 mutations.append(sub_doc.upsert(path, value))
-            elif mutation_type == self.SUB_DOC_COUNTER:
+            elif mutation_type is SubDocument.COUNTER:
                 mutations.append(sub_doc.counter(path, value))
-            elif mutation_type == self.SUB_DOC_INSERT:
+            elif mutation_type is SubDocument.INSERT:
                 mutations.append(sub_doc.insert(path, value))
-            elif mutation_type == self.SUB_DOC_REMOVE:
+            elif mutation_type is SubDocument.REMOVE:
                 mutations.append(sub_doc.remove(path))
-        return self.bucket.mutate_in(item_id, mutations)
-
-    async def swap_if_not_modified(self, key, xform, ttl=None):
         try:
-            result = await self.bucket.get(key)
+            await self.collection.mutate_in(item_id, mutations, mutate_options)
+        except CouchbaseException as e:
+            raise exceptions.DBError from e
+
+    async def swap_if_not_modified(self, key, xform, fmt, ttl=None):
+        transcoder = transcoders[fmt]
+        try:
+            result = await self.collection.get(
+                key,
+                GetOptions(transcoder=transcoder),
+            )
         except DocumentNotFoundException:
             raise exceptions.NotFound(f'Key {key} is removed')
         xform_result = xform(result.value)
@@ -174,10 +222,16 @@ class Couchbase(BaseConnector):
         new_value, return_value = xform_result
         if new_value is not None:
             try:
-                await self.bucket.replace(key, new_value,
-                                          cas=result.cas,
-                                          ttl=ttl or 0)
-            except DocumentExistsException:
+                await self.collection.replace(
+                    key, new_value,
+                    ReplaceOptions(
+                        transcoder=transcoder,
+                        cas=result.cas,
+                        preserve_expiry=True,
+                    )
+                )
+            # TODO: use CasMismatchException?
+            except (DocumentExistsException, CASMismatchException):
                 return False, None
             except DocumentNotFoundException:
                 raise exceptions.NotFound(f'Key {key} is removed')
@@ -198,7 +252,7 @@ class Couchbase(BaseConnector):
 
     # indexes
     async def prepare_indexes(self):
-        log.info('Preparing indexes')
+        log.info('Preparing indexes...')
         cluster = self.cluster
         bucket = self.bucket
         views_mgr = bucket.view_indexes()

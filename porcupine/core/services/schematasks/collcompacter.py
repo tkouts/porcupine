@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
 from porcupine import exceptions, log
+from porcupine.connectors.mutations import Formats
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 
 
@@ -36,7 +37,8 @@ class CollectionCompacter(SchemaMaintenanceTask):
         try:
             success, _ = await self.connector.swap_if_not_modified(
                 self.key,
-                xform=self.compact_set,
+                self.compact_set,
+                Formats.STRING,
                 ttl=self.ttl
             )
             if not success:

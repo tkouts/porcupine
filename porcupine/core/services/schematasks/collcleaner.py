@@ -3,6 +3,7 @@ from functools import partial
 
 from porcupine import log
 from porcupine.core import utils
+from porcupine.connectors.mutations import Formats
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 
 
@@ -20,7 +21,8 @@ class CollectionCleaner(SchemaMaintenanceTask):
         chunk_key = utils.get_collection_key(self.item_id,
                                              self.collection_name,
                                              chunk_no)
-        return chunk_key, await self.connector.get_raw(chunk_key)
+        return chunk_key, await self.connector.get_raw(chunk_key,
+                                                       fmt=Formats.STRING)
 
     @staticmethod
     async def clean_chunk(chunk, stale_ids):
@@ -46,8 +48,9 @@ class CollectionCleaner(SchemaMaintenanceTask):
                     xform = partial(self.clean_chunk, stale_ids=matches)
                     success, _ = await connector.swap_if_not_modified(
                         chunk_key,
-                        xform=xform,
-                        ttl=self.ttl
+                        xform,
+                        Formats.STRING,
+                        ttl=self.ttl,
                     )
                 self.stale_ids = [stale for stale in self.stale_ids
                                   if stale not in matches]
@@ -60,4 +63,4 @@ class CollectionCleaner(SchemaMaintenanceTask):
         if reached_last and self.chunk_no > 0:
             key, chunk = await self.fetch_collection_chunk(chunk_no + 1)
             if chunk == '':
-                await connector.delete_multi([key])
+                await connector.delete(key)

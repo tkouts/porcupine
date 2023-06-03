@@ -96,15 +96,15 @@ def hash_series(*args, using='md5') -> Union[str, int]:
 
 
 def get_attribute_lock_key(item_id: str, attr_name: str) -> str:
-    return f'lck_{item_id}_{attr_name}'  # .format(item_id, attr_name)
+    return f'lck_{item_id}_{attr_name}'
 
 
 def get_blob_key(item_id: str, blob_name: str) -> str:
-    return f'{item_id}/{blob_name}'  # .format(item_id, blob_name)
+    return f'{item_id}/{blob_name}'
 
 
 def get_active_chunk_key(collection_name: str) -> str:
-    return f'{collection_name}_'  # .format(collection_name)
+    return f'{collection_name}_'
 
 
 def get_collection_key(item_id: str, collection_name: str,
@@ -117,7 +117,7 @@ def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
 
 
 def get_composite_path(parent_path: str, comp_name: str) -> str:
-    return f'{parent_path}.{comp_name}'  # .format(parent_path, comp_name)
+    return f'{parent_path}.{comp_name}'
 
 
 def get_descriptor_by_storage_key(cls, key: str):
@@ -139,11 +139,10 @@ async def add_uniques(item):
         txn = context.txn
         # insert unique keys
         item_id = item.id
-        ttl = await item.ttl
         for unique in item.unique_data_types():
             unique_key = get_key_of_unique(parent_id, unique.name,
                                            unique.get_value(item))
-            txn.insert_external(unique_key, item_id, ttl)
+            txn.insert_external(item_id, unique_key, item_id)
 
 
 def remove_uniques(item):

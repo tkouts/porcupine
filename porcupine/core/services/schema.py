@@ -2,9 +2,11 @@
 Schema maintenance service
 """
 import asyncio
+from datetime import timedelta
 
 from porcupine import log
 from porcupine.exceptions import DBAlreadyExists
+from porcupine.connectors.mutations import Formats
 from porcupine.core.services.schematasks.collcompacter import \
     CollectionCompacter
 from porcupine.core.services.schematasks.collrebuilder import \
@@ -39,7 +41,11 @@ class SchemaMaintenance(AbstractService):
                 break
             task_key = f'_st_{task.key}'
             try:
-                await task.connector.insert_multi({task_key: ''}, ttl=20)
+                await task.connector.insert_raw(
+                    task_key, b'',
+                    ttl=timedelta(seconds=20),
+                    fmt=Formats.BINARY,
+                )
             except DBAlreadyExists:
                 log.debug(f'Another schema task for key {task.key} is running')
                 self.collisions += 1
@@ -49,9 +55,10 @@ class SchemaMaintenance(AbstractService):
                     await task.execute()
                 except Exception as e:
                     log.error(
-                        f'Task {type(task).__name__} threw error {str(e)}')
+                        f'Task {type(task).__name__} threw error {str(e)}'
+                    )
                 finally:
-                    await task.connector.delete_multi([task_key])
+                    await task.connector.delete(task_key)
                     self.queue.task_done()
 
     async def status(self):

@@ -1,12 +1,13 @@
-import cbor
 from collections import MutableSequence, MutableMapping
+
+import cbor
 
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.core.schema.storage import UNSET
 from porcupine.response import json
-from porcupine.core.services import db_connector
 from porcupine.core.utils import get_key_of_unique
+from porcupine.connectors.mutations import SubDocument
 
 
 class DataType:
@@ -118,9 +119,9 @@ class DataType:
         new_unique = get_key_of_unique(instance.parent_id,
                                        self.name,
                                        value)
-        context.txn.insert_external(new_unique,
-                                    instance.id,
-                                    await instance.ttl)
+        context.txn.insert_external(instance.id,
+                                    new_unique,
+                                    instance.id)
 
     def remove_unique(self, instance, value):
         unique_key = get_key_of_unique(instance.parent_id,
@@ -149,7 +150,7 @@ class DataType:
             if not instance.__is_new__:
                 context.txn.mutate(instance,
                                    self.storage_key,
-                                   db_connector().SUB_DOC_UPSERT_MUT,
+                                   SubDocument.UPSERT,
                                    value)
 
     async def on_delete(self, instance, value):

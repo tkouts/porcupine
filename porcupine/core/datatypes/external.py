@@ -11,6 +11,7 @@ import aiofiles
 from porcupine.core import utils
 from porcupine.core.context import context
 from porcupine.core.services import db_connector
+from porcupine.connectors.mutations import Formats
 from .common import String
 from .datatype import DataType
 
@@ -29,7 +30,7 @@ class Blob(DataType):
 
     async def fetch(self, instance):
         connector = db_connector()
-        value = await connector.get(self.key_for(instance), fmt='bytes')
+        value = await connector.get(self.key_for(instance), fmt=Formats.BINARY)
         storage = getattr(instance, self.storage)
         setattr(storage, self.name, value)
         return value
@@ -57,14 +58,13 @@ class Blob(DataType):
     async def on_create(self, instance, value):
         await super().on_create(instance, value)
         if value is not None:
-            context.txn.insert_external(self.key_for(instance), value,
-                                        await instance.ttl)
+            context.txn.insert_external(instance.id, self.key_for(instance),
+                                        value)
 
     async def on_change(self, instance, value, old_value):
         await super().on_change(instance, value, old_value)
         if value is not None:
-            context.txn.put_external(self.key_for(instance), value,
-                                     await instance.ttl)
+            context.txn.put_external(instance.id, self.key_for(instance), value)
         else:
             await self.on_delete(instance, value)
 

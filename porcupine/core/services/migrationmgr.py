@@ -8,6 +8,7 @@ from dataclasses import make_dataclass
 from porcupine import log
 from porcupine.exceptions import DBAlreadyExists
 from porcupine.core.context import with_context
+from porcupine.connectors.mutations import Formats
 from . import db_connector
 from .service import AbstractService
 
@@ -46,13 +47,13 @@ class MigrationManager(AbstractService):
             db_key = f'_migration_{func_id}'
             try:
                 await self.__connector.insert_raw(db_key, 'running',
-                                                  fmt='string')
+                                                  fmt=Formats.STRING)
             except DBAlreadyExists:
                 # already running or run
                 # if running wait for migration to complete or fail
                 while True:
                     status = await self.__connector.get_raw(db_key,
-                                                            fmt='string')
+                                                            fmt=Formats.STRING)
                     if status == 'running':
                         await asyncio.sleep(1)
                     else:
@@ -69,7 +70,8 @@ class MigrationManager(AbstractService):
                 raise
 
             self.__migrations[func_id].running = False
-            await self.__connector.upsert_raw(db_key, 'completed', fmt='string')
+            await self.__connector.upsert_raw(db_key, 'completed',
+                                              fmt=Formats.STRING)
 
         return migration_runner
 

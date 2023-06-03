@@ -8,6 +8,7 @@ from porcupine.core.datatypes.system import Items, Containers
 from porcupine.core.services import db_connector
 from porcupine.core import utils
 from porcupine.connectors.base.bounds import FixedBoundary
+from porcupine.connectors.mutations import Formats
 from .item import Item
 from .shortcut import Shortcut
 
@@ -78,7 +79,7 @@ class Container(Item):
         """
         child_id = await db_connector().get(
             utils.get_key_of_unique(self.id, 'name', name),
-            fmt='string'
+            fmt=Formats.STRING
         )
         if child_id:
             item = await db.get_item(child_id)

@@ -5,9 +5,10 @@ from aiostream import stream, pipe
 
 from porcupine import context
 from porcupine.core.utils.collections import FrozenDict
-from porcupine.exceptions import DBAlreadyExists
+from porcupine.exceptions import DBAlreadyExists, DBError
 from porcupine.connectors.base.transaction import Transaction
 from porcupine.connectors.base import persist
+from porcupine.connectors.mutations import Formats
 
 
 class BaseConnector(metaclass=abc.ABCMeta):
@@ -18,31 +19,26 @@ class BaseConnector(metaclass=abc.ABCMeta):
     persist = persist
     supports_ttl = True
 
-    # Sub Document Mutation Codes
-    SUB_DOC_UPSERT_MUT = 0
-    SUB_DOC_COUNTER = 1
-    SUB_DOC_INSERT = 2
-    SUB_DOC_REMOVE = 4
-
     @staticmethod
-    def raise_exists(key):
+    def raise_exists(key, cause=None):
         if '>' in key:
             # unique constraint
             container_id, attr_name, _ = key.split('>')
             raise DBAlreadyExists(
                 f'A resource having the same {attr_name} '
                 f'in {container_id} already exists'
-            )
+            ) from cause
         else:
             # item
             raise DBAlreadyExists(
                 f'A resource having an ID of {key} already exists'
-            )
+            ) from cause
 
     def __init__(self, server):
         # configuration
         self.server = server
-        self.multi_fetch_chunk_size = int(server.config.DB_MULTI_FETCH_SIZE)
+        self.multi_key_concurrency = \
+            int(server.config.DB_MULTI_KEY_CONCURRENCY) or None
         self.coll_compact_threshold = \
             float(server.config.DB_COLLECTION_COMPACT_THRESHOLD)
         self.coll_split_threshold = \
@@ -87,39 +83,38 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def connect(self):
         raise NotImplementedError
 
-    async def get(self, object_id, fmt='json', quiet=True):
+    async def get(self, object_id, fmt=Formats.JSON, quiet=True):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
         item = context.db_cache.get(object_id)
         if item is None:
             item = await self.get_raw(object_id, fmt=fmt, quiet=quiet)
-            if item is not None and fmt == 'json':
+            if item is not None and fmt is Formats.JSON:
                 item = self.persist.loads(item)
             context.db_cache[object_id] = item
         return item
 
     async def get_multi(self, object_ids):
         streamer = stream.iterate(object_ids)
-        streamer |= pipe.map(self.get, task_limit=self.multi_fetch_chunk_size)
+        streamer |= pipe.map(self.get, task_limit=self.multi_key_concurrency)
         streamer |= pipe.zip(stream.iterate(object_ids))
-        async with streamer.stream() as s:
-            async for item, item_id in s:
+        async with streamer.stream() as items:
+            async for item, item_id in items:
                 yield item_id, item
 
-    async def insert_multi(self, insertions: dict, ttl=None):
-        raise NotImplementedError
+    async def batch_update(self, updates: list, ordered=False):
+        async def _process_update(update):
+            try:
+                await update.apply(self)
+            except DBError as db_error:
+                db_error.mutation = update
+                return db_error
 
-    def upsert_multi(self, upsertions, ttl=None):
-        raise NotImplementedError
-
-    def delete_multi(self, deletions):
-        raise NotImplementedError
-
-    def touch_multi(self, touches):
-        raise NotImplementedError
-
-    def append_multi(self, appends):
-        raise NotImplementedError
+        streamer = stream.iterate(updates)
+        streamer |= pipe.map(_process_update,
+                             ordered=ordered,
+                             task_limit=self.multi_key_concurrency)
+        return await stream.list(streamer)
 
     async def exists(self, key):
         if context.txn is not None and key in context.txn:
@@ -135,15 +130,19 @@ class BaseConnector(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_raw(self, key, fmt='json', quiet=True):
+    async def get_raw(self, key, fmt=Formats.JSON, quiet=True):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def insert_raw(self, key, value, ttl=None, fmt='json'):
+    async def insert_raw(self, key, value, ttl=None, fmt=Formats.JSON):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def upsert_raw(self, key, value, ttl=None, fmt='json'):
+    async def upsert_raw(self, key, value, ttl=None, fmt=Formats.JSON):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def append_raw(self, key, value, ttl=None, fmt=Formats.STRING):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -155,7 +154,7 @@ class BaseConnector(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def swap_if_not_modified(self, key, xform, ttl=None):
+    async def swap_if_not_modified(self, key, xform, fmt, ttl=None):
         raise NotImplementedError
 
     # transaction

@@ -1,6 +1,7 @@
 from porcupine import exceptions
 from porcupine.core.services import db_connector
 from porcupine.core import utils
+from porcupine.connectors.mutations import Formats, SubDocument
 
 
 class SchemaMaintenanceTask:
@@ -36,13 +37,13 @@ class CollectionMaintenanceTask(SchemaMaintenanceTask):
             new_chunk_key = utils.get_collection_key(self.item_id,
                                                      self.collection_name,
                                                      self.chunk_no + 1)
-            await connector.insert_multi({new_chunk_key: ''}, ttl=self.ttl)
+            await connector.insert_raw(
+                new_chunk_key, '', ttl=self.ttl, fmt=Formats.STRING
+            )
         except exceptions.DBAlreadyExists:
             return False
         await connector.mutate_in(
             self.item_id,
-            {counter_path: (connector.SUB_DOC_UPSERT_MUT, self.chunk_no + 1)}
+            {counter_path: (SubDocument.UPSERT, self.chunk_no + 1)}
         )
-        if self.ttl:
-            await connector.touch_multi({self.item_id: self.ttl})
         return True

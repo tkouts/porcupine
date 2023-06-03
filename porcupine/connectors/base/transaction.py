@@ -1,14 +1,34 @@
 import asyncio
 import random
-from inspect import isawaitable
+from typing import Dict, Optional
 from collections import defaultdict
+from datetime import timedelta
 
+from porcupine.hinting import TYPING
 from porcupine import exceptions, log, server
+from porcupine.connectors.mutations import (
+    Formats,
+    SubDocument,
+    Insertion,
+    Upsertion,
+    Deletion,
+    SubDocumentMutation,
+    Append,
+)
 from porcupine.core import utils
-from porcupine.core.utils import date
+from porcupine.core.utils import date, default_json_encoder
 from porcupine.core.context import ctx_txn
 from porcupine.core.services import get_service
 from porcupine.core.context import system_override, context_user, context
+
+
+class ExternalDoc:
+    __slots__ = 'item_id', 'key', 'value'
+
+    def __init__(self, item_id, key, value):
+        self.item_id = item_id
+        self.key = key
+        self.value = value
 
 
 class Transaction:
@@ -17,24 +37,23 @@ class Transaction:
                  '_ext_insertions', '_ext_upsertions',
                  '_deletions',
                  '_sd', '_appends',
-                 '_attr_locks', '_touches', '_committed')
+                 '_attr_locks', '_committed')
 
     def __init__(self, connector, **options):
         self.connector = connector
         self.connector.active_txns += 1
         self.options = options
-        self._items = {}
-        self._ext_insertions = {}
-        self._ext_upsertions = {}
+        self._items: Dict[str, TYPING.ANY_ITEM_CO] = {}
+        self._ext_insertions: Dict[str, ExternalDoc] = {}
+        self._ext_upsertions: Dict[str, ExternalDoc] = {}
 
-        self._deletions = {}
+        self._deletions: Dict[str, Optional[TYPING.ANY_ITEM_CO]] = {}
         self._attr_locks = {}
-
-        self._touches = {}
 
         # sub document mutations
         self._sd = defaultdict(dict)
-        self._appends = defaultdict(list)
+        self._appends = {}
+
         self._committed = False
 
     @property
@@ -56,11 +75,11 @@ class Transaction:
         if key in self._deletions:
             return None
         elif key in self._items:
-            return self._items[key][1]
+            return self._items[key]
         elif key in self._ext_upsertions:
-            return self._ext_upsertions[key][1]
+            return self._ext_upsertions[key].value
         elif key in self._ext_insertions:
-            return self._ext_insertions[key][1]
+            return self._ext_insertions[key].value
         raise KeyError(key)
 
     def get_key_append(self, key):
@@ -79,12 +98,11 @@ class Transaction:
                 if path.startswith(key):
                     del mutations[path]
 
-    async def insert(self, item):
+    async def insert(self, item: TYPING.ANY_ITEM_CO):
         if item.id in self._items:
             self.connector.raise_exists(item.id)
 
-        ttl = await item.ttl
-        self._items[item.id] = ttl, item
+        self._items[item.id] = item
 
         await item.on_create()
 
@@ -97,7 +115,7 @@ class Transaction:
 
         item.__reset__()
 
-    async def upsert(self, item):
+    async def upsert(self, item: TYPING.ANY_ITEM_CO):
         if item.__snapshot__:
             locks = []
 
@@ -117,18 +135,17 @@ class Transaction:
                 except exceptions.AttributeSetError as e:
                     raise exceptions.InvalidUsage(str(e))
 
-            if not item.__is_new__ and locks and \
-                    item.__storage__.pid is not None:
+            if (
+                not item.__is_new__
+                and locks
+                and item.__storage__.pid is not None
+            ):
                 # try to lock attributes
                 # print('LOCKING', locks)
                 await self.lock_attributes(item, *[u.name for u in locks])
 
-            ttl = await item.ttl
-            if ttl:
-                self._touches[item.id] = ttl
-
         item.__reset__()
-        self._items[item.id] = None, item
+        self._items[item.id] = item
 
     async def touch(self, item):
         # touch has to be fast / no event handlers
@@ -137,13 +154,9 @@ class Transaction:
             item.__storage__.md = now
         elif 'md' not in item.__snapshot__:
             item.__snapshot__['md'] = now
-            self.mutate(item, 'md', self.connector.SUB_DOC_UPSERT_MUT, now)
-            ttl = await item.ttl
-            if ttl:
-                self._touches[item.id] = ttl
-            if item.has_outdated_schema:
-                # add to items map to trigger schema update
-                self._items[item.id] = None, item
+            self.mutate(item, 'md', SubDocument.UPSERT, now)
+            # add to items map
+            self._items[item.id] = item
 
     async def delete(self, item):
         if item.is_collection:
@@ -184,29 +197,34 @@ class Transaction:
             with system_override():
                 children = await item.get_children()
                 await asyncio.gather(
-                    *[self.restore(child) for child in children])
+                    *[self.restore(child) for child in children]
+                )
 
     def mutate(self, item, path, mutation_type, value):
-        self._sd[item.id][path] = mutation_type, value
+        self._sd[item.id][path] = (
+            mutation_type,
+            default_json_encoder(value) or value,
+        )
 
-    def append(self, key, value, ttl=None):
+    def append(self, item_id, key, value):
         if key in self._ext_insertions:
-            self._ext_insertions[key][1] += value
-        elif value not in self._appends[key]:
-            self._appends[key].append(value)
-            if ttl:
-                self._touches[key] = ttl
+            self._ext_insertions[key].value += value
+        else:
+            item_appends = self._appends.setdefault(item_id, defaultdict(list))
+            if value not in item_appends[key]:
+                item_appends[key].append(value)
 
-    def insert_external(self, key, value, ttl=None):
+    def insert_external(self, item_id, key, value):
         if key in self._ext_insertions:
             self.connector.raise_exists(key)
-        self._ext_insertions[key] = [ttl, value]
+        self._ext_insertions[key] = ExternalDoc(item_id, key, value)
 
-    def put_external(self, key, value, ttl=None):
+    def put_external(self, item_id, key, value):
+        doc = ExternalDoc(item_id, key, value)
         if key in self._ext_insertions:
-            self._ext_insertions[key] = [ttl, value]
+            self._ext_insertions[key] = doc
             return
-        self._ext_upsertions[key] = [ttl, value]
+        self._ext_upsertions[key] = doc
 
     def delete_external(self, key):
         if key in self._ext_insertions:
@@ -215,22 +233,40 @@ class Transaction:
             del self._ext_upsertions[key]
         self._deletions[key] = None
 
+    async def insert_multi(self, insertions):
+        connector = self.connector
+        errors = await connector.batch_update(insertions, ordered=True)
+        if any(errors):
+            # some insertion(s) failed - roll back
+            deletions = [
+                Deletion(i.key)
+                for (r, i) in zip(errors, insertions)
+                if r is None
+            ]
+            await connector.batch_update(deletions)
+            raise next(r for r in errors if r is not None)
+
     async def lock_attributes(self, item, *attributes):
         lock_keys = [utils.get_attribute_lock_key(item.id, attr_name)
                      for attr_name in attributes]
         # filter out the ones already locked
-        multi_insert = {key: '' for key in lock_keys
+        multi_insert = {key: None for key in lock_keys
                         if key not in self._attr_locks}
         if multi_insert:
+            inserts = [
+                Insertion(key, b'', timedelta(seconds=20), Formats.BINARY)
+                for key in multi_insert
+            ]
             try:
-                await self.connector.insert_multi(multi_insert, ttl=20)
+                await self.insert_multi(inserts)
             except exceptions.DBAlreadyExists:
                 raise exceptions.DBDeadlockError('Failed to lock attributes')
             # add lock key to deletions in order to be released
             self._attr_locks.update(multi_insert)
 
-    def prepare(self):
-        dumps = self.connector.persist.dumps
+    async def prepare(self):
+        connector = self.connector
+        dumps = connector.persist.dumps
 
         if self.connector.server.debug:
             # check for any non persisted modifications
@@ -247,40 +283,77 @@ class Transaction:
         inserted_items = []
         modified_items = []
 
+        # expiry map
+        expiry_map = {}
+
         # insertions
-        insertions = defaultdict(dict)
-        for item_id, v in self._items.items():
-            ttl, item = v
+        insertions = []
+        for item_id, item in self._items.items():
+            expiry_map[item_id] = await item.ttl
             if item.__is_new__:
                 inserted_items.append(item)
-                insertions[ttl][item_id] = dumps(item)
+                insertions.append(
+                    Insertion(item_id, dumps(item), expiry_map[item_id],
+                              Formats.JSON)
+                )
             else:
                 modified_items.append(item)
 
         # update insertions with externals
-        for key, v in self._ext_insertions.items():
-            ttl, value = v
+        for key, doc in self._ext_insertions.items():
+            value = doc.value
             if value:
-                insertions[ttl][key] = value
+                insertions.append(
+                    Insertion(key, value, expiry_map[doc.item_id],
+                              Formats.guess_format(value))
+                )
+
+        rest_ops = []
+
+        # sub-document mutations
+        for item_id, mutations in self._sd.items():
+            if item_id not in self._deletions:
+                rest_ops.append(SubDocumentMutation(item_id, mutations))
+
+        # binary appends
+        auto_splits = []
+        if self._appends:
+            split_threshold = connector.coll_split_threshold
+            rnd = random.random()
+            for item_id, appends in self._appends.items():
+                ttl = expiry_map[item_id]
+                for k, v in appends.items():
+                    if k not in self._deletions:
+                        append = ''.join(v)
+                        rest_ops.append(
+                            Append(k, append, ttl, Formats.STRING)
+                        )
+                        possibility = len(append) / split_threshold
+                        if rnd <= possibility * 1.8:
+                            auto_splits.append((k, ttl))
 
         # upsertions
-        upsertions = defaultdict(dict)
-        for key, v in self._ext_upsertions.items():
-            ttl, value = v
+        for key, doc in self._ext_upsertions.items():
+            value = doc.value
             if value:
-                upsertions[ttl][key] = value
+                rest_ops.append(
+                    Upsertion(key, value, expiry_map[doc.item_id],
+                              Formats.guess_format(value))
+                )
 
         # deletions
-        deleted_items = [item for item in self._deletions.values()
-                         if hasattr(item, 'content_class')]
-
-        # update deletions with externals
-        deletions = list(self._deletions.keys())
+        deleted_items = [
+            item for item in self._deletions.values()
+            if item is not None
+        ]
+        rest_ops.extend([Deletion(key) for key in self._deletions])
         # remove locks
-        deletions.extend(self._attr_locks.keys())
+        rest_ops.extend([Deletion(key) for key in self._attr_locks])
 
-        return (insertions, upsertions, deletions), \
-               (inserted_items, modified_items, deleted_items)
+        return (
+            (insertions, rest_ops, auto_splits),
+            (inserted_items, modified_items, deleted_items)
+        )
 
     async def commit(self) -> None:
         """
@@ -289,91 +362,22 @@ class Transaction:
         @return: None
         """
         # prepare
-        db_ops, affected_items = self.prepare()
-        insertions, upsertions, deletions = db_ops
+        db_ops, affected_items = await self.prepare()
+        insertions, rest_ops, auto_splits = db_ops
 
         connector = self.connector
 
         # insertions
         if insertions:
             # first transaction phase - make sure all keys are non-existing
-            insert_tasks = []
-            for ttl in insertions:
-                task = connector.insert_multi(insertions[ttl], ttl=ttl)
-                if isawaitable(task):
-                    insert_tasks.append(task)
-            if insert_tasks:
-                if len(insert_tasks) == 1:
-                    await insert_tasks[0]
-                else:
-                    results = await asyncio.gather(*insert_tasks,
-                                                   return_exceptions=True)
-                    errors = [r for r in results if isinstance(r, Exception)]
-                    if any(errors):
-                        inserted = [key for keys in results
-                                    if isinstance(keys, list)
-                                    for key in keys]
-                        if inserted:
-                            await connector.delete_multi(inserted)
-                        raise errors[0]
+            await self.insert_multi(insertions)
 
-        tasks = []
-        # upsertions
-        if upsertions:
-            for ttl in upsertions:
-                task = connector.upsert_multi(upsertions[ttl], ttl=ttl)
-                if isawaitable(task):
-                    tasks.append(task)
-
-        # sub document mutations
-        # print('SD', self._sd)
-        if self._sd:
-            for item_id, mutations in self._sd.items():
-                if item_id not in deletions:
-                    task = connector.mutate_in(item_id, mutations)
-                    if isawaitable(task):
-                        tasks.append(task)
-
-        # appends
-        auto_splits = []
-
-        if self._appends:
-            split_threshold = connector.coll_split_threshold
-            rnd = random.random()
-            appends = {}
-            for k, v in self._appends.items():
-                if k not in deletions:
-                    append = ''.join(v)
-                    appends[k] = append
-                    possibility = len(append) / split_threshold
-                    if rnd <= possibility * 1.8:
-                        auto_splits.append((k, self._touches.get(k)))
-
-            task = connector.append_multi(appends)
-            if isawaitable(task):
-                tasks.append(task)
-
-        # deletions
-        if deletions:
-            task = connector.delete_multi(deletions)
-            if isawaitable(task):
-                tasks.append(task)
-
-        if tasks:
-            completed, _ = await asyncio.wait(tasks)
-            errors = [task.exception() for task in completed]
+        if rest_ops:
+            errors = await connector.batch_update(rest_ops)
             if any(errors):
-                # TODO: log errors
-                # print(errors)
-                pass
-
-        if self._touches:
-            touches = {
-                k: v for k, v in self._touches.items()
-                if k not in deletions
-            }
-            if touches:
-                await connector.touch_multi(touches)
+                # some updates have failed
+                for exc in (e for e in errors if e is not None):
+                    log.error(f'Transaction.commit: {exc}')
 
         self.connector.active_txns -= 1
         self._committed = True
@@ -428,6 +432,11 @@ class Transaction:
         if not self._committed:
             # release attribute locks
             if self._attr_locks:
-                await self.connector.delete_multi(self._attr_locks.keys())
+                unlocks = [Deletion(key) for key in self._attr_locks]
+                errors = await self.connector.batch_update(unlocks)
+                if any(errors):
+                    # some updates have failed
+                    for exc in (e for e in errors if e is not None):
+                        log.error(f'Transaction.abort: {exc}')
             self.connector.active_txns -= 1
         ctx_txn.set(None)

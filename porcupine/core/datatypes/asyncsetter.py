@@ -18,8 +18,7 @@ class AsyncSetterValue:
         descriptor, instance = self._desc, self._inst()
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
-        context.txn.reset_mutations(instance,
-                                    '{0}.'.format(descriptor.storage_key))
+        context.txn.reset_mutations(instance, f'{descriptor.storage_key}.')
         super(AsyncSetter, descriptor).__set__(instance, value)
 
 
@@ -39,8 +38,10 @@ class AsyncSetter(DataType, metaclass=abc.ABCMeta):
         return self.getter(instance, value)
 
     def __set__(self, instance, value):
-        raise AttributeError('Cannot directly set the {0}. '
-                             'Use the reset method instead.'.format(self.name))
+        raise AttributeError(
+            f'Cannot directly set the {self.name}. '
+            'Use the reset method instead.'
+        )
 
     @staticmethod
     async def can_modify(instance):

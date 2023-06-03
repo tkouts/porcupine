@@ -11,6 +11,7 @@ from porcupine.core.services import get_service, db_connector
 from porcupine.core.utils import get_content_class, get_collection_key
 from porcupine.core.schema.storage import UNSET
 from porcupine.core.stream.streamer import IdStreamer
+from porcupine.connectors.mutations import Formats
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 
@@ -53,7 +54,7 @@ class CollectionResolver:
         while True:
             chunk_key = get_collection_key(self.item_id, self.collection_name,
                                            chunk_no)
-            chunk = await connector.get_raw(chunk_key, fmt='string')
+            chunk = await connector.get_raw(chunk_key, fmt=Formats.STRING)
             if chunk is None:
                 break
             yield chunk
@@ -215,13 +216,12 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
             collection_key = descriptor.key_for(instance)
-            ttl = await instance.ttl
             for item in items:
                 if not await descriptor.accepts_item(item):
                     raise exceptions.ContainmentError(instance,
                                                       descriptor.name, item)
                 item_id = item.id
-                context.txn.append(collection_key, f' {item_id}', ttl)
+                context.txn.append(instance.id, collection_key, f' {item_id}')
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
@@ -230,10 +230,9 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
             collection_key = descriptor.key_for(instance)
-            ttl = await instance.ttl
             for item in items:
                 item_id = item.id
-                context.txn.append(collection_key, f' -{item_id}', ttl)
+                context.txn.append(instance.id, collection_key, f' -{item_id}')
 
     async def reset(self, value: list) -> None:
         descriptor, instance = self._desc, self._inst()

@@ -2,10 +2,11 @@ from porcupine import exceptions, log
 from porcupine.core import utils
 from porcupine.datatypes import Blob, ReferenceN, RelatorN
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
+from porcupine.connectors.mutations import Deletion
 
 
 class SchemaCleaner(SchemaMaintenanceTask):
-    __slots__ = 'ttl'
+    __slots__ = 'ttl',
 
     def __init__(self, key, ttl):
         super().__init__(key)
@@ -64,7 +65,7 @@ class SchemaCleaner(SchemaMaintenanceTask):
                 ttl=self.ttl
             )
             if not success:
-                log.info(f'Failed to update schema of {self.key}')
+                log.warn(f'Failed to update schema of {self.key}')
                 return
         except exceptions.NotFound:
             # the key is removed
@@ -93,5 +94,10 @@ class SchemaCleaner(SchemaMaintenanceTask):
                     _, exists = await connector.exists(external_key)
 
         if external_keys:
-            # TODO handle exceptions
-            await connector.delete_multi(external_keys)
+            errors = await connector.batch_update(
+                [Deletion(key) for key in external_keys]
+            )
+            if any(errors):
+                # some updates have failed
+                for exc in (e for e in errors if e is not None):
+                    log.error(f'SchemaCleaner.execute: {exc}')

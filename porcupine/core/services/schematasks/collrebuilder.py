@@ -1,11 +1,11 @@
 import asyncio
-from inspect import isawaitable
 from collections import deque
 
 from porcupine import log
 from porcupine.core import utils
 from porcupine.core.datatypes.collection import CollectionResolver
 from porcupine.core.services.schematasks.task import CollectionMaintenanceTask
+from porcupine.connectors.mutations import Formats, Upsertion, Deletion
 
 
 class CollectionReBuilder(CollectionMaintenanceTask):
@@ -75,21 +75,20 @@ class CollectionReBuilder(CollectionMaintenanceTask):
                     # print('failed to split')
                     await asyncio.sleep(0.1)
             if chunks is not None:
-                tasks = []
                 insertions, deletions = chunks
                 # print(insertions)
                 # print(deletions)
+                updates = []
+
                 if insertions:
-                    task = connector.upsert_multi(insertions, ttl=self.ttl)
-                    if isawaitable(task):
-                        tasks.append(task)
-                if deletions:
-                    task = connector.delete_multi(deletions)
-                    if isawaitable(task):
-                        tasks.append(task)
-                if tasks:
-                    completed, _ = await asyncio.wait(tasks)
-                    errors = [task.exception() for task in tasks]
-                    if any(errors):
-                        # TODO: log errors
-                        print(errors)
+                    for key, value in insertions.items():
+                        updates.append(
+                            Upsertion(key, value, self.ttl, Formats.STRING)
+                        )
+                for chunk_key in deletions:
+                    updates.append(Deletion(chunk_key))
+                errors = await connector.batch_update(updates)
+                if any(errors):
+                    # some updates have failed
+                    for exc in (e for e in errors if e is not None):
+                        log.error(f'CollectionReBuilder.execute: {exc}')

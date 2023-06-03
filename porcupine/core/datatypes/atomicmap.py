@@ -1,15 +1,14 @@
 from porcupine import exceptions
-from porcupine.core.services import db_connector
 from porcupine.core.context import context
 from porcupine.core.utils import collections
 from porcupine.core.datatypes.mutable import Dictionary
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
+from porcupine.connectors.mutations import SubDocument
 
 IMMUTABLE_TYPES = (str, int, float, bool, tuple)
 
 
 class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
-
     def __init__(self, descriptor: 'AtomicMap', instance, dct: dict):
         collections.FrozenDict.__init__(self, dct)
         AsyncSetterValue.__init__(self, descriptor, instance)
@@ -23,8 +22,8 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         self._dct[key] = value
         if not instance.__is_new__:
             context.txn.mutate(instance,
-                               '{0}.{1}'.format(descriptor.storage_key, key),
-                               db_connector().SUB_DOC_UPSERT_MUT,
+                               f'{descriptor.storage_key}.{key}',
+                               SubDocument.UPSERT,
                                value)
 
     async def delete(self, key: str):
@@ -35,8 +34,8 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
         del self._dct[key]
         if not instance.__is_new__:
             context.txn.mutate(instance,
-                               '{0}.{1}'.format(descriptor.storage_key, key),
-                               db_connector().SUB_DOC_REMOVE, None)
+                               f'{descriptor.storage_key}.{key}',
+                               SubDocument.REMOVE, None)
 
     async def reset(self, value, replace=False):
         if replace and value is not None:
@@ -65,7 +64,6 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
 
 
 class AtomicMap(AsyncSetter, Dictionary):
-
     def __init__(self, default=None, accepts=IMMUTABLE_TYPES, **kwargs):
         super().__init__(default, **kwargs)
         if accepts != IMMUTABLE_TYPES:
@@ -103,11 +101,10 @@ class AtomicMap(AsyncSetter, Dictionary):
     async def on_change(self, instance, value, old_value):
         self.validate(value)
         if not instance.__is_new__:
-            connector = db_connector()
             replace = value and value.pop('__replace__', False)
             if value is None or old_value is None or replace:
                 context.txn.mutate(instance, self.storage_key,
-                                   connector.SUB_DOC_UPSERT_MUT, value)
+                                   SubDocument.UPSERT, value)
             else:
                 changed_keys = [
                     key for key in value
@@ -119,13 +116,13 @@ class AtomicMap(AsyncSetter, Dictionary):
                     if key not in value
                 ]
                 for key in changed_keys:
-                    path = '{0}.{1}'.format(self.storage_key, key)
+                    path = f'{self.storage_key}.{key}'
                     context.txn.mutate(instance,
                                        path,
-                                       connector.SUB_DOC_UPSERT_MUT,
+                                       SubDocument.UPSERT,
                                        value[key])
                 for key in removed_keys:
-                    path = '{0}.{1}'.format(self.storage_key, key)
+                    path = f'{self.storage_key}.{key}'
                     context.txn.mutate(instance,
                                        path,
-                                       connector.SUB_DOC_REMOVE, None)
+                                       SubDocument.REMOVE, None)
