@@ -25,7 +25,6 @@ from couchbase.exceptions import (
     DocumentNotFoundException,
     DocumentExistsException,
     CASMismatchException,
-    HTTPException,
 )
 from couchbase.management.views import View
 from couchbase.management.views import DesignDocumentNamespace
@@ -107,10 +106,9 @@ class Couchbase(BaseConnector):
                 key,
                 GetOptions(transcoder=transcoders[fmt]),
             )
-        except HTTPException:
-            # TODO: fix replica reads
-            # getting from replica
-            result = await self.collection.rget(key, quiet=quiet)
+        # TODO: fix replica reads?
+        # except HTTPException:
+        #     result = await self.collection.rget(key, quiet=quiet)
         except DocumentNotFoundException:
             if quiet:
                 return None

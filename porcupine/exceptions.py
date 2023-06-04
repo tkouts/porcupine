@@ -28,7 +28,7 @@ class OqlError(ServerError):
 
 
 class DBError(Exception):
-    def __init__(self, message='', mutation=None):
+    def __init__(self, message=None, mutation=None):
         super().__init__(message)
         self.mutation = mutation
 
