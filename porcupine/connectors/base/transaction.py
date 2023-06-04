@@ -107,33 +107,39 @@ class Transaction:
         await item.on_create()
 
         # execute data types on_create handlers
-        for data_type in item.__schema__.values():
-            try:
-                await data_type.on_create(item, data_type.get_value(item))
-            except exceptions.AttributeSetError as e:
-                raise exceptions.InvalidUsage(str(e))
+        try:
+            await asyncio.gather(*[
+                data_type.on_create(item, data_type.get_value(item))
+                for data_type in item.__schema__.values()
+            ])
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
 
         item.__reset__()
 
     async def upsert(self, item: TYPING.ANY_ITEM_CO):
         if item.__snapshot__:
-            locks = []
-
             await item.on_change()
 
             # execute data types on_change handlers
+            locks = []
+            on_change_handlers = []
             for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
                 if data_type.should_lock:
                     locks.append(data_type)
-                try:
-                    await data_type.on_change(
+                on_change_handlers.append(
+                    data_type.on_change(
                         item,
                         new_value,
                         data_type.get_value(item, snapshot=False)
                     )
-                except exceptions.AttributeSetError as e:
-                    raise exceptions.InvalidUsage(str(e))
+                )
+
+            try:
+                await asyncio.gather(*on_change_handlers)
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
 
             if (
                 not item.__is_new__
@@ -166,32 +172,37 @@ class Transaction:
 
         await item.on_delete()
 
-        data_types = item.__schema__.values()
         # execute data types on_delete handlers
-        for dt in data_types:
-            await dt.on_delete(item, dt.get_value(item))
+        await asyncio.gather(*[
+            dt.on_delete(item, dt.get_value(item))
+            for dt in item.__schema__.values()
+        ])
 
         self._deletions[item.id] = item
 
     async def recycle(self, item):
-        data_types = item.__schema__.values()
-
         # execute data types on_recycle handlers
-        for dt in data_types:
-            await dt.on_recycle(item, dt.get_value(item))
+        await asyncio.gather(*[
+            dt.on_recycle(item, dt.get_value(item))
+            for dt in item.__schema__.values()
+        ])
 
         if item.is_collection:
             with system_override():
                 children = await item.get_children()
                 await asyncio.gather(
-                    *[self.recycle(child) for child in children])
+                    *[self.recycle(child) for child in children]
+                )
 
     async def restore(self, item):
-        data_types = item.__schema__.values()
-
         # execute data types on_restore handlers
-        for dt in data_types:
-            await dt.on_restore(item, dt.get_value(item))
+        await asyncio.gather(*[
+            dt.on_restore(item, dt.get_value(item))
+            for dt in item.__schema__.values()
+        ])
+
+        # add to items so that ttl can be calculated
+        self._items[item.id] = item
 
         if item.is_collection:
             with system_override():
