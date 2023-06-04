@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 UNSET = sentinel.NotSet
 
 
-class Record(object):
+class Record:
     __slots__ = ()
     fields = frozenset()
 
