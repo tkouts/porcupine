@@ -21,7 +21,8 @@ DEFAULTS = {
     # how many times a transaction is retried
     # before an error is raised
     'DB_TXN_MAX_RETRIES': 16,
-    'DB_MULTI_KEY_CONCURRENCY': 500,
+    'DB_READ_CONCURRENCY': 500,
+    'DB_WRITE_CONCURRENCY': 200,
     # dirtiness threshold
     'DB_COLLECTION_COMPACT_THRESHOLD': 0.3,
     # split threshold set to 16K

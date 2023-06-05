@@ -37,8 +37,10 @@ class BaseConnector(metaclass=abc.ABCMeta):
     def __init__(self, server):
         # configuration
         self.server = server
-        self.multi_key_concurrency = \
-            int(server.config.DB_MULTI_KEY_CONCURRENCY) or None
+        self.read_concurrency = \
+            int(server.config.DB_READ_CONCURRENCY) or None
+        self.write_concurrency = \
+            int(server.config.DB_WRITE_CONCURRENCY) or None
         self.coll_compact_threshold = \
             float(server.config.DB_COLLECTION_COMPACT_THRESHOLD)
         self.coll_split_threshold = \
@@ -96,7 +98,7 @@ class BaseConnector(metaclass=abc.ABCMeta):
 
     async def get_multi(self, object_ids):
         streamer = stream.iterate(object_ids)
-        streamer |= pipe.map(self.get, task_limit=self.multi_key_concurrency)
+        streamer |= pipe.map(self.get, task_limit=self.read_concurrency)
         streamer |= pipe.zip(stream.iterate(object_ids))
         async with streamer.stream() as items:
             async for item, item_id in items:
@@ -113,7 +115,7 @@ class BaseConnector(metaclass=abc.ABCMeta):
         streamer = stream.iterate(updates)
         streamer |= pipe.map(_process_update,
                              ordered=ordered,
-                             task_limit=self.multi_key_concurrency)
+                             task_limit=self.write_concurrency)
         return await stream.list(streamer)
 
     async def exists(self, key):
