@@ -2,7 +2,7 @@ from porcupine import exceptions, log
 from porcupine.core import utils
 from porcupine.datatypes import Blob, ReferenceN, RelatorN
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
-from porcupine.connectors.mutations import Deletion
+from porcupine.connectors.mutations import Deletion, Formats
 
 
 class SchemaCleaner(SchemaMaintenanceTask):
@@ -31,8 +31,10 @@ class SchemaCleaner(SchemaMaintenanceTask):
             if isinstance(attr_value, str):
                 if attr_value == Blob.storage_info:
                     externals[storage_key] = (attr_value, None)
-                elif attr_value == ReferenceN.storage_info \
-                        or attr_value.startswith(RelatorN.storage_info_prefix):
+                elif (
+                    attr_value == ReferenceN.storage_info
+                    or attr_value.startswith(RelatorN.storage_info_prefix)
+                ):
                     try:
                         active_chunk_key = \
                             utils.get_active_chunk_key(storage_key)
@@ -61,8 +63,8 @@ class SchemaCleaner(SchemaMaintenanceTask):
         try:
             success, externals = await connector.swap_if_not_modified(
                 self.key,
-                xform=self.schema_updater,
-                ttl=self.ttl
+                self.schema_updater,
+                Formats.JSON,
             )
             if not success:
                 log.warn(f'Failed to update schema of {self.key}')

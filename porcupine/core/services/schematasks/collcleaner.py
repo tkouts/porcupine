@@ -50,7 +50,6 @@ class CollectionCleaner(SchemaMaintenanceTask):
                         chunk_key,
                         xform,
                         Formats.STRING,
-                        ttl=self.ttl,
                     )
                 self.stale_ids = [stale for stale in self.stale_ids
                                   if stale not in matches]

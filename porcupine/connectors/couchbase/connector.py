@@ -199,7 +199,7 @@ class Couchbase(BaseConnector):
         except CouchbaseException as e:
             raise exceptions.DBError from e
 
-    async def swap_if_not_modified(self, key, xform, fmt, ttl=None):
+    async def swap_if_not_modified(self, key, xform, fmt):
         transcoder = transcoders[fmt]
         try:
             result = await self.collection.get(

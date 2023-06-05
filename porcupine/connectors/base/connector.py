@@ -154,7 +154,7 @@ class BaseConnector(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def swap_if_not_modified(self, key, xform, fmt, ttl=None):
+    async def swap_if_not_modified(self, key, xform, fmt):
         raise NotImplementedError
 
     # transaction

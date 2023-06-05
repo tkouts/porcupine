@@ -32,14 +32,14 @@ class CollectionCompacter(SchemaMaintenanceTask):
         return ' '.join(compacted), True
 
     async def execute(self):
-        if self.connector.server.debug:
+        connector = self.connector
+        if connector.server.debug:
             log.debug(f'Compacting collection {self.key}')
         try:
-            success, _ = await self.connector.swap_if_not_modified(
+            success, _ = await connector.swap_if_not_modified(
                 self.key,
                 self.compact_set,
                 Formats.STRING,
-                ttl=self.ttl
             )
             if not success:
                 log.info(f'Failed to compact collection {self.key}')
