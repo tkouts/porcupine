@@ -268,7 +268,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     async def on_post_change(self, actor):
         if self.has_outdated_schema:
-            await get_service('schema').clean_schema(self.id, await self.ttl)
+            await get_service('schema').clean_schema(self.id)
 
     async def on_post_delete(self, actor):
         ...

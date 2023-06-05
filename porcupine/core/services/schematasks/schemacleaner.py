@@ -6,12 +6,6 @@ from porcupine.connectors.mutations import Deletion, Formats
 
 
 class SchemaCleaner(SchemaMaintenanceTask):
-    __slots__ = 'ttl',
-
-    def __init__(self, key, ttl):
-        super().__init__(key)
-        self.ttl = ttl
-
     @staticmethod
     def schema_updater(item_dict):
         clazz = utils.get_content_class(item_dict['_cc'])

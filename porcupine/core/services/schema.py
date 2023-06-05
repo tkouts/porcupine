@@ -86,9 +86,9 @@ class SchemaMaintenance(AbstractService):
             task = CollectionAutoSplitter(key, ttl)
             await self.queue.put(task)
 
-    async def clean_schema(self, key, ttl):
+    async def clean_schema(self, key):
         if self.queue is not None:
-            task = SchemaCleaner(key, ttl)
+            task = SchemaCleaner(key)
             await self.queue.put(task)
 
     async def remove_stale(self, key):

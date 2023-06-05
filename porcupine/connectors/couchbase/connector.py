@@ -208,11 +208,17 @@ class Couchbase(BaseConnector):
             )
         except DocumentNotFoundException:
             raise exceptions.NotFound(f'Key {key} is removed')
-        xform_result = xform(result.value)
+        if fmt is Formats.JSON and result.value is not None:
+            value = orjson.loads(result.value)
+        else:
+            value = result.value
+        xform_result = xform(value)
         if asyncio.iscoroutine(xform_result):
             xform_result = await xform_result
         new_value, return_value = xform_result
         if new_value is not None:
+            if fmt is Formats.JSON:
+                new_value = json_dumps(new_value)
             try:
                 await self.collection.replace(
                     key, new_value,
