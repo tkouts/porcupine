@@ -112,9 +112,7 @@ class Couchbase(BaseConnector):
         except DocumentNotFoundException:
             if quiet:
                 return None
-            else:
-                raise exceptions.NotFound(
-                    'The resource {0} does not exist'.format(key))
+            raise exceptions.NotFound(f'The resource {key} does not exist')
         except CouchbaseException as e:
             raise exceptions.DBError from e
         if fmt is Formats.JSON and result.value is not None:
