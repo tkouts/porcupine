@@ -1,5 +1,4 @@
 from typing import AsyncIterable
-from functools import partial
 import weakref
 
 from lru import LRU
@@ -202,8 +201,7 @@ class ItemCollection(AsyncSetterValue, IdStreamer):
         return i
 
     def items(self, resolve_shortcuts=False):
-        get_multi = partial(db.get_multi, _coll=self)
-        items = super().items(_multi_fetch=get_multi)
+        items = super().items(self)
         if resolve_shortcuts:
             items |= pipe.map(self._shortcut_resolver)
             items |= pipe.if_not_none()

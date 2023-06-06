@@ -1,9 +1,15 @@
-from typing import Callable, AsyncIterable
+from typing import Callable, AsyncIterable, Awaitable
 
 from aiostream import stream, StreamEmpty
 
 from porcupine import db, exceptions, pipe
 from porcupine.hinting import TYPING
+from porcupine.core.services import db_connector, get_service
+from porcupine.core.utils.db import (
+    resolve_visibility,
+    is_consistent,
+    get_with_id,
+)
 
 
 class BaseStreamer(AsyncIterable):
@@ -24,8 +30,8 @@ class BaseStreamer(AsyncIterable):
         self._operators.append(p)
         return self
 
-    def list(self) -> list:
-        return stream.list(self.get_streamer())
+    def list(self) -> Awaitable[list]:
+        return stream.list(self)
 
     def get_streamer(self, _reverse=True):
         streamer = stream.iterate(self._iterator)
@@ -58,8 +64,8 @@ class BaseStreamer(AsyncIterable):
         except IndexError:
             return True
 
-    def items(self, _multi_fetch=db.get_multi) -> 'ItemStreamer':
-        return ItemStreamer(self, _multi_fetch)
+    def items(self, coll=None) -> 'ItemStreamer':
+        return ItemStreamer(self, coll)
 
 
 class EmptyStreamer(BaseStreamer):
@@ -99,11 +105,40 @@ class ItemStreamer(BaseStreamer):
     supports_reversed_iteration = True
     output_ids = False
 
-    def __init__(self, id_streamer: BaseStreamer, multi_fetch):
+    def __init__(self, id_streamer: BaseStreamer, collection):
         super().__init__(id_streamer)
-        # self._operators.append(pipe.map(db.get_item))
-        self._operators.append(pipe.chunks(40))
-        self._operators.append(pipe.concatmap(multi_fetch, task_limit=4))
+        self._collection = collection
+        self._stale = []
+        connector = db_connector()
+        if self._collection is None:
+            self._operators.append(
+                pipe.map(connector.get, task_limit=connector.read_concurrency)
+            )
+        else:
+            # need to collect stale IDs of expired items
+            self._operators.append(
+                pipe.map(get_with_id, task_limit=connector.read_concurrency)
+            )
+            self._operators.append(pipe.map(self._gather_inconsistent))
+        self._operators.append(pipe.filter(resolve_visibility))
+
+    async def __aiter__(self):
+        async with self.get_streamer().stream() as streamer:
+            async for x in streamer:
+                yield x
+        # print('stale', self._stale, self._collection)
+        if self._collection is not None and self._stale:
+            ttl = await self._collection.ttl
+            key = self._collection.key
+            await get_service('schema').clean_collection(key, self._stale, ttl)
+
+    def _gather_inconsistent(self, item_info):
+        item_id, item = item_info
+        is_cons = is_consistent(item, self._collection)
+        if not is_cons:
+            self._stale.append(item_id)
+            return None
+        return item
 
     def reverse(self):
         self._iterator.reverse()

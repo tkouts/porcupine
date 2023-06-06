@@ -99,10 +99,9 @@ class BaseConnector(metaclass=abc.ABCMeta):
     async def get_multi(self, object_ids):
         streamer = stream.iterate(object_ids)
         streamer |= pipe.map(self.get, task_limit=self.read_concurrency)
-        streamer |= pipe.zip(stream.iterate(object_ids))
         async with streamer.stream() as items:
-            async for item, item_id in items:
-                yield item_id, item
+            async for item in items:
+                yield item
 
     async def batch_update(self, updates: list, ordered=False):
         async def _process_update(update):

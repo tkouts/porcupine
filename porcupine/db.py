@@ -1,81 +1,17 @@
 import asyncio
 import copy
-import time
 from functools import wraps
 from typing import Optional, AsyncIterable
 
 from sanic import Blueprint
 from sanic.request import Request
+from aiostream import stream, pipe
 
 from porcupine import exceptions
 from porcupine.hinting import TYPING
-from porcupine.core.context import context, ctx_txn
-from porcupine.core.services import db_connector, get_service
-
-
-async def _resolve_visibility(item: TYPING.ANY_ITEM_CO, user) -> Optional[bool]:
-    if item.__is_new__:
-        return True
-
-    # check for stale / expired / deleted
-
-    use_cache = (
-        not item.is_deleted
-        and (item.is_composite or not item.acl.is_set())
-    )
-    if item.is_composite:
-        container = item.item_id
-    else:
-        container = item.parent_id
-    cache_key = f'{container}|{user.id if user else ""}'
-
-    if cache_key in context.visibility_cache:
-        visibility = context.visibility_cache[cache_key]
-        if visibility is None:
-            return None
-        if use_cache:
-            return visibility
-
-    it = item
-    visibility = 0
-    connector = db_connector()
-    ttl_supported = connector.supports_ttl
-    _get = connector.get
-    while True:
-        if not it.is_composite:
-            # check expiration
-            if not ttl_supported and it.expires_at is not None:
-                if time.time() > it.expires_at:
-                    # expired - remove from DB
-                    await get_service('schema').remove_stale(it.id)
-                    visibility = None
-                    break
-            if it.is_deleted:
-                visibility = None
-                break
-            if it.is_system:
-                break
-        if it.parent_id is None:
-            break
-        else:
-            parent = await _get(it.parent_id)
-            if parent is None:
-                # stale - remove from DB
-                await get_service('schema').remove_stale(it.id)
-                visibility = None
-                break
-            it = parent
-
-    if visibility is None:
-        if it != item:
-            # add to perms cache
-            context.visibility_cache[cache_key] = visibility
-    else:
-        visibility = await item.can_read(user)
-        if use_cache:
-            context.visibility_cache[cache_key] = visibility
-
-    return visibility
+from porcupine.core.context import ctx_txn
+from porcupine.core.services import db_connector
+from porcupine.core.utils.db import resolve_visibility
 
 
 async def get_item(item_id: str, quiet: bool = True) -> Optional[
@@ -97,43 +33,27 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
     connector = db_connector()
     item = await connector.get(item_id, quiet=quiet)
     if item is not None:
-        if context.system_override:
-            return item
-        visibility = await _resolve_visibility(item, context.user)
+        visibility = await resolve_visibility(item)
         if visibility is not None:
             if visibility:
                 return item
             elif not quiet:
-                raise exceptions.Forbidden('Forbidden')
+                raise exceptions.Forbidden(
+                    f'Access to resource {item_id} is forbidden'
+                )
         elif not quiet:
             raise exceptions.NotFound(f'The resource {item_id} does not exist')
 
 
-async def get_multi(ids: TYPING.ID_LIST, _coll=None) -> AsyncIterable[
-        Optional[TYPING.ANY_ITEM_CO]]:
-    if ids:
-        user = context.user
-        resolve_visibility = _resolve_visibility
-        is_override = context.system_override
-        stale = []
-        connector = db_connector()
-        async for item_id, item in connector.get_multi(ids):
-            if item is not None:
-                if _coll is not None and not _coll.is_consistent(item):
-                    stale.append(item_id)
-                if is_override:
-                    yield item
-                else:
-                    visibility = await resolve_visibility(item, user)
-                    if visibility:
-                        yield item
-            elif _coll is not None:
-                stale.append(item_id)
-
-        if stale:
-            ttl = await _coll.ttl
-            key = _coll.key
-            await get_service('schema').clean_collection(key, stale, ttl)
+async def get_multi(ids: TYPING.ID_LIST) -> AsyncIterable[TYPING.ANY_ITEM_CO]:
+    connector = db_connector()
+    streamer = (
+        stream.iterate(connector.get_multi(ids))
+        | pipe.filter(resolve_visibility)
+    )
+    async with streamer.stream() as items:
+        async for item in items:
+            yield item
 
 
 def transactional(auto_commit=True):
