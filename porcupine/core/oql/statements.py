@@ -1,6 +1,8 @@
 import logging
 from functools import partial
 
+from aiostream import stream
+
 from porcupine import db, log, pipe
 from porcupine.core.oql.feeder import CollectionFeeder
 from porcupine.core.oql.tokens import (
@@ -160,4 +162,4 @@ class Select(BaseStatement):
             field_extractor = partial(self.extract_fields, v=variables)
             streamer |= pipe.map(field_extractor)
 
-        return await streamer.list()
+        return await stream.list(streamer)

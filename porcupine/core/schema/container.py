@@ -1,6 +1,7 @@
 from typing import Awaitable
 
 from sanic.response import json
+from aiostream import stream
 
 from porcupine import db, exceptions, pipe
 from porcupine.view import view
@@ -105,7 +106,7 @@ class Container(Item):
         )
         if skip or take:
             children |= pipe.skip_and_take(skip, take)
-        return children.list()
+        return stream.list(children)
 
     def get_items(self, skip=0, take=None,
                   resolve_shortcuts=False) -> Awaitable[list]:
@@ -117,7 +118,7 @@ class Container(Item):
         items = self.items.items(resolve_shortcuts=resolve_shortcuts)
         if skip or take:
             items |= pipe.skip_and_take(skip, take)
-        return items.list()
+        return stream.list(items)
 
     def get_containers(self, skip=0, take=None) -> Awaitable[list]:
         """
@@ -128,7 +129,7 @@ class Container(Item):
         containers = self.containers.items()
         if skip or take:
             containers |= pipe.skip_and_take(skip, take)
-        return containers.list()
+        return stream.list(containers)
 
     async def has_items(self) -> bool:
         """
