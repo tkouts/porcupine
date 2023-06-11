@@ -3,6 +3,7 @@ import sys
 
 from sanic import Sanic
 from sanic.request import Request
+from orjson import loads as json_loads
 
 from porcupine.config.default import DEFAULTS
 from porcupine.core.services import get_service
@@ -10,10 +11,13 @@ from porcupine.core.router import ContextRouter
 from porcupine.apps.schema.users import SystemUser
 
 
-class RequestWithSession(Request):
+class PorcupineRequest(Request):
     @property
     def session(self):
         return self.get('session')
+
+    def load_json(self, loads=json_loads):
+        return super().load_json(loads)
 
 
 class PorcupineServer(Sanic):
@@ -153,5 +157,5 @@ class PorcupineServer(Sanic):
 
 
 server = PorcupineServer(router=ContextRouter(),
-                         request_class=RequestWithSession,
+                         request_class=PorcupineRequest,
                          configure_logging=False)
