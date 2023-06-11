@@ -92,11 +92,10 @@ class IdStreamer(BaseStreamer):
     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
         has_item = (
             self.get_streamer(_reverse=False)
-            | pipe.map(lambda x: x == item_id)
-            | pipe.until(lambda x: x is True)
+            | pipe.until(lambda x: x == item_id)
         )
         try:
-            await has_item
+            return await has_item == item_id
         except StreamEmpty:
             return False
 
