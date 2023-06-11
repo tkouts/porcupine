@@ -106,7 +106,7 @@ class CollectionIterator(AsyncIterable):
         append = ''
         if context.txn is not None:
             collection_key = descriptor.key_for(instance)
-            append = context.txn.get_key_append(collection_key)
+            append = context.txn.get_key_append(instance.id, collection_key)
             if append:
                 for item_id in resolver.resolve_chunk(append):
                     yield item_id

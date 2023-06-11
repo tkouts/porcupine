@@ -82,9 +82,10 @@ class Transaction:
             return self._ext_insertions[key].value
         raise KeyError(key)
 
-    def get_key_append(self, key):
-        if key in self._appends:
-            return ''.join(self._appends[key])
+    def get_key_append(self, item_id, key):
+        item_appends = self._appends.get(item_id)
+        if item_appends is not None and key in item_appends:
+            return ''.join(item_appends[key])
         return ''
 
     def reset_key_append(self, key):
