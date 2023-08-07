@@ -283,8 +283,7 @@ class Transaction:
         if self.connector.server.debug:
             # check for any non persisted modifications
             desc_locator = utils.locate_descriptor_by_storage_key
-            for v in self._items.values():
-                _, i = v
+            for i in self._items.values():
                 if i.__snapshot__:
                     for storage_key in i.__snapshot__:
                         desc = desc_locator(type(i), storage_key)
