@@ -1,6 +1,9 @@
 import asyncio
 import random
 import time
+import urllib.request
+import urllib.parse
+import base64
 from datetime import timedelta
 
 import orjson
@@ -28,14 +31,13 @@ from couchbase.exceptions import (
 )
 from couchbase.management.views import View
 from couchbase.management.views import DesignDocumentNamespace
+from couchbase.management.views import DesignDocument
 from couchbase.management.search import SearchIndex
 
 from porcupine import exceptions, log
 from porcupine.core.context import context_cacheable
 from porcupine.core.utils import default_json_encoder
 from porcupine.connectors.base.connector import BaseConnector
-from porcupine.connectors.couchbase.management.views import \
-    DesignDocumentWithOptions
 from porcupine.connectors.couchbase.viewindex import Index
 from porcupine.connectors.couchbase.ftsindex import FTSIndex
 from porcupine.connectors.mutations import Formats, SubDocument
@@ -259,23 +261,36 @@ class Couchbase(BaseConnector):
         # use production namespace
         namespace = DesignDocumentNamespace.PRODUCTION
 
+        # set view update daemon params
+        dd_doc_options = self.config()['views']
+        a_host = self.server.config.DB_HOST.split(',')[0]
+        request_body = urllib.parse.urlencode(dd_doc_options).encode('ascii')
+        req = urllib.request.Request(
+            f'http://{a_host}:8091/settings/viewUpdateDaemon',
+            request_body
+        )
+        auth = base64.b64encode(
+            f'{self.user_name}:{self.password}'.encode('utf-8')
+        )
+        req.add_header('Authorization', f'Basic {auth.decode("utf-8")}')
+        urllib.request.urlopen(req)
+
         # get current indexes
         for design_doc in await views_mgr.get_all_design_documents(namespace):
             if design_doc.name != '_system':
                 old_indexes.add(design_doc.name)
 
         # create views
-        dd_doc_options = self.config()['views']
         for container_type, indexes in self.views.items():
             dd_name = container_type.__name__
-            design_doc = DesignDocumentWithOptions(dd_name, {}, dd_doc_options)
+            design_doc = DesignDocument(dd_name, {})
             for index in indexes.values():
                 design_doc.add_view(index.name, index.get_view())
             new_indexes.add(dd_name)
             await views_mgr.upsert_design_document(design_doc, namespace)
 
         # add system views
-        design_doc = DesignDocumentWithOptions('_system', {}, {})
+        design_doc = DesignDocument('_system', {})
         design_doc.add_view('collection_docs', View("""
             function(d, m) {
                 var id = m.id
