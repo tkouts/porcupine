@@ -11,7 +11,7 @@ class SessionManager(BaseSessionManager):
 
     def generate_sig(self, session):
         h = hashlib.blake2b(
-            '{0}{1}'.format(session['id'], session['uid']).encode(),
+            f'{session["id"]}{session["uid"]}'.encode(),
             key=self.secret,
             digest_size=32
         )
@@ -21,11 +21,11 @@ class SessionManager(BaseSessionManager):
         session = None
         i = 0
         chunks = []
-        cookie = request.cookies.get('_s{0}'.format(i))
+        cookie = request.cookies.get(f'_s{i}')
         while cookie:
             chunks.append(cookie)
             i += 1
-            cookie = request.cookies.get('_s{0}'.format(i))
+            cookie = request.cookies.get(f'_s{i}')
         if chunks:
             session_bytes = ''.join(chunks).encode('latin-1')
             session = self.SessionType(cbor.loads(session_bytes))
@@ -51,8 +51,8 @@ class SessionManager(BaseSessionManager):
 
     def remove(self, request, response, start=0):
         j = start
-        next_cookie = request.cookies.get('_s{0}'.format(j))
+        next_cookie = request.cookies.get(f'_s{j}')
         while next_cookie:
-            del response.cookies['_s{0}'.format(j)]
+            del response.cookies[f'_s{j}']
             j += 1
-            next_cookie = request.cookies.get('_s{0}'.format(j))
+            next_cookie = request.cookies.get(f'_s{j}')
