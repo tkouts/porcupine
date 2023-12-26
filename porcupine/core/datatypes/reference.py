@@ -37,7 +37,7 @@ class ItemReference(str):
         """
         This method returns the object that this data type
         instance references. If the current user has no read
-        permission on the referenced item or it has been deleted
+        permission on the referenced item, or it has been deleted
         then it returns None.
 
         @rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
@@ -54,9 +54,6 @@ class Reference1(String, Acceptable):
     This data type is used whenever an item loosely references
     at most one other item. Using this data type, the referenced item
     B{IS NOT} aware of the items that reference it.
-
-    @cvar relates_to: a list of strings containing all the permitted content
-                    classes that the instances of this type can reference.
     """
     def __init__(self, default=None, accepts=(), cascade_delete=False,
                  **kwargs):
