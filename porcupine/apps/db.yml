@@ -47,8 +47,8 @@
               name: Administrators
               type: Group
               is_system: Yes
-              members:
-                - admin
+#              members:
+#                - admin
 
 - id: RB
   type: RecycleBin

@@ -17,8 +17,10 @@ class Resources(App):
 resources = Resources()
 
 
-@resources.route('/<item_id>',
-                 methods=frozenset({'GET', 'PUT', 'PATCH', 'DELETE'}))
+@resources.route(
+    '/<item_id>',
+    methods=frozenset({'GET', 'PUT', 'PATCH', 'DELETE'})
+)
 async def resource_handler(request, item_id):
     item = await db.get_item(item_id, quiet=False)
     if isinstance(item, Composite):

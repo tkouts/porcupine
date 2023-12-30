@@ -12,8 +12,8 @@ DEFAULTS = {
 
 
     # DATABASE
-    'DB_IF': 'porcupine.connectors.couchbase.connector.Couchbase',
-    'DB_HOST': 'localhost',
+    'DB_IF': 'porcupine.connectors.libsql.connector.LibSql',
+    'DB_HOST': 'ws://localhost:8888',
     'DB_NAME': 'porcupine',
     'DB_USER': 'porcupine',
     'DB_PASSWORD': '',

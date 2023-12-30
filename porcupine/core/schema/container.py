@@ -77,15 +77,26 @@ class Container(Item):
                  else None.
         @rtype: L{GenericItem}
         """
-        child_id = await db_connector().get(
-            utils.get_key_of_unique(self.id, 'name', name),
-            fmt=Formats.STRING
+        result = await db_connector().query(
+            'select * from items where parent_id=? and name=? limit 1',
+            [self.id, name]
         )
-        if child_id:
-            item = await db.get_item(child_id)
+        # print(len(result))
+        if len(result) > 0:
+            item = result[0]
+            # print(item)
             if resolve_shortcut and isinstance(item, Shortcut):
                 item = await item.get_target()
             return item
+        # child_id = await db_connector().get(
+        #     utils.get_key_of_unique(self.id, 'name', name),
+        #     fmt=Formats.STRING
+        # )
+        # if child_id:
+        #     item = await db.get_item(child_id)
+        #     if resolve_shortcut and isinstance(item, Shortcut):
+        #         item = await item.get_target()
+        #     return item
 
     async def get_child_by_id(self, oid):
         item = await db.get_item(oid)
@@ -93,19 +104,24 @@ class Container(Item):
             return None
         return item
 
-    def get_children(self, skip=0, take=None,
-                     resolve_shortcuts=False) -> Awaitable[list]:
+    async def get_children(self, skip=0, take=None,
+                           resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns all the children of the container.
 
         @rtype: list
         """
-        children = self.containers.items() | pipe.chain(
-            self.items.items(resolve_shortcuts=resolve_shortcuts)
+        children = await db_connector().query(
+            'select * from items where parent_id=?',
+            [self.id]
         )
-        if skip or take:
-            children |= pipe.skip_and_take(skip, take)
-        return children.list()
+        return children
+        # children = self.containers.items() | pipe.chain(
+        #     self.items.items(resolve_shortcuts=resolve_shortcuts)
+        # )
+        # if skip or take:
+        #     children |= pipe.skip_and_take(skip, take)
+        # return children.list()
 
     def get_items(self, skip=0, take=None,
                   resolve_shortcuts=False) -> Awaitable[list]:

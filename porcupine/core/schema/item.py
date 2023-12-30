@@ -1,6 +1,7 @@
 import time
 from typing import List, Optional, Mapping
 from collections import ChainMap
+from pendulum import DateTime as PendulumDateTime
 
 from porcupine.hinting import TYPING
 from porcupine import exceptions, db
@@ -26,11 +27,11 @@ class GenericItem(Removable, Elastic):
     :type acl: dict
 
     :cvar created: The creation date, handled by the server.
-    :type created: str
+    :type created: L{DateTime<pendulum.DateTime>}
     :ivar modified: The last modification date, handled by the server.
-    :type modified: str
+    :type modified: L{DateTime<pendulum.DateTime>}
     :cvar name: The display name of the object.
-    :type name: L{String<porcupine.dt.String>}
+    :type name: str
     :cvar description: A short description.
     :type description: str
     """
@@ -38,13 +39,14 @@ class GenericItem(Removable, Elastic):
 
     # system attributes
     parent_id = ParentId()
-    created = DateTime(readonly=True, store_as='cr')
+    created: PendulumDateTime = DateTime(readonly=True, store_as='cr')
     expires_at = Integer(None, immutable=True, allow_none=True,
                          protected=True, store_as='exp')
     owner = String(required=True, default=None, allow_none=True,
                    readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')
-    modified = DateTime(required=True, readonly=True, store_as='md')
+    modified: PendulumDateTime = DateTime(required=True, readonly=True,
+                                          store_as='md')
     p_type = String(readonly=True, protected=True, store_as='_pcc')
 
     # security attributes
@@ -77,6 +79,7 @@ class GenericItem(Removable, Elastic):
                     self.__effective_acl = parent_acl
             else:
                 self.__effective_acl = acl
+        # print(self.__effective_acl.to_json())
         return self.__effective_acl
 
     @property
@@ -86,8 +89,8 @@ class GenericItem(Removable, Elastic):
     def reset_effective_acl(self):
         self.__effective_acl = None
 
-    async def clone(self, memo: dict = None) -> 'GenericItem':
-        clone: 'GenericItem' = await super().clone(memo)
+    async def clone(self, memo: dict = None) -> 'Elastic':
+        clone: 'Elastic' = await super().clone(memo)
         now = date.utcnow()
         user = context.user
         with system_override():
