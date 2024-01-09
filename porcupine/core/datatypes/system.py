@@ -5,6 +5,7 @@ from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.utils import permissions, date, add_uniques, \
     remove_uniques, get_content_class
+from porcupine.core.stream.streamer import ItemStreamer
 from .collection import ItemCollection
 from .common import String
 from .counter import Counter
@@ -45,6 +46,20 @@ class Acl(AtomicMap):
 
 
 class ChildrenCollection(ItemCollection):
+    # async def __aiter__(self):
+    #     t = self._desc.t
+    #     cursor = db_connector().get_cursor(
+    #         t.select('*').where(t.parent_id == self._inst().id)
+    #     )
+    #     # query = t.select('*').where(t.parent_id == self._inst().id)
+    #     # print(query)
+    #     async for t in ItemStreamer(cursor, self._desc):
+    #         yield t
+
+    def get_query(self):
+        t = self._desc.t
+        return t.select('*').where(t.parent_id == self._inst().id)
+
     async def add(self, *items: TYPING.ANY_ITEM_CO):
         parent = self._inst()
         parent_id = parent.id
@@ -84,10 +99,11 @@ class ChildrenCollection(ItemCollection):
 
 
 class Children(ReferenceN):
-    name = None
+    name = 'children'
 
     def __init__(self, **kwargs):
         super().__init__(readonly=True, **kwargs)
+        # self.name = 'children'
 
     def getter(self, instance, value=None):
         return ChildrenCollection(self, instance)

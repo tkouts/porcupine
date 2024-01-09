@@ -114,6 +114,9 @@ class Transaction:
                 data_type.on_create(item, data_type.get_value(item))
                 for data_type in item.__schema__.values()
             ])
+            # for data_type in item.__schema__.values():
+            #     print(item.content_class, data_type.name)
+            #     await data_type.on_create(item, data_type.get_value(item))
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
 

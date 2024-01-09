@@ -104,40 +104,41 @@ class ItemStreamer(BaseStreamer):
     supports_reversed_iteration = True
     output_ids = False
 
-    def __init__(self, id_streamer: BaseStreamer, collection):
+    def __init__(self, id_streamer: BaseStreamer):
         super().__init__(id_streamer)
-        self._collection = collection
-        self._stale = []
+        # self._collection = collection
+        # self._stale = []
         connector = db_connector()
-        if self._collection is None:
-            self._operators.append(
-                pipe.map(connector.get, task_limit=connector.read_concurrency)
-            )
-        else:
-            # need to collect stale IDs of expired items
-            self._operators.append(
-                pipe.map(get_with_id, task_limit=connector.read_concurrency)
-            )
-            self._operators.append(pipe.map(self._gather_inconsistent))
+        # if self._collection is None:
+        #     self._operators.append(
+        #         pipe.map(connector.get, task_limit=connector.read_concurrency)
+        #     )
+        # else:
+        #     # need to collect stale IDs of expired items
+        #     self._operators.append(
+        #         pipe.map(get_with_id, task_limit=connector.read_concurrency)
+        #     )
+        #     self._operators.append(pipe.map(self._gather_inconsistent))
+        self._operators.append(pipe.map(connector.persist.loads))
         self._operators.append(pipe.filter(resolve_visibility))
 
-    async def __aiter__(self):
-        async with self.get_streamer().stream() as streamer:
-            async for x in streamer:
-                yield x
-        # print('stale', self._stale, self._collection)
-        if self._collection is not None and self._stale:
-            ttl = await self._collection.ttl
-            key = self._collection.key
-            await get_service('schema').clean_collection(key, self._stale, ttl)
+    # async def __aiter__(self):
+    #     async with self.get_streamer().stream() as streamer:
+    #         async for x in streamer:
+    #             yield x
+    #     # print('stale', self._stale, self._collection)
+    #     if self._collection is not None and self._stale:
+    #         ttl = await self._collection.ttl
+    #         key = self._collection.key
+    #         await get_service('schema').clean_collection(key, self._stale, ttl)
 
-    def _gather_inconsistent(self, item_info):
-        item_id, item = item_info
-        is_cons = is_consistent(item, self._collection)
-        if not is_cons:
-            self._stale.append(item_id)
-            return None
-        return item
+    # def _gather_inconsistent(self, item_info):
+    #     item_id, item = item_info
+    #     is_cons = is_consistent(item, self._collection)
+    #     if not is_cons:
+    #         self._stale.append(item_id)
+    #         return None
+    #     return item
 
     def reverse(self):
         self._iterator.reverse()

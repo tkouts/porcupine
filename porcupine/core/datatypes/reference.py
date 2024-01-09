@@ -125,11 +125,16 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
     storage_info = '_refN_'
     safe_type = (list, tuple)
     allow_none = False
+    # t =
 
     def __init__(self, default=(), accepts=(), cascade_delete=False, **kwargs):
         super(Blob, self).__init__(default, allow_none=False,
                                    store_as=None, **kwargs)
         Acceptable.__init__(self, accepts, cascade_delete)
+
+    @property
+    def t(self):
+        return db_connector().get_table('items', self)
 
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)

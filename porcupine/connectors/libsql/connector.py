@@ -1,13 +1,19 @@
 import libsql_client
 from porcupine import log, context, exceptions
 from .transaction import Transaction
+from .cursor import Cursor
+from .virtual_tables import VirtualTable
+from .query import PorcupineQuery
 from porcupine.connectors.libsql import persist
+
+from pypika import Table
 
 
 class LibSql:
     active_txns = 0
     persist = persist
     supports_ttl = False
+    schema_table = VirtualTable
 
     def __init__(self, server):
         self.server = server
@@ -47,9 +53,19 @@ class LibSql:
         if len(result) > 0:
             return result[0]
 
-    async def query(self, query, params):
-        result = await self.db.execute(query, params)
-        return [self.persist.loads(row) for row in result]
+    def get_cursor(self, query):
+        return Cursor(self, query)
+
+    def query(self, collection):
+        return VirtualTable(collection).select('_rowid_', '*')
+        # result = await self.db.execute(query, params)
+        # return [self.persist.loads(row) for row in result]
+
+    def get_table(self, table_name, collection=None):
+        if table_name == 'items':
+            return VirtualTable(collection, query_cls=PorcupineQuery)
+        else:
+            return Table(table_name, query_cls=PorcupineQuery)
 
     async def prepare_indexes(self):
         log.info('Preparing indexes...')
@@ -62,8 +78,7 @@ class LibSql:
                 created text not null,
                 modified text not null,
                 is_collection boolean,
-                acl json,
-                parent_id text,
+                parent_id text REFERENCES items(id) ON DELETE CASCADE,
                 p_type text,
                 expires_at integer,
                 deleted integer,

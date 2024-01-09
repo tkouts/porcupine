@@ -4,7 +4,7 @@ from sanic.response import json
 
 from porcupine import db, exceptions, pipe
 from porcupine.view import view
-from porcupine.core.datatypes.system import Items, Containers
+from porcupine.core.datatypes.system import Items, Containers, Children
 from porcupine.core.services import db_connector
 from porcupine.core import utils
 from porcupine.connectors.base.bounds import FixedBoundary
@@ -25,8 +25,9 @@ class Container(Item):
     """
     is_collection = True
     containment = (Item, )
-    items = Items()
-    containers = Containers()
+    # items = Items()
+    # containers = Containers()
+    children = Children()
 
     indexes = ('is_collection', )
 
@@ -104,24 +105,38 @@ class Container(Item):
             return None
         return item
 
-    async def get_children(self, skip=0, take=None,
-                           resolve_shortcuts=False) -> Awaitable[list]:
+    def get_children(self, skip=0, take=None,
+                     resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns all the children of the container.
 
         @rtype: list
         """
-        children = await db_connector().query(
-            'select * from items where parent_id=?',
-            [self.id]
-        )
-        return children
+        # children = await db_connector().query(
+        #     'select _rowid_, * from items where parent_id=?',
+        #     [self.id]
+        # )
+        # async for child in self.children:
+        #     print(child)
+        # children = db_connector().query(self.children)
+        # print(children._from)
+        # # print(children.select(children.description).where(children.parent_id == self.id))
+        # results = await db_connector().db.execute(
+        #     str(children.where(children._from[0].parent_id == self.id))
+        # )
+        # print(results[0])
+        # return []
+        children = self.children
+        if resolve_shortcuts:
+            children |= pipe.map(children._shortcut_resolver)
+            children |= pipe.if_not_none
         # children = self.containers.items() | pipe.chain(
         #     self.items.items(resolve_shortcuts=resolve_shortcuts)
         # )
-        # if skip or take:
-        #     children |= pipe.skip_and_take(skip, take)
-        # return children.list()
+        if skip or take:
+            children |= pipe.skip_and_take(skip, take)
+        # print(children)
+        return children.list()
 
     def get_items(self, skip=0, take=None,
                   resolve_shortcuts=False) -> Awaitable[list]:
@@ -166,14 +181,14 @@ class Container(Item):
     can_append = Item.can_update
 
     @view
-    async def children(self, _):
+    async def childrn(self, _):
         # TODO: add support for resolve_shortcuts
         return await self.get_children()
 
-    @children.http_post
+    @childrn.http_post
     # @contract.is_new_item()
     @db.transactional()
-    async def children(self, request):
+    async def childrn(self, request):
         if 'source' in request.args:
             # copy operation
             source = await db.get_item(request.args['source'][0], quiet=False)

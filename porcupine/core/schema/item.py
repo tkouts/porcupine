@@ -10,7 +10,7 @@ from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import permissions, date
-from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
+from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer, Relator1
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
 
@@ -175,10 +175,10 @@ class GenericItem(Removable, Elastic):
         @return: None
         """
         if parent is not None:
-            if self.is_collection:
-                await parent.containers.add(self)
-            else:
-                await parent.items.add(self)
+            # if self.is_collection:
+            await parent.children.add(self)
+            # else:
+            #     await parent.items.add(self)
         else:
             # ROOT item
             if not self.__is_new__:

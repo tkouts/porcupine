@@ -133,6 +133,17 @@ def locate_descriptor_by_storage_key(cls, key):
             return desc
 
 
+@lru_cache(maxsize=None)
+def get_storage_key_from_attr_name(classes, name):
+    for cls in classes:
+        if name in cls.__schema__:
+            return cls.__schema__[name].store_as
+        key = get_storage_key_from_attr_name(cls.__subclasses__(), name)
+        if key:
+            return key
+    return None
+
+
 async def add_uniques(item):
     parent_id = item.parent_id
     if parent_id is not None:

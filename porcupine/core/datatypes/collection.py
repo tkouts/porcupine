@@ -9,7 +9,7 @@ from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
 from porcupine.core.utils import get_content_class, get_collection_key
 from porcupine.core.schema.storage import UNSET
-from porcupine.core.stream.streamer import IdStreamer
+from porcupine.core.stream.streamer import IdStreamer, ItemStreamer
 from porcupine.connectors.mutations import Formats
 from .asyncsetter import AsyncSetterValue
 from .external import Text
@@ -169,12 +169,15 @@ class CollectionIterator(AsyncIterable):
                     await schema_service.compact_collection(collection_key, ttl)
 
 
-class ItemCollection(AsyncSetterValue, IdStreamer):
+class ItemCollection(AsyncSetterValue, ItemStreamer):
     def __init__(self,
                  descriptor: TYPING.DT_CO,
                  instance: TYPING.ANY_ITEM_CO):
         AsyncSetterValue.__init__(self, descriptor, instance)
-        IdStreamer.__init__(self, CollectionIterator(descriptor, instance))
+        ItemStreamer.__init__(
+            self,
+            db_connector().get_cursor(self.get_query())
+        )
 
     @property
     def is_fetched(self) -> bool:
