@@ -1,4 +1,4 @@
-from pypika import Table
+from pypika import Table, Field
 from pypika.terms import Function
 
 from porcupine.core.utils import get_storage_key_from_attr_name
@@ -10,11 +10,9 @@ class JsonExtract(Function):
         super().__init__('json_extract', *args, alias=alias)
 
 
-class VirtualTable(Table):
-    item_columns = (
-        'id', 'sig', 'type', 'name', 'created', 'modified', 'is_collection',
-        'acl', 'parent_id', 'p_type', 'expires_at', 'deleted'
-    )
+class SchemaTable(Table):
+    columns = ()
+    table_name = None
 
     def __init__(
         self,
@@ -24,9 +22,7 @@ class VirtualTable(Table):
         query_cls=None,
     ):
         self.collection = collection
-        self.columns = VirtualTable.item_columns
-        table_name = 'items'
-        super().__init__(table_name, schema, alias, query_cls)
+        super().__init__(self.table_name, schema, alias, query_cls)
         self.data_field = super().field('data')
 
     def field(self, name: str):
@@ -48,18 +44,16 @@ class VirtualTable(Table):
             return JsonExtract(self.data_field, f'$.{full_path}')
 
 
-# class ItemsVirtualTable(Table):
-#     columns = (
-#         'id', 'sig', 'type', 'name', 'created', 'modified', 'is_collection',
-#         'acl', 'parent_id', 'p_type', 'expires_at', 'deleted'
-#     )
-#     def __init__(
-#         self,
-#         name: str,
-#         schema=None,
-#         alias=None,
-#         query_cls=None,
-#     ):
-#         super().__init__(name, schema, alias, query_cls)
-#         self.fields = 'id', 'name'
-#         self.data_field = super().field('data')
+class ItemsTable(SchemaTable):
+    columns = (
+        'id', 'sig', 'type', 'name', 'created', 'modified', 'is_collection',
+        'acl',
+        'parent_id', 'p_type', 'expires_at', 'deleted'
+    )
+    star_columns = [
+        Field(x) for x in [
+        'id', 'sig', 'type', 'name', 'created', 'modified',
+        'acl',
+        'parent_id', 'expires_at', 'deleted', 'data']
+    ]
+    table_name = 'items'

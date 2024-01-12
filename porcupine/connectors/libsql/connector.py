@@ -2,7 +2,7 @@ import libsql_client
 from porcupine import log, context, exceptions
 from .transaction import Transaction
 from .cursor import Cursor
-from .virtual_tables import VirtualTable
+from .virtual_tables import ItemsTable
 from .query import PorcupineQuery
 from porcupine.connectors.libsql import persist
 
@@ -13,7 +13,6 @@ class LibSql:
     active_txns = 0
     persist = persist
     supports_ttl = False
-    schema_table = VirtualTable
 
     def __init__(self, server):
         self.server = server
@@ -34,6 +33,7 @@ class LibSql:
             return context.txn[object_id]
         item = context.db_cache.get(object_id)
         if item is None:
+            # print('getting', object_id)
             item = await self.get_raw(object_id)
             if item is not None:
                 item = self.persist.loads(item)
@@ -49,21 +49,34 @@ class LibSql:
             'select * from items where id=?',
             [item_id]
         )
-        # print(item_id, len(result))
         if len(result) > 0:
             return result[0]
 
-    def get_cursor(self, query):
-        return Cursor(self, query)
+    def fetch_access_map(self, item_id):
+        return self.db.execute('''
+            with recursive
+                parent_ids(id) as (
+                    values(?)
+                    UNION
+                    select items.parent_id from items, parent_ids
+                    where items.id=parent_ids.id
+                )
+            select id, parent_id, acl, is_deleted, expires_at
+            from items where items.id in parent_ids;
+        ''', [item_id])
 
-    def query(self, collection):
-        return VirtualTable(collection).select('_rowid_', '*')
-        # result = await self.db.execute(query, params)
-        # return [self.persist.loads(row) for row in result]
+    def get_cursor(self, query, **params):
+        return Cursor(self, query, **params)
 
-    def get_table(self, table_name, collection=None):
+    async def query(self, query, params):
+        # return VirtualTable(collection).select('_rowid_', '*')
+        result = await self.db.execute(query, params)
+        return [self.persist.loads(row) for row in result]
+
+    @staticmethod
+    def get_table(table_name, collection=None):
         if table_name == 'items':
-            return VirtualTable(collection, query_cls=PorcupineQuery)
+            return ItemsTable(collection, query_cls=PorcupineQuery)
         else:
             return Table(table_name, query_cls=PorcupineQuery)
 
@@ -74,6 +87,7 @@ class LibSql:
                 id text primary key not null,
                 sig text not null,
                 type text not null,
+                acl json,
                 name text not null,
                 created text not null,
                 modified text not null,
@@ -81,7 +95,11 @@ class LibSql:
                 parent_id text REFERENCES items(id) ON DELETE CASCADE,
                 p_type text,
                 expires_at integer,
-                deleted integer,
+                is_deleted integer,
                 data json not null
             )
+        ''')
+        await self.db.execute('''
+            create index if not exists idx_is_collection on
+            items(parent_id, is_collection)
         ''')

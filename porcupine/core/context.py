@@ -11,6 +11,8 @@ ctx_sys = ContextVar('__sys__', default=False)
 ctx_db_cache = ContextVar('db_cache')
 ctx_visibility_cache = ContextVar('visibility_cache')
 ctx_caches = ContextVar('caches')
+ctx_access_map = ContextVar('access_map')
+# TODO: remove?
 ctx_item_meta_cache = ContextVar('item_meta')
 
 
@@ -40,6 +42,10 @@ class PContext:
         return ctx_item_meta_cache.get()
 
     @property
+    def access_map(self):
+        return ctx_access_map.get()
+
+    @property
     def visibility_cache(self):
         return ctx_visibility_cache.get()
 
@@ -48,6 +54,7 @@ class PContext:
         connector = db_connector()
         ctx_db_cache.set(LRU(connector.cache_size))
         ctx_visibility_cache.set(LRU(128))
+        ctx_access_map.set({})
         ctx_caches.set({})
         ctx_item_meta_cache.set({})
 

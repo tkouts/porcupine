@@ -176,7 +176,8 @@ class ItemCollection(AsyncSetterValue, ItemStreamer):
         AsyncSetterValue.__init__(self, descriptor, instance)
         ItemStreamer.__init__(
             self,
-            db_connector().get_cursor(self.get_query())
+            db_connector().get_cursor(descriptor.query.select('*'),
+                                      parent_id=instance.id)
         )
 
     @property

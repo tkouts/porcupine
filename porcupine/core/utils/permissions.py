@@ -3,6 +3,7 @@ Helper module for resolving object permissions
 """
 from porcupine.core.services import db_connector
 from porcupine.core.context import context_cacheable
+from porcupine.core.accesscontroller import resolve_acl
 
 # 0 - no access
 # 1 - read
@@ -17,7 +18,7 @@ COORDINATOR = 8
 
 
 async def resolve(item, membership) -> int:
-    acl = await item.effective_acl
+    acl = item.effective_acl
     member_of = set()
     if membership is not None:
         if await membership.is_admin():

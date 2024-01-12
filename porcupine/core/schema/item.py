@@ -10,7 +10,8 @@ from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import permissions, date
-from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer, Relator1
+from porcupine.core.accesscontroller import resolve_acl
+from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
 
@@ -66,19 +67,9 @@ class GenericItem(Removable, Elastic):
         return f'{self.name}({self.content_class})'
 
     @property
-    async def effective_acl(self) -> Mapping:
+    def effective_acl(self) -> Mapping:
         if self.__effective_acl is None:
-            acl = self.acl
-            if self.parent_id is not None and \
-                    (not acl.is_set() or acl.is_partial()):
-                parent = await db_connector().get(self.parent_id)
-                parent_acl = await parent.effective_acl
-                if acl.is_partial():
-                    self.__effective_acl = ChainMap(*[acl, parent_acl])
-                else:
-                    self.__effective_acl = parent_acl
-            else:
-                self.__effective_acl = acl
+            self.__effective_acl = resolve_acl(self)
         # print(self.__effective_acl.to_json())
         return self.__effective_acl
 

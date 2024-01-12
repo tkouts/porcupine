@@ -11,6 +11,8 @@ from .common import String
 from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
 from .reference import ReferenceN
+from pypika.terms import Parameter
+from functools import cached_property
 
 
 class AclValue(AtomicMapValue):
@@ -56,9 +58,10 @@ class ChildrenCollection(ItemCollection):
     #     async for t in ItemStreamer(cursor, self._desc):
     #         yield t
 
-    def get_query(self):
-        t = self._desc.t
-        return t.select('*').where(t.parent_id == self._inst().id)
+    # def get_query(self):
+    #     t = self._desc.t
+    #     # return f'select * from items where parent_id="{self._inst().id}"'
+    #     return t.select(*t.star_columns).where(t.parent_id == Parameter(':parent_id'))
 
     async def add(self, *items: TYPING.ANY_ITEM_CO):
         parent = self._inst()
@@ -103,7 +106,14 @@ class Children(ReferenceN):
 
     def __init__(self, **kwargs):
         super().__init__(readonly=True, **kwargs)
+        self.__query = None
         # self.name = 'children'
+
+    @cached_property
+    def query(self):
+        return self.t.select().where(
+            self.t.parent_id == Parameter(':parent_id')
+        )
 
     def getter(self, instance, value=None):
         return ChildrenCollection(self, instance)

@@ -1,15 +1,17 @@
 from typing import Callable, AsyncIterable, Awaitable
-
+from functools import partial
 from aiostream import stream, StreamEmpty
 
 from porcupine import db, exceptions, pipe
 from porcupine.hinting import TYPING
 from porcupine.core.services import db_connector, get_service
-from porcupine.core.utils.db import (
-    resolve_visibility,
-    is_consistent,
-    get_with_id,
-)
+from porcupine.core.context import ctx_user
+from porcupine.core.accesscontroller import resolve_visibility
+# from porcupine.core.utils.db import (
+#     resolve_visibility,
+#     is_consistent,
+#     get_with_id,
+# )
 
 
 class BaseStreamer(AsyncIterable):
@@ -109,6 +111,14 @@ class ItemStreamer(BaseStreamer):
         # self._collection = collection
         # self._stale = []
         connector = db_connector()
+        # access_controller = ctx_access_controller.get()
+        # user = ctx_user.get()
+        # async def resolve_visibility(item):
+        #     return await rv(item, user)
+        # resolve_visibility = partial(
+        #     access_controller.resolve_visibility,
+        #     user=ctx_user.get()
+        # )
         # if self._collection is None:
         #     self._operators.append(
         #         pipe.map(connector.get, task_limit=connector.read_concurrency)
@@ -120,6 +130,7 @@ class ItemStreamer(BaseStreamer):
         #     )
         #     self._operators.append(pipe.map(self._gather_inconsistent))
         self._operators.append(pipe.map(connector.persist.loads))
+        # self._operators.append(pipe.filter(resolve_visibility))
         self._operators.append(pipe.filter(resolve_visibility))
 
     # async def __aiter__(self):

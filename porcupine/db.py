@@ -11,7 +11,7 @@ from porcupine import exceptions
 from porcupine.hinting import TYPING
 from porcupine.core.context import ctx_txn
 from porcupine.core.services import db_connector
-from porcupine.core.utils.db import resolve_visibility
+from porcupine.core.accesscontroller import resolve_visibility
 
 
 async def get_item(item_id: str, quiet: bool = True) -> Optional[
