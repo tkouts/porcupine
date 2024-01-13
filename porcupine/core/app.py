@@ -44,7 +44,7 @@ class App(Blueprint):
             if parent:
                 item = await parent.get_child_by_id(item_id)
             else:
-                item = await connector.get(item_id)
+                item = await db.get_item(item_id)
         elif parent:
             item = await parent.get_child_by_name(item_dict['name'])
         else:

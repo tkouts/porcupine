@@ -80,9 +80,10 @@ async def resolve_visibility(item) -> bool:
 
     access_map = ctx_access_map.get()
     parent_id = item.parent_id
-
-    if parent_id is not None and parent_id not in access_map:
-        # print('fetching', parent_id)
+    if parent_id is None:
+        # ROOT container
+        access_map[item.id] = item.access_record
+    elif parent_id not in access_map:
         results = await connector.fetch_access_map(parent_id)
         access_map.update({
             row['id']: AccessRecord(row['parent_id'],
@@ -97,7 +98,8 @@ async def resolve_visibility(item) -> bool:
     user = ctx_user.get()
     visibility_cache = ctx_visibility_cache.get()
     use_cache = (
-        not item.is_deleted
+        parent_id is not None
+        and not item.is_deleted
         and item.expires_at is None
         and not item.acl.is_set()
     )

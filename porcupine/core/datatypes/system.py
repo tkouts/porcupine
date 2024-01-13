@@ -5,7 +5,7 @@ from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.utils import permissions, date, add_uniques, \
     remove_uniques, get_content_class
-from porcupine.core.stream.streamer import ItemStreamer
+# from porcupine.core.stream.streamer import ItemStreamer
 from .collection import ItemCollection
 from .common import String
 from .counter import Counter
@@ -91,6 +91,9 @@ class ChildrenCollection(ItemCollection):
 
             # insert item to DB
             await context.txn.insert(item)
+            # update access map
+            if item.is_collection:
+                context.access_map[item.id] = item.access_record
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO):
         await super().remove(*items)

@@ -3,7 +3,6 @@ Helper module for resolving object permissions
 """
 from porcupine.core.services import db_connector
 from porcupine.core.context import context_cacheable
-from porcupine.core.accesscontroller import resolve_acl
 
 # 0 - no access
 # 1 - read

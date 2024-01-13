@@ -1,6 +1,6 @@
 import time
 from typing import List, Optional, Mapping
-from collections import ChainMap
+# from collections import ChainMap
 from pendulum import DateTime as PendulumDateTime
 
 from porcupine.hinting import TYPING
@@ -180,6 +180,8 @@ class GenericItem(Removable, Elastic):
                 self.created = self.modified = date.utcnow()
                 self.modified_by = user.name
             await context.txn.insert(self)
+            if self.is_collection:
+                context.access_map[self.id] = self.access_record
 
     async def touch(self) -> None:
         await context.txn.touch(self)

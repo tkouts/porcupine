@@ -8,6 +8,7 @@ from porcupine.core.datatypes.system import Items, Containers, Children
 from porcupine.core.services import db_connector
 from porcupine.core import utils
 from porcupine.connectors.base.bounds import FixedBoundary
+from porcupine.core.accesscontroller import AccessRecord
 from porcupine.connectors.mutations import Formats
 from .item import Item
 from .shortcut import Shortcut
@@ -30,6 +31,15 @@ class Container(Item):
     children = Children()
 
     indexes = ('is_collection', )
+
+    @property
+    def access_record(self):
+        return AccessRecord(
+            self.parent_id,
+            self.acl.to_json(),
+            self.is_deleted,
+            self.expires_at
+        )
 
     async def child_exists(self, name: str) -> bool:
         """
