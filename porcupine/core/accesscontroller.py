@@ -66,7 +66,7 @@ def resolve_acl(item):
             acls.append(p_acl)
             if '__partial__' not in p_acl:
                 break
-    return ChainMap(*acls)
+    return ChainMap(*acls) if len(acls) > 1 else acls[0]
 
 
 async def resolve_visibility(item) -> bool:
