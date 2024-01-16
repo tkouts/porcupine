@@ -1,13 +1,24 @@
 from typing import Mapping
+import orjson
+from porcupine.core.utils.collections import OptionalFrozenDict
+from porcupine.core.utils import permissions
+from porcupine.core.accesscontroller import resolve_acl
+from porcupine.core.context import ctx_sys
 from porcupine.core.utils import get_content_class
 
 
+class AclProxy(OptionalFrozenDict):
+    def is_set(self) -> bool:
+        return self._dct is not None
+
+
 class PartialItem:
-    __slots__ = '_partial', '_content_class'
+    __slots__ = '_partial', '_content_class', 'acl'
 
     def __init__(self, partial=Mapping):
         self._partial = partial
         self._content_class = get_content_class(partial['type'])
+        self.acl = AclProxy(partial['acl'] and orjson.loads(partial['acl']))
 
     @property
     def __is_new__(self):
@@ -25,6 +36,10 @@ class PartialItem:
     def content_class(self):
         return self._partial['type']
 
+    @property
+    def effective_acl(self):
+        return resolve_acl(self)
+
     def __getattr__(self, item):
         try:
             return self._partial[item]
@@ -34,20 +49,27 @@ class PartialItem:
                 f" object has no attribute '{item}'"
             )
 
-    # @property
-    # def parent_id(self):
-    #     try:
-    #         return self._partial['parent_id']
-    #     except KeyError:
-    #         raise AttributeError(
-    #             f"'{self.content_class}' object has no attribute 'parent_id'"
-    #         )
-    #
-    # @property
-    # def item_id(self):
-    #     try:
-    #         return self._partial['item_id']
-    #     except KeyError:
-    #         raise AttributeError(
-    #             f"'{self.content_class}' object has no attribute 'item_id'"
-    #         )
+    def upgrade(self):
+        row = self._partial
+        content_class = self._content_class
+        storage = orjson.loads(row['data'])
+        storage['id'] = row['id']
+        storage['sig'] = row['sig']
+        if not content_class.is_composite:
+            storage['acl'] = self.acl.to_json()
+            storage['name'] = row['name']
+            storage['cr'] = row['created']
+            storage['md'] = row['modified']
+            # params['is_collection'] = obj.is_collection
+            storage['sys'] = row['is_system']
+            storage['pid'] = row['parent_id']
+            # params['p_type'] = dct.pop('_pcc', None)
+            storage['exp'] = row['expires_at']
+            storage['dl'] = row['is_deleted']
+        return content_class(storage)
+
+    async def can_read(self, membership):
+        if ctx_sys.get():
+            return True
+        user_role = await permissions.resolve(self, membership)
+        return user_role > permissions.NO_ACCESS

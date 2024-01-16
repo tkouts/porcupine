@@ -1,4 +1,5 @@
 import collections
+from typing import Optional
 
 
 class FrozenDict(collections.Mapping):
@@ -16,6 +17,34 @@ class FrozenDict(collections.Mapping):
 
     def to_json(self):
         return {**self._dct}
+
+
+class OptionalFrozenDict(FrozenDict):
+    def __init__(self, dct: Optional[dict]):
+        if dct is not None:
+            super().__init__(dct)
+        else:
+            self._dct = None
+
+    def __getitem__(self, item):
+        if self._dct is None:
+            raise KeyError(item)
+        return super().__getitem__(item)
+
+    def __iter__(self):
+        if self._dct is None:
+            raise StopIteration
+        return super().__iter__()
+
+    def __len__(self):
+        if self._dct is None:
+            return 0
+        return super().__len__()
+
+    def to_json(self):
+        if self._dct is None:
+            return None
+        return super().to_json()
 
 
 class WriteOnceDict(collections.MutableMapping, dict):

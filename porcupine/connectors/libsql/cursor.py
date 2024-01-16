@@ -1,4 +1,5 @@
 from typing import AsyncIterable
+from porcupine.core.schema.partial import PartialItem
 
 
 class Cursor(AsyncIterable):

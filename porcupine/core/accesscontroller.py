@@ -2,6 +2,7 @@ import orjson
 import time
 from collections import namedtuple, ChainMap
 from porcupine.core.services import db_connector
+# from porcupine.core.schema.partial import PartialItem
 from porcupine.core.context import (
     ctx_access_map,
     ctx_user,
@@ -78,23 +79,9 @@ async def resolve_visibility(item) -> bool:
     if item.is_composite:
         return await resolve_visibility(await connector.get(item.item_id))
 
-    access_map = ctx_access_map.get()
     parent_id = item.parent_id
-    if parent_id is None:
-        # ROOT container
-        access_map[item.id] = item.access_record
-    elif parent_id not in access_map:
-        results = await connector.fetch_access_map(parent_id)
-        access_map.update({
-            row['id']: AccessRecord(row['parent_id'],
-                                    row['acl'] and
-                                    orjson.loads(row['acl']),
-                                    row['is_deleted'],
-                                    row['expires_at'])
-            for row in results
-            if row['id'] not in access_map
-        })
 
+    # check cache
     user = ctx_user.get()
     visibility_cache = ctx_visibility_cache.get()
     use_cache = (
@@ -104,10 +91,28 @@ async def resolve_visibility(item) -> bool:
         and not item.acl.is_set()
     )
     cache_key = f'{parent_id}|{user.id if user else ""}'
-
     if use_cache and cache_key in visibility_cache:
         # print('using cache', item)
         return visibility_cache[cache_key]
+
+    # update access map if needed
+    access_map = ctx_access_map.get()
+    if item.parent_id is None:
+        # ROOT container
+        access_map[item.id] = item.access_record
+    elif parent_id not in access_map:
+        # print('fetching', parent_id)
+        container_id = item.id if item.is_collection else parent_id
+        results = await connector.fetch_access_map(container_id)
+        access_map.update({
+            row['id']: AccessRecord(row['parent_id'],
+                                    row['acl'] and
+                                    orjson.loads(row['acl']),
+                                    row['is_deleted'],
+                                    row['expires_at'])
+            for row in results
+            if row['id'] not in access_map
+        })
 
     can_read = True
 
@@ -126,3 +131,7 @@ async def resolve_visibility(item) -> bool:
         visibility_cache[cache_key] = can_read
 
     return can_read
+
+
+# async def resolve_row_visibility(row) -> bool:
+#     return await resolve_visibility(PartialItem(row))

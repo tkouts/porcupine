@@ -7,10 +7,16 @@ from porcupine.hinting import TYPING
 from porcupine import db, exceptions, pipe
 from porcupine.core.context import context
 from porcupine.core.services import get_service, db_connector
-from porcupine.core.utils import get_content_class, get_collection_key
+from porcupine.core.utils import (
+    get_content_class,
+    get_collection_key,
+    get_storage_key_from_attr_name
+)
 from porcupine.core.schema.storage import UNSET
 from porcupine.core.stream.streamer import IdStreamer, ItemStreamer
 from porcupine.connectors.mutations import Formats
+from porcupine.core.schema.partial import PartialItem
+from porcupine.connectors.libsql.virtual_tables import JsonExtract
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 
@@ -179,6 +185,33 @@ class ItemCollection(AsyncSetterValue, ItemStreamer):
             db_connector().get_cursor(descriptor.query.select('*'),
                                       parent_id=instance.id)
         )
+
+    def __getattr__(self, item):
+        # print(name)
+        if item in self._desc.columns:
+            return self._desc.t.field(item)
+        else:
+            print(self._desc.accepts)
+            alias = None
+            if '.' in item:
+                attr, path = item.split('.', 1)
+                storage_key = get_storage_key_from_attr_name(
+                    self._desc.accepts, attr
+                ) or attr
+                full_path = '.'.join([storage_key, path])
+            else:
+                storage_key = get_storage_key_from_attr_name(
+                    self._desc.accepts, item
+                ) or item
+                full_path = storage_key
+                alias = item
+            return JsonExtract(self._desc.data_field, f'$.{full_path}',
+                               alias=alias)
+        # return getattr(self._desc.t, item)
+
+    def get_query(self):
+        return self._desc.query
+
 
     @property
     def is_fetched(self) -> bool:

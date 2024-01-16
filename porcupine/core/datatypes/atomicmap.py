@@ -1,6 +1,6 @@
 from porcupine import exceptions
 from porcupine.core.context import context
-from porcupine.core.utils import collections
+from porcupine.core.utils.collections import OptionalFrozenDict
 from porcupine.core.datatypes.mutable import Dictionary
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
 from porcupine.connectors.mutations import SubDocument
@@ -8,9 +8,9 @@ from porcupine.connectors.mutations import SubDocument
 IMMUTABLE_TYPES = (str, int, float, bool, tuple)
 
 
-class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
+class AtomicMapValue(AsyncSetterValue, OptionalFrozenDict):
     def __init__(self, descriptor: 'AtomicMap', instance, dct: dict):
-        collections.FrozenDict.__init__(self, dct)
+        OptionalFrozenDict.__init__(self, dct)
         AsyncSetterValue.__init__(self, descriptor, instance)
 
     async def set(self, key: str, value):
@@ -42,26 +42,6 @@ class AtomicMapValue(AsyncSetterValue, collections.FrozenDict):
             value['__replace__'] = True
         await super().reset(value)
 
-    def __getitem__(self, item):
-        if self._dct is None:
-            raise KeyError(item)
-        return super().__getitem__(item)
-
-    def __iter__(self):
-        if self._dct is None:
-            raise StopIteration
-        return super().__iter__()
-
-    def __len__(self):
-        if self._dct is None:
-            return 0
-        return super().__len__()
-
-    def to_json(self):
-        if self._dct is None:
-            return None
-        return super().to_json()
-
 
 class AtomicMap(AsyncSetter, Dictionary):
     def __init__(self, default=None, accepts=IMMUTABLE_TYPES, **kwargs):
@@ -70,7 +50,8 @@ class AtomicMap(AsyncSetter, Dictionary):
             for value_type in accepts:
                 if value_type not in IMMUTABLE_TYPES:
                     raise TypeError(
-                        'Atomic map value types should be immutable')
+                        'Atomic map value types should be immutable.'
+                    )
         self.accepts = accepts
 
     def getter(self, instance, value=None):

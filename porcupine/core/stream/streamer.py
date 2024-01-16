@@ -6,6 +6,7 @@ from porcupine import db, exceptions, pipe
 from porcupine.hinting import TYPING
 from porcupine.core.services import db_connector, get_service
 from porcupine.core.context import ctx_user
+from porcupine.core.schema.partial import PartialItem
 from porcupine.core.accesscontroller import resolve_visibility
 # from porcupine.core.utils.db import (
 #     resolve_visibility,
@@ -23,10 +24,11 @@ class BaseStreamer(AsyncIterable):
         self._operators = []
         self._reversed = False
 
-    async def __aiter__(self):
-        async with self.get_streamer().stream() as streamer:
-            async for x in streamer:
-                yield x
+    def __aiter__(self):
+        return self.get_streamer().stream().__aiter__()
+        # async with self.get_streamer().stream() as streamer:
+        #     async for x in streamer:
+        #         yield x
 
     def __or__(self, p: Callable[[], AsyncIterable]):
         self._operators.append(p)
@@ -106,11 +108,15 @@ class ItemStreamer(BaseStreamer):
     supports_reversed_iteration = True
     output_ids = False
 
+    # @staticmethod
+    # async def _resolve_row_visibility(row):
+    #     return await resolve_visibility(PartialItem(row))
+
     def __init__(self, id_streamer: BaseStreamer):
         super().__init__(id_streamer)
         # self._collection = collection
         # self._stale = []
-        connector = db_connector()
+        # connector = db_connector()
         # access_controller = ctx_access_controller.get()
         # user = ctx_user.get()
         # async def resolve_visibility(item):
@@ -129,9 +135,10 @@ class ItemStreamer(BaseStreamer):
         #         pipe.map(get_with_id, task_limit=connector.read_concurrency)
         #     )
         #     self._operators.append(pipe.map(self._gather_inconsistent))
-        self._operators.append(pipe.map(connector.persist.loads))
-        # self._operators.append(pipe.filter(resolve_visibility))
+        self._operators.append(pipe.map(PartialItem))
         self._operators.append(pipe.filter(resolve_visibility))
+        self._operators.append(pipe.map(lambda x: x.upgrade()))
+        # self._operators.append(pipe.filter(resolve_visibility))
 
     # async def __aiter__(self):
     #     async with self.get_streamer().stream() as streamer:

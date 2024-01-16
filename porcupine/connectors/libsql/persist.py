@@ -1,10 +1,9 @@
 """
 libsql database object persistence layer
 """
-# import json
 import orjson
 from collections import OrderedDict
-from porcupine import context, log
+from porcupine import log
 from porcupine.core import utils
 
 
@@ -28,6 +27,7 @@ def loads(row):
         storage['cr'] = row['created']
         storage['md'] = row['modified']
         # params['is_collection'] = obj.is_collection
+        storage['sys'] = row['is_system']
         storage['pid'] = row['parent_id']
         # params['p_type'] = dct.pop('_pcc', None)
         storage['exp'] = row['expires_at']
@@ -48,16 +48,20 @@ def dumps(obj):
     params['type'] = obj.content_class
     if not obj.is_composite:
         acl = dct.pop('acl', None)
-        params['acl'] = orjson.dumps(acl).decode() if acl is not None else None
+        params['acl'] = (
+            orjson.dumps(acl).decode('utf-8')
+            if acl is not None else None
+        )
         params['name'] = dct.pop('name')
         params['created'] = dct.pop('cr').isoformat()
         params['modified'] = dct.pop('md').isoformat()
         params['is_collection'] = obj.is_collection
+        params['is_system'] = dct.pop('sys', False)
         params['parent_id'] = dct.pop('pid', None)
         params['p_type'] = dct.pop('_pcc', None)
         params['expires_at'] = dct.pop('exp', None)
         params['is_deleted'] = dct.pop('dl', 0)
 
-    params['data'] = orjson.dumps(dct, default=json_encoder).decode()
+    params['data'] = orjson.dumps(dct, default=json_encoder).decode('utf-8')
     # print(params)
     return params

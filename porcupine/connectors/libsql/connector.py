@@ -2,11 +2,11 @@ import libsql_client
 from porcupine import log, context, exceptions
 from .transaction import Transaction
 from .cursor import Cursor
-from .virtual_tables import ItemsTable
-from .query import PorcupineQuery
+# from .virtual_tables import ItemsTable
+# from .query import PorcupineQuery
 from porcupine.connectors.libsql import persist
 
-from pypika import Table
+# from pypika import Table
 
 
 class LibSql:
@@ -73,12 +73,12 @@ class LibSql:
         result = await self.db.execute(query, params)
         return [self.persist.loads(row) for row in result]
 
-    @staticmethod
-    def get_table(table_name, collection=None):
-        if table_name == 'items':
-            return ItemsTable(collection, query_cls=PorcupineQuery)
-        else:
-            return Table(table_name, query_cls=PorcupineQuery)
+    # @staticmethod
+    # def get_table(table_name, collection=None):
+    #     if table_name == 'items':
+    #         return ItemsTable(collection, query_cls=PorcupineQuery)
+    #     else:
+    #         return Table(table_name, query_cls=PorcupineQuery)
 
     async def prepare_indexes(self):
         log.info('Preparing indexes...')
@@ -92,6 +92,7 @@ class LibSql:
                 created text not null,
                 modified text not null,
                 is_collection boolean,
+                is_system boolean,
                 parent_id text REFERENCES items(id) ON DELETE CASCADE,
                 p_type text,
                 expires_at integer,

@@ -109,7 +109,7 @@ class Children(ReferenceN):
 
     def __init__(self, **kwargs):
         super().__init__(readonly=True, **kwargs)
-        self.__query = None
+        # self.__query = None
         # self.name = 'children'
 
     @cached_property

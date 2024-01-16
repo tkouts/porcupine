@@ -7,8 +7,10 @@ from porcupine.core import utils
 from .collection import ItemCollection
 from .datatype import DataType
 from .common import String
+from .mutable import List
 from .external import Text, Blob
 from .asyncsetter import AsyncSetter
+from pypika import Table, Field
 
 
 class Acceptable:
@@ -121,20 +123,25 @@ class Reference1(String, Acceptable):
         return value
 
 
-class ReferenceN(AsyncSetter, Text, Acceptable):
-    storage_info = '_refN_'
-    safe_type = (list, tuple)
-    allow_none = False
-    # t =
+class ReferenceN(AsyncSetter, List, Acceptable):
+    # storage_info = '_refN_'
+    safe_type = list, tuple
+    # allow_none = False
+    storage = '__externals__'
+    # t = Table('items')
+    columns = (
+        'id', 'sig', 'type', 'name', 'created',
+        'modified', 'is_collection', 'is_system', 'acl',
+        'parent_id', 'p_type', 'expires_at', 'deleted'
+    )
 
     def __init__(self, default=(), accepts=(), cascade_delete=False, **kwargs):
-        super(Blob, self).__init__(default, allow_none=False,
+        super(List, self).__init__(default, allow_none=False,
                                    store_as=None, **kwargs)
         Acceptable.__init__(self, accepts, cascade_delete)
+        self.t = Table('items')
+        self.data_field = self.t.field('data')
 
-    @property
-    def t(self):
-        return db_connector().get_table('items', self)
 
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)
@@ -153,11 +160,11 @@ class ReferenceN(AsyncSetter, Text, Acceptable):
 
     async def clone(self, instance, memo):
         collection = getattr(instance, self.name)
-        super(Text, self).__set__(instance, [memo['_id_map_'].get(oid, oid)
+        super(List, self).__set__(instance, [memo['_id_map_'].get(oid, oid)
                                              async for oid in collection])
 
     # allow regular snapshots
-    snapshot = DataType.snapshot
+    # snapshot = DataType.snapshot
 
     # permissions providers
 
