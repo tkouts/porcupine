@@ -385,7 +385,7 @@ class Transaction:
         # prepare
         db_ops, affected_items = await self.prepare()
         insertions, rest_ops, auto_splits = db_ops
-        print(rest_ops)
+        # print(rest_ops)
         connector = self.connector
 
         # insertions
