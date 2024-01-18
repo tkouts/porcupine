@@ -111,6 +111,10 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         await new_item.apply_patch(dct, camel_to_snake)
         return new_item
 
+    @staticmethod
+    def from_partial(partial):
+        ...
+
     @lru_cache(maxsize=None)
     @classmethod
     def view_attrs(cls):

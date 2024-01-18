@@ -133,20 +133,20 @@ class DataType:
 
     async def on_create(self, instance, value):
         self.validate(value)
-        if self.unique and self.storage == '__storage__':
-            await self.add_unique(instance, value)
+        # if self.unique and self.storage == '__storage__':
+        #     await self.add_unique(instance, value)
 
     async def on_change(self, instance, value, old_value):
         self.validate(value)
         if self.storage == '__storage__':  # and not instance.__is_new__:
-            if self.unique:
-                old_parent_id = instance.get_snapshot_of('parent_id')
-                if instance.parent_id == old_parent_id:
-                    # item is not moved
-                    self.remove_unique(instance, old_value)
-                    await self.add_unique(instance, value)
-                # else:
-                #     # parent_id on_change handler will do the job
+            # if self.unique:
+            #     old_parent_id = instance.get_snapshot_of('parent_id')
+            #     if instance.parent_id == old_parent_id:
+            #         # item is not moved
+            #         self.remove_unique(instance, old_value)
+            #         await self.add_unique(instance, value)
+            #     # else:
+            #     #     # parent_id on_change handler will do the job
             if not instance.__is_new__:
                 context.txn.mutate(instance,
                                    self.storage_key,
@@ -154,17 +154,17 @@ class DataType:
                                    value)
 
     async def on_delete(self, instance, value):
-        if self.unique and self.storage == '__storage__':
-            self.remove_unique(instance, value)
+        ...
 
     async def on_recycle(self, instance, value):
-        if self.unique and self.storage == '__storage__':
-            self.remove_unique(instance, value)
+        ...
+        # if self.unique and self.storage == '__storage__':
+        #     self.remove_unique(instance, value)
 
     async def on_restore(self, instance, value):
         self.validate(value)
-        if self.unique and self.storage == '__storage__':
-            await self.add_unique(instance, value)
+        # if self.unique and self.storage == '__storage__':
+        #     await self.add_unique(instance, value)
 
     # HTTP views
 

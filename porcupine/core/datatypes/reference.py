@@ -132,8 +132,13 @@ class ReferenceN(AsyncSetter, List, Acceptable):
     columns = (
         'id', 'sig', 'type', 'name', 'created',
         'modified', 'is_collection', 'is_system', 'acl',
-        'parent_id', 'p_type', 'expires_at', 'deleted'
+        'parent_id', 'p_type', 'expires_at', 'is_deleted'
     )
+    # star_fields = (
+    #     'id', 'sig', 'type', 'name', 'created',
+    #     'modified', 'is_system', 'acl',
+    #     'parent_id', 'expires_at', 'is_deleted', 'data'
+    # )
 
     def __init__(self, default=(), accepts=(), cascade_delete=False, **kwargs):
         super(List, self).__init__(default, allow_none=False,
@@ -141,7 +146,6 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         Acceptable.__init__(self, accepts, cascade_delete)
         self.t = Table('items')
         self.data_field = self.t.field('data')
-
 
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)

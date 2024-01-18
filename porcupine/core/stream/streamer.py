@@ -22,13 +22,13 @@ class BaseStreamer(AsyncIterable):
     def __init__(self, iterator: TYPING.STREAMER_ITERATOR_TYPE):
         self._iterator = iterator
         self._operators = []
-        self._reversed = False
+        # self._reversed = False
 
-    def __aiter__(self):
-        return self.get_streamer().stream().__aiter__()
-        # async with self.get_streamer().stream() as streamer:
-        #     async for x in streamer:
-        #         yield x
+    async def __aiter__(self):
+        # return self.get_streamer().stream().__aiter__()
+        async with self.get_streamer().stream() as streamer:
+            async for x in streamer:
+                yield x
 
     def __or__(self, p: Callable[[], AsyncIterable]):
         self._operators.append(p)
@@ -45,9 +45,9 @@ class BaseStreamer(AsyncIterable):
             streamer |= pipe.reverse()
         return streamer
 
-    def reverse(self):
-        self._reversed = True
-        return self
+    # def reverse(self):
+    #     self._reversed = True
+    #     return self
 
     def intersection(self, other):
         return IntersectionStreamer(self, other)
@@ -135,7 +135,7 @@ class ItemStreamer(BaseStreamer):
         #         pipe.map(get_with_id, task_limit=connector.read_concurrency)
         #     )
         #     self._operators.append(pipe.map(self._gather_inconsistent))
-        self._operators.append(pipe.map(PartialItem))
+        # self._operators.append(pipe.map(PartialItem))
         self._operators.append(pipe.filter(resolve_visibility))
         self._operators.append(pipe.map(lambda x: x.upgrade()))
         # self._operators.append(pipe.filter(resolve_visibility))

@@ -5,15 +5,20 @@ Porcupine reference data types
 from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
+from porcupine.connectors.libsql.query import QueryType, PorcupineQuery
 from .reference import Reference1, ReferenceN, ItemReference
 from .collection import ItemCollection
+from pypika import Table, Parameter, Field
+from methodtools import lru_cache
+from .asyncsetter import AsyncSetterValue
 
 
 class RelatorBase:
     def __init__(self, rel_attr, respects_references):
         if not rel_attr:
             raise exceptions.SchemaError(
-                'Relator must specify its related attribute')
+                'Relator must specify its related attribute'
+            )
         self.rel_attr = rel_attr
         self.respects_references = respects_references
 
@@ -24,7 +29,8 @@ class RelatorBase:
                 if isinstance(rel_attr_value, RelatorCollection):
                     # call super add to avoid recursion
                     await super(RelatorCollection, rel_attr_value).add(instance)
-                elif isinstance(rel_attr_value, RelatorItem):
+                elif rel_attr_value is None or \
+                        isinstance(rel_attr_value, RelatorItem):
                     setattr(item, self.rel_attr, instance.id)
                     await context.txn.upsert(item)
 
@@ -158,15 +164,34 @@ class RelatorN(ReferenceN, RelatorBase):
                  **kwargs):
         super().__init__(default, **kwargs)
         RelatorBase.__init__(self, rel_attr, respects_references)
+        self.t = Table('items')
+        self.data_field = self.t.field('data')
 
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        return RelatorCollection(self, instance)
+    # def __get__(self, instance, owner):
+    #     if instance is None:
+    #         return self
+    #     return RelatorCollection(self, instance)
 
-    @property
-    def storage_info(self):
-        return f'{self.storage_info_prefix}:{self.rel_attr}'
+    # @property
+    # def storage_info(self):
+    #     return f'{self.storage_info_prefix}:{self.rel_attr}'
+
+    @lru_cache(maxsize=None)
+    def query(self, query_type=QueryType.ITEMS):
+        # TODO: implement many-to-many
+        rel_attr = self.rel_attr
+        q = (
+            PorcupineQuery
+            .from_(self.t, query_type=query_type)
+            .select()
+            .where(
+                getattr(self.t, rel_attr) ==
+                Parameter(f':{rel_attr}')
+            )
+        )
+        if query_type is QueryType.ITEMS:
+            q = q.select('*')
+        return q
 
     async def on_create(self, instance, value):
         added, _ = await super().on_create(instance, value)

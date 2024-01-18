@@ -1,4 +1,5 @@
 from porcupine import db, exceptions
+from porcupine.response import json
 from porcupine.hinting import TYPING
 from porcupine.contract import contract
 from porcupine.core.context import system_override, context
@@ -11,6 +12,7 @@ from .common import String
 from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
 from .reference import ReferenceN
+from .relator import RelatorN, Relator1, RelatorCollection
 from pypika.terms import Parameter
 from functools import cached_property
 
@@ -47,7 +49,7 @@ class Acl(AtomicMap):
         return await instance.effective_acl
 
 
-class ChildrenCollection(ItemCollection):
+class ChildrenCollection(RelatorCollection):
     # async def __aiter__(self):
     #     t = self._desc.t
     #     cursor = db_connector().get_cursor(
@@ -65,11 +67,9 @@ class ChildrenCollection(ItemCollection):
 
     async def add(self, *items: TYPING.ANY_ITEM_CO):
         parent = self._inst()
-        parent_id = parent.id
+        # parent_id = parent.id
         user = context.user
         shortcut = get_content_class('Shortcut')
-
-        await super().add(*items)
 
         for item in items:
             if not item.__is_new__:
@@ -79,7 +79,7 @@ class ChildrenCollection(ItemCollection):
                 item.owner = user.id
                 item.created = item.modified = date.utcnow()
                 item.modified_by = user.name
-                item.parent_id = parent_id
+                # item.parent_id = parent_id
                 item.p_type = parent.content_class
 
             expire_times = [item.expires_at, parent.expires_at]
@@ -95,6 +95,8 @@ class ChildrenCollection(ItemCollection):
             if item.is_collection:
                 context.access_map[item.id] = item.access_record
 
+        await super().add(*items)
+
     async def remove(self, *items: TYPING.ANY_ITEM_CO):
         await super().remove(*items)
         for item in items:
@@ -104,19 +106,17 @@ class ChildrenCollection(ItemCollection):
         return self._inst().id == item.parent_id
 
 
-class Children(ReferenceN):
+class Children(RelatorN):
     name = 'children'
 
     def __init__(self, **kwargs):
-        super().__init__(readonly=True, **kwargs)
+        super().__init__(
+            readonly=True,
+            rel_attr='parent_id',
+            **kwargs
+        )
         # self.__query = None
         # self.name = 'children'
-
-    @cached_property
-    def query(self):
-        return self.t.select().where(
-            self.t.parent_id == Parameter(':parent_id')
-        )
 
     def getter(self, instance, value=None):
         return ChildrenCollection(self, instance)
@@ -127,8 +127,7 @@ class Children(ReferenceN):
                 # create a separate instance per owner
                 # accepting the container's containment types
                 clazz = type(self)
-                children = clazz(default=self.default,
-                                 accepts=owner.containment)
+                children = clazz(accepts=owner.containment)
                 setattr(owner, clazz.name, children)
                 return children
             return self
@@ -159,31 +158,54 @@ class Children(ReferenceN):
     async def get(self, instance, request, expand=True):
         return await super().get(instance, request, True)
 
-    # disallow direct additions / assignment
-    post = None
+    @db.transactional()
+    async def post(self, instance, request):
+        if 'source' in request.args:
+            # copy operation
+            source = await db.get_item(request.args.get('source'), quiet=False)
+            # TODO: handle items with no copy capability
+            new_item = await source.copy_to(instance)
+        else:
+            # new item
+            try:
+                new_item = await instance.new_from_dict(request.json)
+                await new_item.append_to(instance)
+            except exceptions.AttributeSetError as e:
+                raise exceptions.InvalidUsage(str(e))
+
+        location = f'/resources/{new_item.id}'
+
+        return json(
+            new_item,
+            status=201,
+            headers={
+                'Location': location
+            })
+
+    # disallow direct assignment
     put = None
 
 
-class Items(Children):
-    name = 'items'
-
-    @property
-    def allowed_types(self):
-        if not self.accepts_resolved:
-            resolved = super().allowed_types
-            self.accepts = tuple([x for x in resolved if not x.is_collection])
-        return self.accepts
-
-
-class Containers(Children):
-    name = 'containers'
-
-    @property
-    def allowed_types(self):
-        if not self.accepts_resolved:
-            resolved = super().allowed_types
-            self.accepts = tuple([x for x in resolved if x.is_collection])
-        return self.accepts
+# class Items(Children):
+#     name = 'items'
+#
+#     @property
+#     def allowed_types(self):
+#         if not self.accepts_resolved:
+#             resolved = super().allowed_types
+#             self.accepts = tuple([x for x in resolved if not x.is_collection])
+#         return self.accepts
+#
+#
+# class Containers(Children):
+#     name = 'containers'
+#
+#     @property
+#     def allowed_types(self):
+#         if not self.accepts_resolved:
+#             resolved = super().allowed_types
+#             self.accepts = tuple([x for x in resolved if x.is_collection])
+#         return self.accepts
 
 
 class Deleted(Counter):
@@ -203,10 +225,12 @@ class Deleted(Counter):
         return False
 
 
-class ParentId(String):
-
+class ParentId(Relator1):
     def __init__(self):
-        super().__init__(default=None, readonly=True, allow_none=True,
+        super().__init__(default=None,
+                         rel_attr='children',
+                         accepts=('Container', ),
+                         readonly=True,
                          store_as='pid')
 
     async def on_create(self, instance, value):

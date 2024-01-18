@@ -61,8 +61,9 @@ class UnprocessableEntity(SanicException):
 class ContainmentError(TypeError):
     def __init__(self, target_item, attribute, source_item):
         super().__init__(
-            f"Attribute '{attribute}' of '{target_item.__class__.__name__}' "
-            f"does not accept objects of '{source_item.content_class}'"
+            f"Attribute '{attribute}' of type "
+            f"'{target_item.__class__.__name__}' "
+            f"does not accept objects of type '{source_item.content_class}'"
         )
 
 

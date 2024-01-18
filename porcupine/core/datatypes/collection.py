@@ -13,12 +13,13 @@ from porcupine.core.utils import (
     get_storage_key_from_attr_name
 )
 from porcupine.core.schema.storage import UNSET
-from porcupine.core.stream.streamer import IdStreamer, ItemStreamer
+from porcupine.core.stream.streamer import ItemStreamer
 from porcupine.connectors.mutations import Formats
-from porcupine.core.schema.partial import PartialItem
 from porcupine.connectors.libsql.virtual_tables import JsonExtract
 from .asyncsetter import AsyncSetterValue
 from .external import Text
+from porcupine.connectors.libsql.query import QueryType
+from pypika.functions import Count
 
 
 class CollectionResolver:
@@ -175,23 +176,20 @@ class CollectionIterator(AsyncIterable):
                     await schema_service.compact_collection(collection_key, ttl)
 
 
-class ItemCollection(AsyncSetterValue, ItemStreamer):
+class ItemCollection(AsyncSetterValue):
     def __init__(self,
                  descriptor: TYPING.DT_CO,
                  instance: TYPING.ANY_ITEM_CO):
-        AsyncSetterValue.__init__(self, descriptor, instance)
-        ItemStreamer.__init__(
-            self,
-            db_connector().get_cursor(descriptor.query.select('*'),
-                                      parent_id=instance.id)
-        )
+        super().__init__(descriptor, instance)
+        self.__query_params = {
+            descriptor.rel_attr: instance.id
+        }
 
     def __getattr__(self, item):
-        # print(name)
         if item in self._desc.columns:
             return self._desc.t.field(item)
         else:
-            print(self._desc.accepts)
+            # print(self._desc.accepts)
             alias = None
             if '.' in item:
                 attr, path = item.split('.', 1)
@@ -207,11 +205,23 @@ class ItemCollection(AsyncSetterValue, ItemStreamer):
                 alias = item
             return JsonExtract(self._desc.data_field, f'$.{full_path}',
                                alias=alias)
-        # return getattr(self._desc.t, item)
 
-    def get_query(self):
-        return self._desc.query
+    def query(self, query_type=QueryType.ITEMS):
+        return self._desc.query(query_type)
 
+    def cursor(self, query, skip=0, take=None, resolve_shortcuts=False,
+               **kwargs):
+        if query.type is QueryType.ITEMS:
+            items = ItemStreamer(query.cursor({
+                **kwargs,
+                **self.__query_params
+            }))
+            if resolve_shortcuts:
+                items |= pipe.map(self._shortcut_resolver)
+                items |= pipe.if_not_none()
+            if skip or take:
+                items |= pipe.skip_and_take(skip, take)
+            return items
 
     @property
     def is_fetched(self) -> bool:
@@ -237,11 +247,16 @@ class ItemCollection(AsyncSetterValue, ItemStreamer):
             return await i.get_target()
         return i
 
-    def items(self, resolve_shortcuts=False):
-        items = super().items(self)
-        if resolve_shortcuts:
-            items |= pipe.map(self._shortcut_resolver)
-            items |= pipe.if_not_none()
+    def items(self, skip=0, take=None, filter=None, resolve_shortcuts=False):
+        q = self.query()
+        if filter is not None:
+            q = q.where(filter)
+        items = self.cursor(q, skip, take, resolve_shortcuts)
+        # if resolve_shortcuts:
+        #     items |= pipe.map(self._shortcut_resolver)
+        #     items |= pipe.if_not_none()
+        # if skip or take:
+        #     items |= pipe.skip_and_take(skip, take)
         return items
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
@@ -250,13 +265,13 @@ class ItemCollection(AsyncSetterValue, ItemStreamer):
             if not await descriptor.can_add(instance, *items):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
-            collection_key = descriptor.key_for(instance)
+            # collection_key = descriptor.key_for(instance)
             for item in items:
                 if not await descriptor.accepts_item(item):
                     raise exceptions.ContainmentError(instance,
                                                       descriptor.name, item)
-                item_id = item.id
-                context.txn.append(instance.id, collection_key, f' {item_id}')
+                # item_id = item.id
+                # context.txn.append(instance.id, collection_key, f' {item_id}')
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
@@ -264,10 +279,10 @@ class ItemCollection(AsyncSetterValue, ItemStreamer):
             if not await descriptor.can_remove(instance, *items):
                 raise exceptions.Forbidden('Forbidden')
             await instance.touch()
-            collection_key = descriptor.key_for(instance)
-            for item in items:
-                item_id = item.id
-                context.txn.append(instance.id, collection_key, f' -{item_id}')
+            # collection_key = descriptor.key_for(instance)
+            # for item in items:
+            #     item_id = item.id
+            #     context.txn.append(instance.id, collection_key, f' -{item_id}')
 
     async def reset(self, value: list) -> None:
         descriptor, instance = self._desc, self._inst()
@@ -280,3 +295,15 @@ class ItemCollection(AsyncSetterValue, ItemStreamer):
                     [oid async for oid in self])
         # set collection
         super(Text, descriptor).__set__(instance, value)
+
+    async def has(self, item_id: TYPING.ITEM_ID) -> bool:
+        # TODO: implement
+        return True
+
+    async def count(self, filter=None):
+        q = self.query(QueryType.RAW).select(Count(1))
+        if filter is not None:
+            q = q.where(filter)
+        print(q)
+        result = await q.execute(self.__query_params)
+        return result[0][0]

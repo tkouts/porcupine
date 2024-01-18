@@ -1,10 +1,11 @@
 from typing import Awaitable
 
 from sanic.response import json
+from pypika import Parameter
 
 from porcupine import db, exceptions, pipe
 from porcupine.view import view
-from porcupine.core.datatypes.system import Items, Containers, Children
+from porcupine.core.datatypes.system import Children
 from porcupine.core.services import db_connector
 from porcupine.core import utils
 from porcupine.connectors.base.bounds import FixedBoundary
@@ -55,25 +56,28 @@ class Container(Item):
         _, exists = await db_connector().exists(unique_name_key)
         return exists
 
-    async def children_count(self):
-        container_views = db_connector().views[Container]
-        cursor = container_views['is_collection'].get_cursor()
-        cursor.set_scope(self.id)
-        return await cursor.count()
+    def children_count(self):
+        return self.children.count()
+        # container_views = db_connector().views[Container]
+        # cursor = container_views['is_collection'].get_cursor()
+        # cursor.set_scope(self.id)
+        # return await cursor.count()
 
-    async def items_count(self):
-        container_views = db_connector().views[Container]
-        cursor = container_views['is_collection'].get_cursor()
-        cursor.set_scope(self.id)
-        cursor.set([FixedBoundary(False)])
-        return await cursor.count()
+    def items_count(self):
+        return self.children.count(self.children.is_collection == False)
+        # container_views = db_connector().views[Container]
+        # cursor = container_views['is_collection'].get_cursor()
+        # cursor.set_scope(self.id)
+        # cursor.set([FixedBoundary(False)])
+        # return await cursor.count()
 
-    async def containers_count(self):
-        container_views = db_connector().views[Container]
-        cursor = container_views['is_collection'].get_cursor()
-        cursor.set_scope(self.id)
-        cursor.set([FixedBoundary(True)])
-        return await cursor.count()
+    def containers_count(self):
+        return self.children.count(self.children.is_collection == True)
+        # container_views = db_connector().views[Container]
+        # cursor = container_views['is_collection'].get_cursor()
+        # cursor.set_scope(self.id)
+        # cursor.set([FixedBoundary(True)])
+        # return await cursor.count()
 
     async def get_child_by_name(self, name, resolve_shortcut=False):
         """
@@ -122,30 +126,7 @@ class Container(Item):
 
         @rtype: list
         """
-        # children = await db_connector().query(
-        #     'select _rowid_, * from items where parent_id=?',
-        #     [self.id]
-        # )
-        # async for child in self.children:
-        #     print(child)
-        # children = db_connector().query(self.children)
-        # print(children._from)
-        # # print(children.select(children.description).where(children.parent_id == self.id))
-        # results = await db_connector().db.execute(
-        #     str(children.where(children._from[0].parent_id == self.id))
-        # )
-        # print(results[0])
-        # return []
-        children = self.children
-        if resolve_shortcuts:
-            children |= pipe.map(children._shortcut_resolver)
-            children |= pipe.if_not_none
-        # children = self.containers.items() | pipe.chain(
-        #     self.items.items(resolve_shortcuts=resolve_shortcuts)
-        # )
-        if skip or take:
-            children |= pipe.skip_and_take(skip, take)
-        # print(children)
+        children = self.children.items(skip, take, resolve_shortcuts)
         return children.list()
 
     def get_items(self, skip=0, take=None,
@@ -155,9 +136,9 @@ class Container(Item):
 
         @rtype: list
         """
-        items = self.items.items(resolve_shortcuts=resolve_shortcuts)
-        if skip or take:
-            items |= pipe.skip_and_take(skip, take)
+        items = self.children.items(
+            skip, take, self.children.is_collection == False, resolve_shortcuts
+        )
         return items.list()
 
     def get_containers(self, skip=0, take=None) -> Awaitable[list]:
@@ -166,9 +147,9 @@ class Container(Item):
 
         @rtype: list
         """
-        containers = self.containers.items()
-        if skip or take:
-            containers |= pipe.skip_and_take(skip, take)
+        containers = self.children.items(
+            skip, take, self.children.is_collection == True
+        )
         return containers.list()
 
     async def has_items(self) -> bool:
@@ -191,32 +172,11 @@ class Container(Item):
     can_append = Item.can_update
 
     @view
-    async def childrn(self, _):
+    async def items(self, _):
         # TODO: add support for resolve_shortcuts
-        return await self.get_children()
+        print(await self.children.count())
+        return await self.get_items()
 
-    @childrn.http_post
-    # @contract.is_new_item()
-    @db.transactional()
-    async def childrn(self, request):
-        if 'source' in request.args:
-            # copy operation
-            source = await db.get_item(request.args['source'][0], quiet=False)
-            # TODO: handle items with no copy capability
-            new_item = await source.copy_to(self)
-        else:
-            # new item
-            try:
-                new_item = await Container.new_from_dict(request.json)
-                await new_item.append_to(self)
-            except exceptions.AttributeSetError as e:
-                raise exceptions.InvalidUsage(str(e))
-
-        location = '/resources/{0}'.format(new_item.id)
-
-        return json(
-            new_item,
-            status=201,
-            headers={
-                'Location': location
-            })
+    @view
+    async def containers(self, _):
+        return await self.get_containers()
