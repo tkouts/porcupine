@@ -45,26 +45,11 @@ class Acl(AtomicMap):
         return user_role == permissions.COORDINATOR
 
     # HTTP views
-    async def get(self, instance, _):
-        return await instance.effective_acl
+    def get(self, instance, _):
+        return instance.effective_acl
 
 
 class ChildrenCollection(RelatorCollection):
-    # async def __aiter__(self):
-    #     t = self._desc.t
-    #     cursor = db_connector().get_cursor(
-    #         t.select('*').where(t.parent_id == self._inst().id)
-    #     )
-    #     # query = t.select('*').where(t.parent_id == self._inst().id)
-    #     # print(query)
-    #     async for t in ItemStreamer(cursor, self._desc):
-    #         yield t
-
-    # def get_query(self):
-    #     t = self._desc.t
-    #     # return f'select * from items where parent_id="{self._inst().id}"'
-    #     return t.select(*t.star_columns).where(t.parent_id == Parameter(':parent_id'))
-
     async def add(self, *items: TYPING.ANY_ITEM_CO):
         parent = self._inst()
         # parent_id = parent.id
