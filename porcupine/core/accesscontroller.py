@@ -7,7 +7,8 @@ from porcupine.core.context import (
     ctx_access_map,
     ctx_user,
     ctx_sys,
-    ctx_visibility_cache
+    ctx_visibility_cache,
+    context_cacheable
 )
 
 AccessRecord = namedtuple(
@@ -133,5 +134,63 @@ async def resolve_visibility(item) -> bool:
     return can_read
 
 
-# async def resolve_row_visibility(row) -> bool:
-#     return await resolve_visibility(PartialItem(row))
+class Roles:
+    # 0 - no access
+    # 1 - read
+    # 2 - update, delete if owner
+    # 4 - update, delete anyway
+    # 8 - full control
+    NO_ACCESS = 0
+    READER = 1
+    AUTHOR = 2
+    CONTENT_CO = 4
+    COORDINATOR = 8
+
+    @staticmethod
+    async def resolve(item, membership):
+        acl = item.effective_acl
+        member_of = set()
+        if membership is not None:
+            if await membership.is_admin():
+                return Roles.COORDINATOR
+            if membership.id in acl:
+                return acl[membership.id]
+
+            # get membership
+            member_of.update({
+                group_id
+                async for group_id in membership.member_of
+            })
+
+            if member_of:
+                # resolve nested groups membership
+                member_of.update(
+                    await Roles._resolve_membership(frozenset(member_of))
+                )
+
+            if hasattr(membership, 'authenticate'):
+                member_of.add('authusers')
+
+        # last add everyone
+        member_of.add('everyone')
+
+        perms = [acl.get(group_id, Roles.NO_ACCESS) for group_id in member_of]
+        if not perms:
+            return Roles.NO_ACCESS
+        return max(perms)
+
+    @staticmethod
+    @context_cacheable(1024)
+    async def _resolve_membership(group_ids: frozenset) -> set:
+        extended_membership = set()
+        groups = [r async for r in db_connector().get_multi(group_ids)
+                  if r is not None]
+        for group in groups:
+            extended_membership.update({
+                group_id async for group_id in group.member_of
+            })
+        if extended_membership:
+            extended_membership.update(
+                await Roles._resolve_membership(frozenset(extended_membership))
+            )
+        return extended_membership
