@@ -6,10 +6,11 @@ from pendulum import DateTime as PendulumDateTime
 from porcupine.hinting import TYPING
 from porcupine import exceptions, db
 from porcupine.contract import contract
+from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
-from porcupine.core.utils import permissions, date
+from porcupine.core.utils import date
 from porcupine.core.accesscontroller import resolve_acl
 from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
 from .elastic import Elastic
@@ -226,24 +227,24 @@ class GenericItem(Removable, Elastic):
     async def can_read(self, membership):
         if context.system_override:
             return True
-        user_role = await permissions.resolve(self, membership)
-        return user_role > permissions.NO_ACCESS
+        user_role = await Roles.resolve(self, membership)
+        return user_role > Roles.NO_ACCESS
 
     async def can_update(self, membership) -> bool:
         if context.system_override:
             return True
-        user_role = await permissions.resolve(self, membership)
-        return user_role >= permissions.AUTHOR
+        user_role = await Roles.resolve(self, membership)
+        return user_role >= Roles.AUTHOR
 
     async def can_delete(self, membership) -> bool:
         if self.is_system:
             return False
         elif context.system_override:
             return True
-        user_role = await permissions.resolve(self, membership)
+        user_role = await Roles.resolve(self, membership)
         return (
-            user_role > permissions.AUTHOR or
-            user_role == permissions.AUTHOR and self.owner == membership.id
+            user_role > Roles.AUTHOR or
+            user_role == Roles.AUTHOR and self.owner == membership.id
         )
 
     # HTTP views

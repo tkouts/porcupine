@@ -4,8 +4,9 @@ from porcupine.hinting import TYPING
 from porcupine.contract import contract
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
-from porcupine.core.utils import permissions, date, add_uniques, \
+from porcupine.core.utils import date, add_uniques, \
     remove_uniques, get_content_class
+from porcupine.core.accesscontroller import Roles
 # from porcupine.core.stream.streamer import ItemStreamer
 from .collection import ItemCollection
 from .common import String
@@ -41,8 +42,8 @@ class Acl(AtomicMap):
 
     @staticmethod
     async def can_modify(instance):
-        user_role = await permissions.resolve(instance, context.user)
-        return user_role == permissions.COORDINATOR
+        user_role = await Roles.resolve(instance, context.user)
+        return user_role == Roles.COORDINATOR
 
     # HTTP views
     def get(self, instance, _):

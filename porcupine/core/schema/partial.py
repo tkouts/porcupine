@@ -1,7 +1,7 @@
 from typing import Mapping
 import orjson
+from porcupine.core.accesscontroller import Roles
 from porcupine.core.utils.collections import OptionalFrozenDict
-from porcupine.core.utils import permissions
 from porcupine.core.accesscontroller import resolve_acl
 from porcupine.core.context import ctx_sys
 from porcupine.core.utils import get_content_class
@@ -71,5 +71,5 @@ class PartialItem:
     async def can_read(self, membership):
         if ctx_sys.get():
             return True
-        user_role = await permissions.resolve(self, membership)
-        return user_role > permissions.NO_ACCESS
+        user_role = await Roles.resolve(self, membership)
+        return user_role > Roles.NO_ACCESS

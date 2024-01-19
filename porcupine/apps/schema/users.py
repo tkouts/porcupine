@@ -1,7 +1,7 @@
 import hashlib
 
 from porcupine import db
-from porcupine.core.utils import permissions
+from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import context_user
 from porcupine.schema import Container
 from porcupine.schema import Item
@@ -126,7 +126,7 @@ class User(Membership):
             user_storage.name = self.name
             # set acl
             await user_storage.acl.reset({
-                self.id: permissions.CONTENT_CO
+                self.id: Roles.CONTENT_CO
             })
             await user_storage.append_to(storage_container)
             self.personal_folder = user_storage.id
