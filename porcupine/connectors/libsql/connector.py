@@ -1,7 +1,7 @@
 import libsql_client
 from porcupine import log, context, exceptions
 from .transaction import Transaction
-from .cursor import Cursor
+# from .cursor import Cursor
 # from .virtual_tables import ItemsTable
 # from .query import PorcupineQuery
 from porcupine.connectors.libsql import persist
@@ -65,20 +65,11 @@ class LibSql:
             from items where items.id in parent_ids;
         ''', [item_id])
 
-    def get_cursor(self, query, **params):
-        return Cursor(self, query, **params)
+    # def get_cursor(self, query, **params):
+    #     return Cursor(self, query, **params)
 
-    async def query(self, query, params):
-        # return VirtualTable(collection).select('_rowid_', '*')
-        result = await self.db.execute(query, params)
-        return [self.persist.loads(row) for row in result]
-
-    # @staticmethod
-    # def get_table(table_name, collection=None):
-    #     if table_name == 'items':
-    #         return ItemsTable(collection, query_cls=PorcupineQuery)
-    #     else:
-    #         return Table(table_name, query_cls=PorcupineQuery)
+    def query(self, query, params):
+        return self.db.execute(query, params)
 
     async def prepare_indexes(self):
         log.info('Preparing indexes...')

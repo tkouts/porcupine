@@ -1,4 +1,5 @@
 from typing import Mapping
+from collections.abc import Sequence
 import orjson
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.utils.collections import OptionalFrozenDict
@@ -15,10 +16,11 @@ class AclProxy(OptionalFrozenDict):
 class PartialItem:
     __slots__ = '_partial', '_content_class', 'acl'
 
-    def __init__(self, partial=Mapping):
+    def __init__(self, partial=Sequence):
         self._partial = partial
         self._content_class = get_content_class(partial['type'])
-        self.acl = AclProxy(partial['acl'] and orjson.loads(partial['acl']))
+        acl = partial['acl']
+        self.acl = AclProxy(acl and orjson.loads(acl))
 
     @property
     def __is_new__(self):
@@ -31,6 +33,14 @@ class PartialItem:
     @property
     def is_collection(self):
         return self._content_class.is_collection
+
+    @property
+    def clazz(self):
+        return self._content_class
+
+    @property
+    def raw_data(self):
+        return self._partial
 
     @property
     def content_class(self):
@@ -49,24 +59,17 @@ class PartialItem:
                 f" object has no attribute '{item}'"
             )
 
-    def upgrade(self):
-        row = self._partial
-        content_class = self._content_class
-        storage = orjson.loads(row['data'])
-        storage['id'] = row['id']
-        storage['sig'] = row['sig']
-        if not content_class.is_composite:
-            storage['acl'] = self.acl.to_json()
-            storage['name'] = row['name']
-            storage['cr'] = row['created']
-            storage['md'] = row['modified']
-            # params['is_collection'] = obj.is_collection
-            storage['sys'] = row['is_system']
-            storage['pid'] = row['parent_id']
-            # params['p_type'] = dct.pop('_pcc', None)
-            storage['exp'] = row['expires_at']
-            storage['dl'] = row['is_deleted']
-        return content_class(storage)
+    def __repr__(self) -> str:
+        d = self._partial.asdict()
+        fields = [f'{k}={repr(v)}' for k, v in d.items()]
+        return f"Partial[{self.content_class}]({' '.join(fields)})"
+
+    def to_json(self):
+        d = self._partial.asdict()
+        remove = 'parent_id', 'acl'
+        for k in remove:
+            d.pop(k)
+        return d
 
     async def can_read(self, membership):
         if ctx_sys.get():

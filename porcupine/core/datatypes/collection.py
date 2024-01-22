@@ -1,179 +1,11 @@
-from typing import AsyncIterable
-import weakref
-
-from lru import LRU
-
 from porcupine.hinting import TYPING
-from porcupine import db, exceptions, pipe
+from porcupine import exceptions
 from porcupine.core.context import context
-from porcupine.core.services import get_service, db_connector
-from porcupine.core.utils import (
-    get_content_class,
-    get_collection_key,
-    get_storage_key_from_attr_name
-)
 from porcupine.core.schema.storage import UNSET
-from porcupine.core.stream.streamer import ItemStreamer
-from porcupine.connectors.mutations import Formats
-from porcupine.connectors.libsql.virtual_tables import JsonExtract
 from .asyncsetter import AsyncSetterValue
 from .external import Text
 from porcupine.connectors.libsql.query import QueryType
 from pypika.functions import Count
-
-
-class CollectionResolver:
-    __slots__ = (
-        'item_id',
-        'collection_name',
-        'chunk_no',
-        'total',
-        'dirty',
-        'removed',
-        'resolved',
-        'chunk_sizes'
-    )
-
-    def __init__(self, item_id: str, name: str, chunk_no: int):
-        self.item_id = item_id
-        self.collection_name = name
-        self.chunk_no = chunk_no
-        self.total = 0
-        self.dirty = 0
-        self.resolved = LRU(2730)
-        self.removed = set()
-        self.chunk_sizes = []
-
-    @property
-    def max_chunk_size(self):
-        if self.chunk_sizes:
-            return max(self.chunk_sizes)
-        return 0
-
-    @property
-    def is_split(self):
-        return len(self.chunk_sizes) > 1
-
-    async def __chunks(self):
-        connector = db_connector()
-        chunk_no = self.chunk_no
-        while True:
-            chunk_key = get_collection_key(self.item_id, self.collection_name,
-                                           chunk_no)
-            chunk = await connector.get_raw(chunk_key, fmt=Formats.STRING)
-            if chunk is None:
-                break
-            yield chunk
-            chunk_no -= 1
-
-    def resolve_chunk(self, c: str):
-        ids = reversed([e for e in c.split(' ') if e])
-        for oid in ids:
-            self.total += 1
-            if oid.startswith('-'):
-                key = oid[1:]
-                self.dirty += 1
-                self.removed.add(key)
-            else:
-                if oid in self.removed:
-                    # removed
-                    self.dirty += 1
-                elif oid in self.resolved:
-                    # duplicate
-                    self.dirty += 1
-                else:
-                    self.resolved[oid] = True
-                    yield oid
-
-    async def __aiter__(self) -> TYPING.ITEM_ID:
-        async for chunk in self.__chunks():
-            self.chunk_sizes.append(len(chunk))
-            for item_id in self.resolve_chunk(chunk):
-                yield item_id
-
-
-class CollectionIterator(AsyncIterable):
-    __slots__ = '_desc', '_inst'
-
-    def __init__(self,
-                 descriptor: TYPING.DT_CO,
-                 instance: TYPING.ANY_ITEM_CO):
-        self._desc = descriptor
-        self._inst = weakref.ref(instance)
-
-    async def __aiter__(self) -> TYPING.ITEM_ID:
-        descriptor, instance = self._desc, self._inst()
-        dirtiness = 0.0
-        storage = instance.__externals__
-        current_value = getattr(storage, descriptor.storage_key)
-        chunk_no = descriptor.current_chunk(instance)
-        resolver = CollectionResolver(instance.id, descriptor.name, chunk_no)
-
-        # compute deltas first
-        append = ''
-        if context.txn is not None:
-            collection_key = descriptor.key_for(instance)
-            append = context.txn.get_key_append(instance.id, collection_key)
-            if append:
-                for item_id in resolver.resolve_chunk(append):
-                    yield item_id
-
-        if current_value is not UNSET:
-            # collection is small and fetched
-            if append:
-                # w/appends: need to recompute
-                for item_id in resolver.resolve_chunk(' '.join(current_value)):
-                    yield item_id
-            else:
-                # no appends: as is
-                for item_id in current_value:
-                    yield item_id
-            return
-
-        total_items = 0
-        collection = []
-
-        async for item_id in resolver:
-            total_items += 1
-            if total_items < 301:
-                collection.append(item_id)
-            yield item_id
-
-        current_size = resolver.max_chunk_size
-        is_split = resolver.is_split
-
-        if total_items < 301:
-            # set storage / no snapshot
-            # cache / mark as fetched
-            setattr(storage, descriptor.storage_key, collection)
-
-        # compute dirtiness factor
-        if resolver.total:
-            dirtiness = resolver.dirty / resolver.total
-
-        connector = db_connector()
-        split_threshold = connector.coll_split_threshold
-        compact_threshold = connector.coll_compact_threshold
-
-        # print(current_size, split_threshold)
-        # print(dirtiness, compact_threshold)
-
-        if current_size > split_threshold or dirtiness > compact_threshold:
-            # collection maintenance
-            collection_key = descriptor.key_for(instance)
-            schema_service = get_service('schema')
-            ttl = await instance.ttl
-            if current_size > split_threshold:
-                shd_compact = (current_size * (1 - dirtiness)) < split_threshold
-                if not is_split and shd_compact:
-                    await schema_service.compact_collection(collection_key, ttl)
-                else:
-                    await schema_service.rebuild_collection(collection_key, ttl)
-            elif dirtiness > compact_threshold:
-                if is_split:
-                    await schema_service.rebuild_collection(collection_key, ttl)
-                else:
-                    await schema_service.compact_collection(collection_key, ttl)
 
 
 class ItemCollection(AsyncSetterValue):
@@ -186,42 +18,14 @@ class ItemCollection(AsyncSetterValue):
         }
 
     def __getattr__(self, item):
-        if item in self._desc.columns:
-            return self._desc.t.field(item)
-        else:
-            # print(self._desc.accepts)
-            alias = None
-            if '.' in item:
-                attr, path = item.split('.', 1)
-                storage_key = get_storage_key_from_attr_name(
-                    self._desc.accepts, attr
-                ) or attr
-                full_path = '.'.join([storage_key, path])
-            else:
-                storage_key = get_storage_key_from_attr_name(
-                    self._desc.accepts, item
-                ) or item
-                full_path = storage_key
-                alias = item
-            return JsonExtract(self._desc.data_field, f'$.{full_path}',
-                               alias=alias)
+        return getattr(self._desc.t, item)
 
-    def query(self, query_type=QueryType.ITEMS):
-        return self._desc.query(query_type)
-
-    def cursor(self, query, skip=0, take=None, resolve_shortcuts=False,
-               **kwargs):
-        if query.type is QueryType.ITEMS:
-            items = ItemStreamer(query.cursor({
-                **kwargs,
-                **self.__query_params
-            }))
-            if resolve_shortcuts:
-                items |= pipe.map(self._shortcut_resolver)
-                items |= pipe.if_not_none()
-            if skip or take:
-                items |= pipe.skip_and_take(skip, take)
-            return items
+    def query(self, query_type=QueryType.ITEMS, where=None):
+        q = self._desc.query(query_type)
+        q.set_params(self.__query_params)
+        if where is not None:
+            q = q.where(where)
+        return q
 
     @property
     def is_fetched(self) -> bool:
@@ -240,24 +44,16 @@ class ItemCollection(AsyncSetterValue):
     def is_consistent(_):
         return True
 
-    @staticmethod
-    async def _shortcut_resolver(i):
-        shortcut = get_content_class('Shortcut')
-        if isinstance(i, shortcut):
-            return await i.get_target()
-        return i
-
-    def items(self, skip=0, take=None, filter=None, resolve_shortcuts=False):
-        q = self.query()
-        if filter is not None:
-            q = q.where(filter)
-        items = self.cursor(q, skip, take, resolve_shortcuts)
-        # if resolve_shortcuts:
-        #     items |= pipe.map(self._shortcut_resolver)
-        #     items |= pipe.if_not_none()
-        # if skip or take:
-        #     items |= pipe.skip_and_take(skip, take)
-        return items
+    def items(
+        self,
+        skip=0,
+        take=None,
+        where=None,
+        resolve_shortcuts=False,
+        **kwargs
+    ):
+        q = self.query(where=where)
+        return q.cursor(skip, take, resolve_shortcuts, **kwargs)
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
@@ -300,10 +96,6 @@ class ItemCollection(AsyncSetterValue):
         # TODO: implement
         return True
 
-    async def count(self, filter=None):
-        q = self.query(QueryType.RAW).select(Count(1))
-        if filter is not None:
-            q = q.where(filter)
-        print(q)
-        result = await q.execute(self.__query_params)
-        return result[0][0]
+    async def count(self, where=None):
+        q = self.query(QueryType.RAW, where).select(Count(1))
+        return (await q.execute(first_only=True))[0]

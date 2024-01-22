@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import orjson
 from methodtools import lru_cache
 from typing import ClassVar, Type, Optional
 
@@ -8,7 +9,7 @@ from porcupine.config.default import DEFAULTS
 from porcupine.core.context import system_override
 from porcupine.core.services import get_service
 from porcupine.core import utils
-from porcupine.datatypes import DataType, String, ReferenceN
+from porcupine.datatypes import DataType, String
 from porcupine.core.datatypes.asyncsetter import AsyncSetter
 from .storage import storage
 
@@ -37,13 +38,6 @@ class ElasticMeta(type):
                         if hasattr(attr, 'storage_info'):
                             field_spec.append(attr.storage_key)
                             externals_info[attr.storage_key] = attr.storage_info
-                        if isinstance(attr, ReferenceN):
-                            field_spec.append(
-                                utils.get_active_chunk_key(attr.storage_key))
-                    # if cls.is_composite and attr.unique:
-                    #     raise TypeError(f'Data type "{attr.name}" '
-                    #                     f'of composite "{cls.__name__}" '
-                    #                     'cannot be unique')
             except AttributeError:
                 continue
         cls.__schema__ = schema
@@ -113,21 +107,41 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
 
     @staticmethod
     def from_partial(partial):
-        ...
+        row = partial.raw_data
+        content_class = partial.clazz
+        storage = orjson.loads(row['data'])
+        storage['id'] = row['id']
+        storage['sig'] = row['sig']
+        if not content_class.is_composite:
+            storage['acl'] = partial.acl.to_json()
+            storage['name'] = row['name']
+            storage['cr'] = row['created']
+            storage['md'] = row['modified']
+            # params['is_collection'] = obj.is_collection
+            storage['sys'] = row['is_system']
+            storage['pid'] = row['parent_id']
+            # params['p_type'] = dct.pop('_pcc', None)
+            storage['exp'] = row['expires_at']
+            storage['dl'] = row['is_deleted']
+        return content_class(storage)
 
     @lru_cache(maxsize=None)
     @classmethod
     def view_attrs(cls):
         schema = cls.__schema__.values()
-        return tuple([data_type.name for data_type in schema
-                     if not data_type.protected
-                     and data_type.storage == '__storage__'])
+        return tuple([
+            data_type.name for data_type in schema
+            if not data_type.protected
+            and data_type.storage == '__storage__'
+        ])
 
     @lru_cache(maxsize=None)
     @classmethod
     def unique_data_types(cls):
         schema = cls.__schema__.values()
-        return tuple([data_type for data_type in schema if data_type.unique])
+        return tuple([
+            data_type for data_type in schema if data_type.unique
+        ])
 
     def __init__(self, dict_storage: Optional[dict] = None, _score=0):
         self.__is_new__ = dict_storage is None or 'id' not in dict_storage

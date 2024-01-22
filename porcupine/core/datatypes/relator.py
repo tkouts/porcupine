@@ -5,12 +5,13 @@ Porcupine reference data types
 from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
+from porcupine.connectors.schematables import ItemsTable
 from porcupine.connectors.libsql.query import QueryType, PorcupineQuery
 from .reference import Reference1, ReferenceN, ItemReference
 from .collection import ItemCollection
-from pypika import Table, Parameter, Field
+from pypika import Parameter
 from methodtools import lru_cache
-from .asyncsetter import AsyncSetterValue
+# from .asyncsetter import AsyncSetterValue
 
 
 class RelatorBase:
@@ -164,17 +165,7 @@ class RelatorN(ReferenceN, RelatorBase):
                  **kwargs):
         super().__init__(default, **kwargs)
         RelatorBase.__init__(self, rel_attr, respects_references)
-        self.t = Table('items')
-        self.data_field = self.t.field('data')
-
-    # def __get__(self, instance, owner):
-    #     if instance is None:
-    #         return self
-    #     return RelatorCollection(self, instance)
-
-    # @property
-    # def storage_info(self):
-    #     return f'{self.storage_info_prefix}:{self.rel_attr}'
+        self.t = ItemsTable(self)
 
     @lru_cache(maxsize=None)
     def query(self, query_type=QueryType.ITEMS):
@@ -191,6 +182,8 @@ class RelatorN(ReferenceN, RelatorBase):
         )
         if query_type is QueryType.ITEMS:
             q = q.select('*')
+        elif query_type is QueryType.PARTIAL:
+            q = q.select(*self.t.partial_fields)
         return q
 
     async def on_create(self, instance, value):

@@ -7,10 +7,10 @@ from datetime import timedelta
 from porcupine import log
 from porcupine.exceptions import DBAlreadyExists
 from porcupine.connectors.mutations import Formats
-from porcupine.core.services.schematasks.collcompacter import \
-    CollectionCompacter
-from porcupine.core.services.schematasks.collrebuilder import \
-    CollectionReBuilder
+# from porcupine.core.services.schematasks.collcompacter import \
+#     CollectionCompacter
+# from porcupine.core.services.schematasks.collrebuilder import \
+#     CollectionReBuilder
 from porcupine.core.services.schematasks.schemacleaner import SchemaCleaner
 from porcupine.core.services.schematasks.staleremover import StaleRemover
 from porcupine.core.services.schematasks.collcleaner import CollectionCleaner
@@ -71,15 +71,15 @@ class SchemaMaintenance(AbstractService):
         await self.queue.put(None)
         await self.queue.join()
 
-    async def compact_collection(self, key, ttl):
-        if self.queue is not None:
-            task = CollectionCompacter(key, ttl)
-            await self.queue.put(task)
-
-    async def rebuild_collection(self, key, ttl):
-        if self.queue is not None:
-            task = CollectionReBuilder(key, ttl)
-            await self.queue.put(task)
+    # async def compact_collection(self, key, ttl):
+    #     if self.queue is not None:
+    #         task = CollectionCompacter(key, ttl)
+    #         await self.queue.put(task)
+    #
+    # async def rebuild_collection(self, key, ttl):
+    #     if self.queue is not None:
+    #         task = CollectionReBuilder(key, ttl)
+    #         await self.queue.put(task)
 
     async def auto_split(self, key, ttl):
         if self.queue is not None:

@@ -1,6 +1,5 @@
 from typing import Awaitable
 
-from sanic.response import json
 from pypika import Parameter
 
 from porcupine import db, exceptions, pipe
@@ -8,11 +7,10 @@ from porcupine.view import view
 from porcupine.core.datatypes.system import Children
 from porcupine.core.services import db_connector
 from porcupine.core import utils
-from porcupine.connectors.base.bounds import FixedBoundary
 from porcupine.core.accesscontroller import AccessRecord
-from porcupine.connectors.mutations import Formats
 from .item import Item
 from .shortcut import Shortcut
+from porcupine.connectors.libsql.query import QueryType
 
 
 class Container(Item):
@@ -27,8 +25,6 @@ class Container(Item):
     """
     is_collection = True
     containment = (Item, )
-    # items = Items()
-    # containers = Containers()
     children = Children()
 
     indexes = ('is_collection', )
@@ -58,26 +54,12 @@ class Container(Item):
 
     def children_count(self):
         return self.children.count()
-        # container_views = db_connector().views[Container]
-        # cursor = container_views['is_collection'].get_cursor()
-        # cursor.set_scope(self.id)
-        # return await cursor.count()
 
     def items_count(self):
         return self.children.count(self.children.is_collection == False)
-        # container_views = db_connector().views[Container]
-        # cursor = container_views['is_collection'].get_cursor()
-        # cursor.set_scope(self.id)
-        # cursor.set([FixedBoundary(False)])
-        # return await cursor.count()
 
     def containers_count(self):
         return self.children.count(self.children.is_collection == True)
-        # container_views = db_connector().views[Container]
-        # cursor = container_views['is_collection'].get_cursor()
-        # cursor.set_scope(self.id)
-        # cursor.set([FixedBoundary(True)])
-        # return await cursor.count()
 
     async def get_child_by_name(self, name, resolve_shortcut=False):
         """
@@ -92,32 +74,20 @@ class Container(Item):
                  else None.
         @rtype: L{GenericItem}
         """
-        result = await db_connector().query(
-            'select * from items where parent_id=? and name=? limit 1',
-            [self.id, name]
+        q = self.children.query(
+            where=self.children.name == Parameter(':name')
         )
-        # print(len(result))
-        if len(result) > 0:
-            item = result[0]
-            # print(item)
-            if resolve_shortcut and isinstance(item, Shortcut):
-                item = await item.get_target()
-            return item
-        # child_id = await db_connector().get(
-        #     utils.get_key_of_unique(self.id, 'name', name),
-        #     fmt=Formats.STRING
-        # )
-        # if child_id:
-        #     item = await db.get_item(child_id)
-        #     if resolve_shortcut and isinstance(item, Shortcut):
-        #         item = await item.get_target()
-        #     return item
-
-    async def get_child_by_id(self, oid):
-        item = await db.get_item(oid)
-        if item is not None and item.parent_id != self.id:
-            return None
+        item = await q.execute(first_only=True, name=name)
+        if item and resolve_shortcut and isinstance(item, Shortcut):
+            item = await item.get_target()
         return item
+
+    def get_child_by_id(self, oid):
+        # TODO: maybe use db.get_item to read our own writes?
+        q = self.children.query(
+            where=self.children.id == Parameter(':id')
+        )
+        return q.execute(first_only=True, id=oid)
 
     def get_children(self, skip=0, take=None,
                      resolve_shortcuts=False) -> Awaitable[list]:
@@ -137,7 +107,10 @@ class Container(Item):
         @rtype: list
         """
         items = self.children.items(
-            skip, take, self.children.is_collection == False, resolve_shortcuts
+            skip, take,
+            self.children.is_collection == Parameter(':is_collection'),
+            resolve_shortcuts,
+            is_collection=False
         )
         return items.list()
 
@@ -148,7 +121,9 @@ class Container(Item):
         @rtype: list
         """
         containers = self.children.items(
-            skip, take, self.children.is_collection == True
+            skip, take,
+            self.children.is_collection == Parameter(':is_collection'),
+            is_collection=True
         )
         return containers.list()
 
@@ -174,7 +149,10 @@ class Container(Item):
     @view
     async def items(self, _):
         # TODO: add support for resolve_shortcuts
-        print(await self.children.count())
+        # print(await self.children_count())
+        # q = self.children.query(QueryType.PARTIAL)
+        # q = q.select(self.children.name, self.children.description)
+        # return await q.cursor(take=20).list()
         return await self.get_items()
 
     @view

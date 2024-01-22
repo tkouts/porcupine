@@ -1,11 +1,12 @@
 from typing import Callable, AsyncIterable, Awaitable
-from functools import partial
+# from functools import partial
 from aiostream import stream, StreamEmpty
 
 from porcupine import db, exceptions, pipe
 from porcupine.hinting import TYPING
-from porcupine.core.services import db_connector, get_service
-from porcupine.core.context import ctx_user
+# from porcupine.core.services import db_connector, get_service
+# from porcupine.core.context import ctx_user
+from porcupine.core.schema.elastic import Elastic
 from porcupine.core.schema.partial import PartialItem
 from porcupine.core.accesscontroller import resolve_visibility
 # from porcupine.core.utils.db import (
@@ -41,8 +42,8 @@ class BaseStreamer(AsyncIterable):
         streamer = stream.iterate(self._iterator)
         for op in self._operators:
             streamer |= op
-        if _reverse and not self.supports_reversed_iteration and self._reversed:
-            streamer |= pipe.reverse()
+        # if _reverse and not self.supports_reversed_iteration and self._reversed:
+        #     streamer |= pipe.reverse()
         return streamer
 
     # def reverse(self):
@@ -104,63 +105,24 @@ class IdStreamer(BaseStreamer):
             return False
 
 
-class ItemStreamer(BaseStreamer):
+class PartialStreamer(BaseStreamer):
+    def __init__(self, cursor):
+        super().__init__(cursor)
+        self._operators.append(pipe.map(PartialItem))
+        self._operators.append(pipe.filter(resolve_visibility))
+
+
+class ItemStreamer(PartialStreamer):
     supports_reversed_iteration = True
     output_ids = False
 
-    # @staticmethod
-    # async def _resolve_row_visibility(row):
-    #     return await resolve_visibility(PartialItem(row))
+    def __init__(self, cursor):
+        super().__init__(cursor)
+        self._operators.append(pipe.map(Elastic.from_partial))
 
-    def __init__(self, id_streamer: BaseStreamer):
-        super().__init__(id_streamer)
-        # self._collection = collection
-        # self._stale = []
-        # connector = db_connector()
-        # access_controller = ctx_access_controller.get()
-        # user = ctx_user.get()
-        # async def resolve_visibility(item):
-        #     return await rv(item, user)
-        # resolve_visibility = partial(
-        #     access_controller.resolve_visibility,
-        #     user=ctx_user.get()
-        # )
-        # if self._collection is None:
-        #     self._operators.append(
-        #         pipe.map(connector.get, task_limit=connector.read_concurrency)
-        #     )
-        # else:
-        #     # need to collect stale IDs of expired items
-        #     self._operators.append(
-        #         pipe.map(get_with_id, task_limit=connector.read_concurrency)
-        #     )
-        #     self._operators.append(pipe.map(self._gather_inconsistent))
-        # self._operators.append(pipe.map(PartialItem))
-        self._operators.append(pipe.filter(resolve_visibility))
-        self._operators.append(pipe.map(lambda x: x.upgrade()))
-        # self._operators.append(pipe.filter(resolve_visibility))
-
-    # async def __aiter__(self):
-    #     async with self.get_streamer().stream() as streamer:
-    #         async for x in streamer:
-    #             yield x
-    #     # print('stale', self._stale, self._collection)
-    #     if self._collection is not None and self._stale:
-    #         ttl = await self._collection.ttl
-    #         key = self._collection.key
-    #         await get_service('schema').clean_collection(key, self._stale, ttl)
-
-    # def _gather_inconsistent(self, item_info):
-    #     item_id, item = item_info
-    #     is_cons = is_consistent(item, self._collection)
-    #     if not is_cons:
-    #         self._stale.append(item_id)
-    #         return None
-    #     return item
-
-    def reverse(self):
-        self._iterator.reverse()
-        return super().reverse()
+    # def reverse(self):
+    #     self._iterator.reverse()
+    #     return super().reverse()
 
 
 class CombinedIdStreamer(IdStreamer):
