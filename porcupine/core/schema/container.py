@@ -151,7 +151,8 @@ class Container(Item):
         # TODO: add support for resolve_shortcuts
         # print(await self.children_count())
         # q = self.children.query(QueryType.PARTIAL)
-        # q = q.select(self.children.name, self.children.description)
+        # q = q.select(self.children.name, self.children.owner)
+        # print(q)
         # return await q.cursor(take=20).list()
         return await self.get_items()
 

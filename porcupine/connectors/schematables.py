@@ -1,11 +1,5 @@
-from pypika import Table, Field
-from pypika.terms import Function
+from pypika import Table
 from porcupine.core.utils import get_storage_key_from_attr_name
-
-
-class JsonExtract(Function):
-    def __init__(self, *args, alias=None):
-        super().__init__('json_extract', *args, alias=alias)
 
 
 class SchemaTable(Table):
@@ -28,7 +22,6 @@ class SchemaTable(Table):
         if name in self.columns:
             return super().field(name)
         else:
-            # print(self._desc.accepts)
             alias = None
             if '.' in name:
                 attr, path = name.split('.', 1)
@@ -42,11 +35,7 @@ class SchemaTable(Table):
                 ) or name
                 full_path = storage_key
                 alias = name
-            return JsonExtract(
-                self.data_field,
-                f'$.{full_path}',
-                alias=alias
-            )
+            return self.data_field.get_text_value(full_path).as_(alias)
 
 
 class ItemsTable(SchemaTable):

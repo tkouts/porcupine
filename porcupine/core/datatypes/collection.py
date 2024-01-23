@@ -20,6 +20,9 @@ class ItemCollection(AsyncSetterValue):
     def __getattr__(self, item):
         return getattr(self._desc.t, item)
 
+    def __getitem__(self, item):
+        return self._desc.t[item]
+
     def query(self, query_type=QueryType.ITEMS, where=None):
         q = self._desc.query(query_type)
         q.set_params(self.__query_params)
