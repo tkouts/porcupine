@@ -24,14 +24,14 @@ def loads(row):
         acl = row['acl']
         storage['acl'] = acl and orjson.loads(acl)
         storage['name'] = row['name']
-        storage['cr'] = row['created']
-        storage['md'] = row['modified']
+        storage['created'] = row['created']
+        storage['modified'] = row['modified']
         # params['is_collection'] = obj.is_collection
-        storage['sys'] = row['is_system']
-        storage['pid'] = row['parent_id']
-        # params['p_type'] = dct.pop('_pcc', None)
-        storage['exp'] = row['expires_at']
-        storage['dl'] = row['is_deleted']
+        storage['is_system'] = row['is_system']
+        storage['parent_id'] = row['parent_id']
+        storage['p_type'] = row['p_type']
+        storage['expires_at'] = row['expires_at']
+        storage['is_deleted'] = row['is_deleted']
     # item_meta_cache = context.item_meta
     # item_meta = {}
     # if not content_class.is_composite:
@@ -53,14 +53,14 @@ def dumps(obj):
             if acl is not None else None
         )
         params['name'] = dct.pop('name')
-        params['created'] = dct.pop('cr').isoformat()
-        params['modified'] = dct.pop('md').isoformat()
+        params['created'] = dct.pop('created').isoformat()
+        params['modified'] = dct.pop('modified').isoformat()
         params['is_collection'] = obj.is_collection
-        params['is_system'] = dct.pop('sys', False)
-        params['parent_id'] = dct.pop('pid', None)
-        params['p_type'] = dct.pop('_pcc', None)
-        params['expires_at'] = dct.pop('exp', None)
-        params['is_deleted'] = dct.pop('dl', 0)
+        params['is_system'] = dct.pop('is_system', False)
+        params['parent_id'] = dct.pop('parent_id', None)
+        params['p_type'] = dct.pop('p_type', None)
+        params['expires_at'] = dct.pop('expires_at', None)
+        params['is_deleted'] = dct.pop('is_deleted', 0)
 
     params['data'] = orjson.dumps(dct, default=json_encoder).decode('utf-8')
     # print(params)

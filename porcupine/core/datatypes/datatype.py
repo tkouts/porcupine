@@ -39,9 +39,9 @@ class DataType:
     def storage_key(self):
         return self.store_as or self.name
 
-    @property
-    def should_lock(self):
-        return self.lock_on_update or self.unique
+    # @property
+    # def should_lock(self):
+    #     return self.lock_on_update or self.unique
 
     def get_value(self, instance, snapshot=True):
         storage_key = self.storage_key

@@ -21,6 +21,7 @@ from porcupine.core.utils import date, default_json_encoder
 from porcupine.core.context import ctx_txn
 from porcupine.core.services import get_service
 from porcupine.core.context import system_override, context_user, context
+from porcupine.connectors.schematables import ItemsTable
 
 
 class ExternalDoc:
@@ -33,12 +34,16 @@ class ExternalDoc:
 
 
 class Transaction:
-    __slots__ = ('connector', 'options',
+    __slots__ = ('connector',
+                 'options',
                  '_items',
-                 '_ext_insertions', '_ext_upsertions',
+                 '_ext_insertions',
+                 '_ext_upsertions',
                  '_deletions',
-                 '_sd', '_appends',
-                 '_attr_locks', '_committed')
+                 '_sd',
+                 '_appends',
+                 # '_attr_locks',
+                 '_committed')
 
     def __init__(self, connector, **options):
         self.connector = connector
@@ -49,7 +54,7 @@ class Transaction:
         self._ext_upsertions: Dict[str, ExternalDoc] = {}
 
         self._deletions: Dict[str, Optional[TYPING.ANY_ITEM_CO]] = {}
-        self._attr_locks = {}
+        # self._attr_locks = {}
 
         # sub document mutations
         self._sd = defaultdict(dict)
@@ -114,9 +119,6 @@ class Transaction:
                 data_type.on_create(item, data_type.get_value(item))
                 for data_type in item.__schema__.values()
             ])
-            # for data_type in item.__schema__.values():
-            #     print(item.content_class, data_type.name)
-            #     await data_type.on_create(item, data_type.get_value(item))
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
 
@@ -131,8 +133,8 @@ class Transaction:
             on_change_handlers = []
             for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
-                if data_type.should_lock:
-                    locks.append(data_type)
+                # if data_type.should_lock:
+                #     locks.append(data_type)
                 on_change_handlers.append(
                     data_type.on_change(
                         item,
@@ -146,14 +148,14 @@ class Transaction:
             except exceptions.AttributeSetError as e:
                 raise exceptions.InvalidUsage(str(e))
 
-            if (
-                not item.__is_new__
-                and locks
-                and item.__storage__.pid is not None
-            ):
-                # try to lock attributes
-                # print('LOCKING', locks)
-                await self.lock_attributes(item, *[u.name for u in locks])
+            # if (
+            #     not item.__is_new__
+            #     and locks
+            #     and item.__storage__.pid is not None
+            # ):
+            #     # try to lock attributes
+            #     # print('LOCKING', locks)
+            #     await self.lock_attributes(item, *[u.name for u in locks])
 
         item.__reset__()
         self._items[item.id] = item
@@ -162,10 +164,10 @@ class Transaction:
         # touch has to be fast / no event handlers
         now = date.utcnow()  # .isoformat()
         if item.__is_new__:
-            item.__storage__.md = now
+            item.__storage__.modified = now
         elif 'md' not in item.__snapshot__:
-            item.__snapshot__['md'] = now
-            self.mutate(item, 'md', SubDocument.UPSERT, now)
+            item.__snapshot__['modified'] = now
+            self.mutate(item, 'modified', SubDocument.UPSERT, now)
             # add to items map
             self._items[item.id] = item
 
@@ -262,23 +264,23 @@ class Transaction:
             await connector.batch_update(deletions)
             raise next(r for r in errors if r is not None)
 
-    async def lock_attributes(self, item, *attributes):
-        lock_keys = [utils.get_attribute_lock_key(item.id, attr_name)
-                     for attr_name in attributes]
-        # filter out the ones already locked
-        multi_insert = {key: None for key in lock_keys
-                        if key not in self._attr_locks}
-        if multi_insert:
-            inserts = [
-                Insertion(key, b'', timedelta(seconds=20), Formats.BINARY)
-                for key in multi_insert
-            ]
-            try:
-                await self.insert_multi(inserts)
-            except exceptions.DBAlreadyExists:
-                raise exceptions.DBDeadlockError('Failed to lock attributes')
-            # add lock key to deletions in order to be released
-            self._attr_locks.update(multi_insert)
+    # async def lock_attributes(self, item, *attributes):
+    #     lock_keys = [utils.get_attribute_lock_key(item.id, attr_name)
+    #                  for attr_name in attributes]
+    #     # filter out the ones already locked
+    #     multi_insert = {key: None for key in lock_keys
+    #                     if key not in self._attr_locks}
+    #     if multi_insert:
+    #         inserts = [
+    #             Insertion(key, b'', timedelta(seconds=20), Formats.BINARY)
+    #             for key in multi_insert
+    #         ]
+    #         try:
+    #             await self.insert_multi(inserts)
+    #         except exceptions.DBAlreadyExists:
+    #             raise exceptions.DBDeadlockError('Failed to lock attributes')
+    #         # add lock key to deletions in order to be released
+    #         self._attr_locks.update(multi_insert)
 
     async def prepare(self):
         connector = self.connector
@@ -332,9 +334,36 @@ class Transaction:
         rest_ops = []
 
         # sub-document mutations
-        # for item_id, mutations in self._sd.items():
-        #     if item_id not in self._deletions:
-        #         rest_ops.append(SubDocumentMutation(item_id, mutations))
+        for item_id, mutations in self._sd.items():
+            if item_id not in self._deletions:
+                attrs = []
+                values = []
+                for attr_name, mutation in mutations.items():
+                    mut_type, mut_value = mutation
+                    if attr_name in ItemsTable.columns:
+                        attrs.append(f'{attr_name}=?')
+                    else:
+                        # TODO: implement mutation types - only upsert for now
+                        attrs.append(
+                            f'data=(select json_set("data", \'$.{attr_name}\', ?) from items)'
+                        )
+                    values.append(mut_value)
+                values.append(item_id)
+                # print(
+                #     'update items set '
+                #     f'{", ".join(attrs)} '
+                #     f'where id=?'
+                # )
+                insertions.append(
+                    libsql_client.Statement(
+                        'update items set '
+                        f'{",".join(attrs)} '
+                        f'where id=?',
+                        values
+                    )
+                )
+                # rest_ops.append(SubDocumentMutation(item_id, mutations))
+                # print(item_id, mutations)
 
         # binary appends
         auto_splits = []
@@ -369,7 +398,7 @@ class Transaction:
         ]
         rest_ops.extend([Deletion(key) for key in self._deletions])
         # remove locks
-        rest_ops.extend([Deletion(key) for key in self._attr_locks])
+        # rest_ops.extend([Deletion(key) for key in self._attr_locks])
 
         return (
             (insertions, rest_ops, auto_splits),
@@ -394,12 +423,12 @@ class Transaction:
             # await self.insert_multi(insertions)
             await connector.db.batch(insertions)
 
-        if rest_ops:
-            errors = await connector.batch_update(rest_ops)
-            if any(errors):
-                # some updates have failed
-                for exc in (e for e in errors if e is not None):
-                    log.error(f'Transaction.commit: {exc}')
+        # if rest_ops:
+        #     errors = await connector.batch_update(rest_ops)
+        #     if any(errors):
+        #         # some updates have failed
+        #         for exc in (e for e in errors if e is not None):
+        #             log.error(f'Transaction.commit: {exc}')
 
         self.connector.active_txns -= 1
         self._committed = True
@@ -453,12 +482,12 @@ class Transaction:
         """
         if not self._committed:
             # release attribute locks
-            if self._attr_locks:
-                unlocks = [Deletion(key) for key in self._attr_locks]
-                errors = await self.connector.batch_update(unlocks)
-                if any(errors):
-                    # some updates have failed
-                    for exc in (e for e in errors if e is not None):
-                        log.error(f'Transaction.abort: {exc}')
+            # if self._attr_locks:
+            #     unlocks = [Deletion(key) for key in self._attr_locks]
+            #     errors = await self.connector.batch_update(unlocks)
+            #     if any(errors):
+            #         # some updates have failed
+            #         for exc in (e for e in errors if e is not None):
+            #             log.error(f'Transaction.abort: {exc}')
             self.connector.active_txns -= 1
         ctx_txn.set(None)

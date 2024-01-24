@@ -115,14 +115,14 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         if not content_class.is_composite:
             storage['acl'] = partial.acl.to_json()
             storage['name'] = row['name']
-            storage['cr'] = row['created']
-            storage['md'] = row['modified']
+            storage['created'] = row['created']
+            storage['modified'] = row['modified']
             # params['is_collection'] = obj.is_collection
-            storage['sys'] = row['is_system']
-            storage['pid'] = row['parent_id']
-            # params['p_type'] = dct.pop('_pcc', None)
-            storage['exp'] = row['expires_at']
-            storage['dl'] = row['is_deleted']
+            storage['is_system'] = row['is_system']
+            storage['parent_id'] = row['parent_id']
+            storage['p_type'] = row['p_type']
+            storage['expires_at'] = row['expires_at']
+            storage['is_deleted'] = row['is_deleted']
         return content_class(storage)
 
     @lru_cache(maxsize=None)

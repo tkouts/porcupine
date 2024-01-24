@@ -197,8 +197,7 @@ class Children(RelatorN):
 class Deleted(Counter):
 
     def __init__(self):
-        super().__init__(readonly=True, protected=True, store_as='dl',
-                         lock_on_update=True)
+        super().__init__(readonly=True, protected=True)
 
     @contract(accepts=bool)
     @db.transactional()
@@ -216,8 +215,7 @@ class ParentId(Relator1):
         super().__init__(default=None,
                          rel_attr='children',
                          accepts=('Container', ),
-                         readonly=True,
-                         store_as='pid')
+                         readonly=True)
 
     async def on_create(self, instance, value):
         await super().on_create(instance, value)

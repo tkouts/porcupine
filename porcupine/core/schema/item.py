@@ -41,22 +41,20 @@ class GenericItem(Removable, Elastic):
 
     # system attributes
     parent_id = ParentId()
-    created: PendulumDateTime = DateTime(readonly=True, store_as='cr')
-    expires_at = Integer(None, immutable=True, allow_none=True,
-                         protected=True, store_as='exp')
-    owner = String(required=True, default=None, allow_none=True,
-                   readonly=True, store_as='own')
-    modified_by = String(required=True, readonly=True, store_as='mdby')
-    modified: PendulumDateTime = DateTime(required=True, readonly=True,
-                                          store_as='md')
-    p_type = String(readonly=True, protected=True, store_as='_pcc')
+    created: PendulumDateTime = DateTime(readonly=True)
+    modified: PendulumDateTime = DateTime(required=True, readonly=True)
+    expires_at = Integer(None, immutable=True, allow_none=True, protected=True)
+    p_type = String(readonly=True, protected=True)
 
     # security attributes
-    is_system = Boolean(readonly=True, protected=True, store_as='sys')
+    is_system = Boolean(readonly=True, protected=True)
     acl: AclValue = Acl()
 
     # common attributes
     name = String(required=True, unique=True)
+    owner = String(required=True, default=None, allow_none=True,
+                   readonly=True, store_as='own')
+    modified_by = String(required=True, readonly=True, store_as='mdby')
     description = String(store_as='desc')
 
     def __init__(self, dict_storage=None, **kwargs):
