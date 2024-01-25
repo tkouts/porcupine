@@ -14,7 +14,7 @@ class ItemCollection(AsyncSetterValue):
                  instance: TYPING.ANY_ITEM_CO):
         super().__init__(descriptor, instance)
         self.__query_params = {
-            descriptor.rel_attr: instance.id
+            'instance_id': instance.id
         }
 
     def __getattr__(self, item):

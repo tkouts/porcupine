@@ -2,6 +2,7 @@
 Porcupine reference data types
 ==============================
 """
+from functools import cached_property
 from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
@@ -9,7 +10,7 @@ from porcupine.connectors.schematables import ItemsTable
 from porcupine.connectors.libsql.query import QueryType, PorcupineQuery
 from .reference import Reference1, ReferenceN, ItemReference
 from .collection import ItemCollection
-from pypika import Parameter
+from pypika import Parameter, Table
 from methodtools import lru_cache
 # from .asyncsetter import AsyncSetterValue
 
@@ -167,23 +168,83 @@ class RelatorN(ReferenceN, RelatorBase):
         RelatorBase.__init__(self, rel_attr, respects_references)
         self.t = ItemsTable(self)
 
+    @property
+    def is_many_to_many(self):
+        allowed_types = self.allowed_types
+        if allowed_types:
+            return isinstance(getattr(allowed_types[0],
+                                      self.rel_attr), RelatorN)
+        return False
+
+    @cached_property
+    def associative_table(self):
+        if self.is_many_to_many:
+            ref_class = self.allowed_types[0]
+            other_relator = getattr(ref_class, self.rel_attr)
+            classes = [
+                f'{ref_class.__name__}.{self.rel_attr}',
+                f'{other_relator.allowed_types[0].__name__}.{self.name}'
+            ]
+            classes.sort()
+            return Table('<->'.join(classes))
+
+    @property
+    def associative_table_fields(self):
+        if self.is_many_to_many:
+            fields = [
+                self.join_field.name,
+                self.equality_field.name
+            ]
+            fields.sort()
+            return fields
+
+    @property
+    def join_field(self):
+        if self.is_many_to_many:
+            ref_class = self.allowed_types[0]
+            return getattr(
+                self.associative_table,
+                f'{ref_class.__name__.lower()}_id'
+            )
+
+    @property
+    def equality_field(self):
+        if self.is_many_to_many:
+            ref_class = self.allowed_types[0]
+            this_class = getattr(ref_class, self.rel_attr).allowed_types[0]
+            return getattr(
+                self.associative_table,
+                f'{this_class.__name__.lower()}_id'
+            )
+
     @lru_cache(maxsize=None)
     def query(self, query_type=QueryType.ITEMS):
-        # TODO: implement many-to-many
-        rel_attr = self.rel_attr
-        q = (
-            PorcupineQuery
-            .from_(self.t, query_type=query_type)
-            .select()
-            .where(
-                getattr(self.t, rel_attr) ==
-                Parameter(f':{rel_attr}')
+        if self.is_many_to_many:
+            q = (
+                PorcupineQuery
+                .from_(self.associative_table, query_type=query_type)
+                .join(self.t)
+                .on(self.join_field == self.t.id)
+                .select()
+                .where(
+                    self.equality_field == Parameter(':instance_id')
+                )
             )
-        )
+        else:
+            rel_attr = self.rel_attr
+            q = (
+                PorcupineQuery
+                .from_(self.t, query_type=query_type)
+                .select()
+                .where(
+                    getattr(self.t, rel_attr) == Parameter(':instance_id')
+                )
+            )
         if query_type is QueryType.ITEMS:
-            q = q.select('*')
+            q = q.select(self.t.star)
         elif query_type is QueryType.PARTIAL:
             q = q.select(*self.t.partial_fields)
+        # print(q)
         return q
 
     async def on_create(self, instance, value):

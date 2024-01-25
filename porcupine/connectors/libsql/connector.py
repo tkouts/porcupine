@@ -5,6 +5,7 @@ from .transaction import Transaction
 # from .virtual_tables import ItemsTable
 # from .query import PorcupineQuery
 from porcupine.connectors.libsql import persist
+from porcupine.core import schemaregistry
 
 # from pypika import Table
 
@@ -95,3 +96,16 @@ class LibSql:
             create index if not exists idx_is_collection on
             items(parent_id, is_collection)
         ''')
+        # many-to-many relations
+        many_to_many = {
+            d.associative_table: d.associative_table_fields
+            for d in schemaregistry.get_many_to_many_relationships()
+        }
+        print(many_to_many)
+        for table, fields in many_to_many.items():
+            await self.db.execute(f'''
+                create table if not exists "{table.get_table_name()}" (
+                    {fields[0]} text not null REFERENCES items(id) ON DELETE CASCADE,
+                    {fields[1]} text not null REFERENCES items(id) ON DELETE CASCADE
+                )
+            ''')
