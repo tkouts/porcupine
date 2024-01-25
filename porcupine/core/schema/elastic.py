@@ -49,10 +49,10 @@ class ElasticMeta(type):
         # add indexes
         if cls.is_collection:
             if hasattr(cls, 'indexes') and 'indexes' in cls.__dict__:
-                DEFAULTS['__indices__'][cls] = cls.indexes
+                schemaregistry.add_indexes(cls, cls.indexes)
             if hasattr(cls, 'full_text_indexes') and \
                     'full_text_indexes' in cls.__dict__:
-                DEFAULTS['__fts_indices__'][cls] = cls.full_text_indexes
+                schemaregistry.add_fts_indexes(cls, cls.full_text_indexes)
 
         # register content class
         schemaregistry.register(cls)
