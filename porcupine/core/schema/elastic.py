@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import ClassVar, Type, Optional
 
 from porcupine.hinting import TYPING
-from porcupine.config.default import DEFAULTS
+# from porcupine.config.default import DEFAULTS
 from porcupine.core.context import system_override
 from porcupine.core.services import get_service
 from porcupine.core import utils, schemaregistry
@@ -48,10 +48,15 @@ class ElasticMeta(type):
 
         # add indexes
         if cls.is_collection:
-            if hasattr(cls, 'indexes') and 'indexes' in cls.__dict__:
+            if (
+                hasattr(cls, 'indexes')
+                and 'indexes' in cls.__dict__
+            ):
                 schemaregistry.add_indexes(cls, cls.indexes)
-            if hasattr(cls, 'full_text_indexes') and \
-                    'full_text_indexes' in cls.__dict__:
+            if (
+                hasattr(cls, 'full_text_indexes')
+                and 'full_text_indexes' in cls.__dict__
+            ):
                 schemaregistry.add_fts_indexes(cls, cls.full_text_indexes)
 
         # register content class
