@@ -38,19 +38,19 @@ class Container(Item):
             self.expires_at
         )
 
-    async def child_exists(self, name: str) -> bool:
-        """
-        Checks if a child with the specified name is contained
-        in the container.
-
-        @param name: The name of the child to check for
-        @type name: str
-
-        @rtype: bool
-        """
-        unique_name_key = utils.get_key_of_unique(self.id, 'name', name)
-        _, exists = await db_connector().exists(unique_name_key)
-        return exists
+    # async def child_exists(self, name: str) -> bool:
+    #     """
+    #     Checks if a child with the specified name is contained
+    #     in the container.
+    #
+    #     @param name: The name of the child to check for
+    #     @type name: str
+    #
+    #     @rtype: bool
+    #     """
+    #     unique_name_key = utils.get_key_of_unique(self.id, 'name', name)
+    #     _, exists = await db_connector().exists(unique_name_key)
+    #     return exists
 
     def children_count(self):
         return self.children.count()
