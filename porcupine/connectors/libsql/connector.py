@@ -45,7 +45,7 @@ class LibSql:
         return item
 
     async def get_raw(self, item_id):
-        result = await self.db.execute(
+        result = await self.query(
             'select * from items where id=?',
             [item_id]
         )
@@ -53,7 +53,7 @@ class LibSql:
             return result[0]
 
     def fetch_access_map(self, item_id):
-        return self.db.execute('''
+        return self.query('''
             with recursive
                 parent_ids(id) as (
                     values(?)
