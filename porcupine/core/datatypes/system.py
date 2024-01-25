@@ -4,18 +4,18 @@ from porcupine.hinting import TYPING
 from porcupine.contract import contract
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
-from porcupine.core.utils import date, add_uniques, \
-    remove_uniques, get_content_class
+from porcupine.core.utils import date
+from porcupine.core.schemaregistry import get_content_class
 from porcupine.core.accesscontroller import Roles
 # from porcupine.core.stream.streamer import ItemStreamer
-from .collection import ItemCollection
-from .common import String
+# from .collection import ItemCollection
+# from .common import String
 from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
-from .reference import ReferenceN
+# from .reference import ReferenceN
 from .relator import RelatorN, Relator1, RelatorCollection
-from pypika.terms import Parameter
-from functools import cached_property
+# from pypika.terms import Parameter
+# from functools import cached_property
 
 
 class AclValue(AtomicMapValue):
@@ -223,8 +223,8 @@ class ParentId(Relator1):
 
     async def on_change(self, instance, value, old_value):
         await super().on_change(instance, value, old_value)
-        remove_uniques(instance)
-        await add_uniques(instance)
+        # remove_uniques(instance)
+        # await add_uniques(instance)
         instance.reset_effective_acl()
 
     @contract(accepts=str)

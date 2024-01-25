@@ -4,7 +4,7 @@ import os
 from sanic import Blueprint
 
 from porcupine import db, config
-from porcupine.core import utils
+from porcupine.core.schemaregistry import get_content_class
 from porcupine.core.services import db_connector
 from porcupine.core.server import server
 from porcupine.core.context import with_context, system_override
@@ -51,7 +51,7 @@ class App(Blueprint):
             item = None
 
         if item is None:
-            item = utils.get_content_class(item_type)()
+            item = get_content_class(item_type)()
             if item_id:
                 # restore id in dict so it is set
                 item_dict['id'] = item_id

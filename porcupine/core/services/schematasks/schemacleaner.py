@@ -1,5 +1,5 @@
 from porcupine import exceptions, log
-from porcupine.core import utils
+from porcupine.core import utils, schemaregistry
 from porcupine.datatypes import Blob, ReferenceN, RelatorN
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 from porcupine.connectors.mutations import Deletion, Formats
@@ -8,7 +8,7 @@ from porcupine.connectors.mutations import Deletion, Formats
 class SchemaCleaner(SchemaMaintenanceTask):
     @staticmethod
     def schema_updater(item_dict):
-        clazz = utils.get_content_class(item_dict['_cc'])
+        clazz = schemaregistry.get_content_class(item_dict['_cc'])
         item_schema = frozenset([key for key in item_dict.keys()
                                  if not key.startswith('_')
                                  and not key.endswith('_')])

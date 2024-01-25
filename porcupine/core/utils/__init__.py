@@ -1,16 +1,16 @@
 """
 Porcupine utilities package
 """
-import cbor
+from typing import Union
 import hashlib
 import random
 import re
-from typing import Union
 
+import cbor
 import mmh3
 from methodtools import lru_cache
 
-from porcupine.core.context import context
+# from porcupine.core.context import context
 from porcupine.core.utils.collections import WriteOnceDict
 from porcupine.core.utils.date import DATE_TYPES
 
@@ -20,8 +20,6 @@ VALID_ID_CHARS = [
     list(range(ord('A'), ord('Z'))) +
     list(range(ord('0'), ord('9')))
 ]
-
-ELASTIC_MAP = WriteOnceDict()
 
 
 def default_json_encoder(obj):
@@ -38,10 +36,6 @@ def generate_oid(length: int = 8) -> str:
     @rtype: str
     """
     return ''.join(random.choice(VALID_ID_CHARS) for _ in range(length))
-
-
-def get_content_class(name: str):
-    return ELASTIC_MAP[name]
 
 
 @lru_cache(maxsize=None)
@@ -95,8 +89,8 @@ def hash_series(*args, using='md5') -> Union[str, int]:
         return h.hexdigest()
 
 
-def get_attribute_lock_key(item_id: str, attr_name: str) -> str:
-    return f'lck_{item_id}_{attr_name}'
+# def get_attribute_lock_key(item_id: str, attr_name: str) -> str:
+#     return f'lck_{item_id}_{attr_name}'
 
 
 def get_blob_key(item_id: str, blob_name: str) -> str:
@@ -144,30 +138,30 @@ def get_storage_key_from_attr_name(classes, name):
     return None
 
 
-async def add_uniques(item):
-    parent_id = item.parent_id
-    if parent_id is not None:
-        txn = context.txn
-        # insert unique keys
-        item_id = item.id
-        for unique in item.unique_data_types():
-            unique_key = get_key_of_unique(parent_id, unique.name,
-                                           unique.get_value(item))
-            txn.insert_external(item_id, unique_key, item_id)
-
-
-def remove_uniques(item):
-    parent_id = item.get_snapshot_of('parent_id')
-    is_deleted = item.get_snapshot_of('is_deleted')
-    if parent_id is not None and not is_deleted:
-        txn = context.txn
-        # remove unique keys
-        for unique in item.unique_data_types():
-            unique_key = get_key_of_unique(
-                parent_id,
-                unique.name,
-                item.get_snapshot_of(unique.name))
-            txn.delete_external(unique_key)
+# async def add_uniques(item):
+#     parent_id = item.parent_id
+#     if parent_id is not None:
+#         txn = context.txn
+#         # insert unique keys
+#         item_id = item.id
+#         for unique in item.unique_data_types():
+#             unique_key = get_key_of_unique(parent_id, unique.name,
+#                                            unique.get_value(item))
+#             txn.insert_external(item_id, unique_key, item_id)
+#
+#
+# def remove_uniques(item):
+#     parent_id = item.get_snapshot_of('parent_id')
+#     is_deleted = item.get_snapshot_of('is_deleted')
+#     if parent_id is not None and not is_deleted:
+#         txn = context.txn
+#         # remove unique keys
+#         for unique in item.unique_data_types():
+#             unique_key = get_key_of_unique(
+#                 parent_id,
+#                 unique.name,
+#                 item.get_snapshot_of(unique.name))
+#             txn.delete_external(unique_key)
 
 
 _re1 = re.compile('(.)([A-Z][a-z]+)')

@@ -2,7 +2,7 @@ from enum import Enum
 from typing import AsyncIterable
 from pypika.queries import QueryBuilder, Query
 from porcupine import pipe
-from porcupine.core.utils import get_content_class
+from porcupine.core.schemaregistry import get_content_class
 from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import ItemStreamer, PartialStreamer
 from porcupine.core.schema.partial import PartialItem

@@ -3,12 +3,13 @@ from porcupine.contract import contract
 from porcupine.core.context import context, system_override
 from porcupine.core.services import db_connector
 from porcupine.core.schema.storage import UNSET
+from porcupine.core.schemaregistry import get_content_class
 from porcupine.core import utils
 from .collection import ItemCollection
-from .datatype import DataType
+# from .datatype import DataType
 from .common import String
 from .mutable import List
-from .external import Text, Blob
+# from .external import Text, Blob
 from .asyncsetter import AsyncSetter
 from pypika import Table, Field
 
@@ -24,7 +25,7 @@ class Acceptable:
     def allowed_types(self):
         if not self.accepts_resolved:
             self.accepts = tuple([
-                utils.get_content_class(x) if isinstance(x, str) else x
+                get_content_class(x) if isinstance(x, str) else x
                 for x in self.accepts
             ])
             self.accepts_resolved = True

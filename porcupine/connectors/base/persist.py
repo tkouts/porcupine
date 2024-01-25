@@ -3,12 +3,12 @@ Default database object persistence layer
 """
 import json
 from porcupine import context, log
-from porcupine.core import utils
+from porcupine.core.schemaregistry import get_content_class
 
 
 def loads(storage):
     try:
-        content_class = utils.get_content_class(storage['_cc'])
+        content_class = get_content_class(storage['_cc'])
     except KeyError:
         log.error(
             'Unable to determine content class of document \n'

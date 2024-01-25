@@ -1,14 +1,14 @@
 import asyncio
 import copy
 import orjson
-from methodtools import lru_cache
+from functools import lru_cache
 from typing import ClassVar, Type, Optional
 
 from porcupine.hinting import TYPING
 from porcupine.config.default import DEFAULTS
 from porcupine.core.context import system_override
 from porcupine.core.services import get_service
-from porcupine.core import utils
+from porcupine.core import utils, schemaregistry
 from porcupine.datatypes import DataType, String
 from porcupine.core.datatypes.asyncsetter import AsyncSetter
 from .storage import storage
@@ -55,7 +55,7 @@ class ElasticMeta(type):
                 DEFAULTS['__fts_indices__'][cls] = cls.full_text_indexes
 
         # register content class
-        utils.ELASTIC_MAP[cls.__name__] = cls
+        schemaregistry.register(cls)
         super().__init__(name, bases, dct)
 
 
@@ -100,7 +100,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         item_type = dct.pop('type')
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
-            item_type = utils.get_content_class(item_type)
+            item_type = schemaregistry.get_content_class(item_type)
         new_item = item_type()
         await new_item.apply_patch(dct, camel_to_snake)
         return new_item
@@ -125,8 +125,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             storage['is_deleted'] = row['is_deleted']
         return content_class(storage)
 
-    @lru_cache(maxsize=None)
     @classmethod
+    @lru_cache(maxsize=None)
     def view_attrs(cls):
         schema = cls.__schema__.values()
         return tuple([
@@ -135,8 +135,8 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             and data_type.storage == '__storage__'
         ])
 
-    @lru_cache(maxsize=None)
     @classmethod
+    @lru_cache(maxsize=None)
     def unique_data_types(cls):
         schema = cls.__schema__.values()
         return tuple([

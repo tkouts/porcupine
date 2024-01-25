@@ -10,6 +10,7 @@ from porcupine.contract import contract
 from porcupine.core.context import context, system_override
 from porcupine.core.schema.composite import Composite
 from porcupine.core import utils
+from porcupine.core.schemaregistry import get_content_class
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
 from .datatype import DataType
 from .reference import ReferenceN, ItemCollection, Reference1
@@ -277,7 +278,7 @@ class Embedded(AsyncSetter, Reference1):
         value = self.__get__(instance, type(instance))
         item_dict = request.json
         try:
-            embedded = utils.get_content_class(item_dict.pop('_type'))
+            embedded = get_content_class(item_dict.pop('_type'))
             await embedded.apply_patch(item_dict)
             # setattr(instance, self.name, embedded)
             await value.reset(embedded)

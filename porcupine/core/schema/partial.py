@@ -5,7 +5,7 @@ from porcupine.core.accesscontroller import Roles
 from porcupine.core.utils.collections import OptionalFrozenDict
 from porcupine.core.accesscontroller import resolve_acl
 from porcupine.core.context import ctx_sys
-from porcupine.core.utils import get_content_class
+from porcupine.core.schemaregistry import get_content_class
 
 
 class AclProxy(OptionalFrozenDict):

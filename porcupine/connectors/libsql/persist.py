@@ -4,13 +4,14 @@ libsql database object persistence layer
 import orjson
 from collections import OrderedDict
 from porcupine import log
+from porcupine.core.schemaregistry import get_content_class
 from porcupine.core import utils
 
 
 def loads(row):
     # print(row)
     try:
-        content_class = utils.get_content_class(row['type'])
+        content_class = get_content_class(row['type'])
     except KeyError:
         log.error(
             'Unable to determine content class of document \n'
