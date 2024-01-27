@@ -124,8 +124,18 @@ class ItemCollection(AsyncSetterValue):
         super(List, descriptor).__set__(instance, value)
 
     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
-        # TODO: implement
-        return True
+        if self._desc.is_many_to_many:
+            q = self.query(
+                QueryType.RAW_ASSOCIATIVE,
+                where=self._desc.join_field == item_id
+            ).select(Count(1))
+        else:
+            q = self.query(
+                QueryType.RAW,
+                where=self.id == item_id
+            ).select(Count(1))
+        result = await q.execute(first_only=True)
+        return result[0] != 0
 
     async def count(self, where=None):
         if self._desc.is_many_to_many and where is None:
