@@ -151,17 +151,17 @@ class ReferenceN(AsyncSetter, List, Acceptable):
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)
 
-    def current_chunk(self, instance) -> int:
-        active_chunk_key = utils.get_active_chunk_key(self.name)
-        current_chunk = getattr(instance.__storage__, active_chunk_key)
-        if current_chunk is UNSET:
-            return 0
-        return current_chunk
+    # def current_chunk(self, instance) -> int:
+    #     active_chunk_key = utils.get_active_chunk_key(self.name)
+    #     current_chunk = getattr(instance.__storage__, active_chunk_key)
+    #     if current_chunk is UNSET:
+    #         return 0
+    #     return current_chunk
 
-    def key_for(self, instance, chunk=None):
-        if chunk is None:
-            chunk = self.current_chunk(instance)
-        return utils.get_collection_key(instance.id, self.name, chunk)
+    # def key_for(self, instance, chunk=None):
+    #     if chunk is None:
+    #         chunk = self.current_chunk(instance)
+    #     return utils.get_collection_key(instance.id, self.name, chunk)
 
     async def clone(self, instance, memo):
         collection = getattr(instance, self.name)
@@ -182,8 +182,11 @@ class ReferenceN(AsyncSetter, List, Acceptable):
     # Event handlers
 
     async def on_create(self, instance, value):
+        # print('create', self.name, value)
         if value:
-            ref_items = [i async for i in db.get_multi(value)]
+            # TODO: Replace with get_multi
+            ref_items = [await db.get_item(oid) for oid in value]
+            # ref_items = [i async for i in db.get_multi(value)]
             # check containment
             for item in ref_items:
                 if not await self.accepts_item(item):
@@ -192,27 +195,37 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         else:
             ref_items = []
         # write external
-        raw_value = ' '.join([i.__storage__.id for i in ref_items])
-        await super().on_create(instance, raw_value)
+        # raw_value = ' '.join([i.__storage__.id for i in ref_items])
+        await super().on_create(instance, [i.__storage__.id for i in ref_items])
+        collection = self.__get__(instance, None)
+        # # with system_override():
+        try:
+            await collection.add(*ref_items)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
         return ref_items, []
 
     async def on_change(self, instance, value, old_value):
+        print('change', value, old_value)
         # need to compute deltas
         collection = getattr(instance, self.name)
         new_value = frozenset(value)
         # compute old value leaving out non-accessible items
-        ref_items = [i async for i in db.get_multi(old_value)]
+        ref_items = [await db.get_item(oid) for oid in old_value]
         old_value = frozenset([i.__storage__.id for i in ref_items])
         added_ids = new_value.difference(old_value)
         removed_ids = old_value.difference(new_value)
-        added = [i async for i in db.get_multi(added_ids)]
-        removed = [i async for i in db.get_multi(removed_ids)]
-        with system_override():
-            try:
-                await collection.add(*added)
-            except exceptions.AttributeSetError as e:
-                raise exceptions.InvalidUsage(str(e))
-            await collection.remove(*removed)
+        # TODO: Replace with get_multi
+        added = [await db.get_item(oid) for oid in added_ids]
+        removed = [await db.get_item(oid) for oid in removed_ids]
+        # added = [i async for i in db.get_multi(added_ids)]
+        # removed = [i async for i in db.get_multi(removed_ids)]
+        # with system_override():
+        try:
+            await collection.add(*added)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+        await collection.remove(*removed)
         return added, removed
 
     async def on_delete(self, instance, value):
@@ -276,7 +289,7 @@ class ReferenceN(AsyncSetter, List, Acceptable):
             if expand:
                 items = [item async for item in collection.items()]
                 return items
-            return [oid async for oid in collection]
+            return await collection.ids()
 
     @contract(accepts=str)
     @db.transactional()
@@ -296,6 +309,17 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         return True
+
+    @contract(accepts=list)
+    async def put(self, instance, request):
+        """
+        Adds an item to the collection
+        :param instance:
+        :param request:
+        :return:
+        """
+        collection = await super().put(instance, request)
+        return await collection.ids()
 
     @db.transactional()
     async def delete(self, instance, request):

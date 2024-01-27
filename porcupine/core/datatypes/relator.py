@@ -9,7 +9,7 @@ from porcupine.core.services import db_connector
 from porcupine.connectors.schematables import ItemsTable
 from porcupine.connectors.libsql.query import QueryType, PorcupineQuery
 from .reference import Reference1, ReferenceN, ItemReference
-from .collection import ItemCollection
+# from .collection import ItemCollection
 from pypika import Parameter, Table
 from methodtools import lru_cache
 # from .asyncsetter import AsyncSetterValue
@@ -24,29 +24,29 @@ class RelatorBase:
         self.rel_attr = rel_attr
         self.respects_references = respects_references
 
-    async def add_reference(self, instance, *items):
-        with system_override():
-            for item in items:
-                rel_attr_value = getattr(item, self.rel_attr)
-                if isinstance(rel_attr_value, RelatorCollection):
-                    # call super add to avoid recursion
-                    await super(RelatorCollection, rel_attr_value).add(instance)
-                elif rel_attr_value is None or \
-                        isinstance(rel_attr_value, RelatorItem):
-                    setattr(item, self.rel_attr, instance.id)
-                    await context.txn.upsert(item)
-
-    async def remove_reference(self, instance, *items):
-        with system_override():
-            for item in items:
-                rel_attr_value = getattr(item, self.rel_attr)
-                if isinstance(rel_attr_value, RelatorCollection):
-                    # call super remove to avoid recursion
-                    await super(RelatorCollection,
-                                rel_attr_value).remove(instance)
-                elif isinstance(rel_attr_value, RelatorItem):
-                    setattr(item, self.rel_attr, None)
-                    await context.txn.upsert(item)
+    # async def add_reference(self, instance, *items):
+    #     with system_override():
+    #         for item in items:
+    #             rel_attr_value = getattr(item, self.rel_attr)
+    #             if isinstance(rel_attr_value, RelatorCollection):
+    #                 # call super add to avoid recursion
+    #                 await super(RelatorCollection, rel_attr_value).add(instance)
+    #             elif rel_attr_value is None or \
+    #                     isinstance(rel_attr_value, RelatorItem):
+    #                 setattr(item, self.rel_attr, instance.id)
+    #                 await context.txn.upsert(item)
+    #
+    # async def remove_reference(self, instance, *items):
+    #     with system_override():
+    #         for item in items:
+    #             rel_attr_value = getattr(item, self.rel_attr)
+    #             if isinstance(rel_attr_value, RelatorCollection):
+    #                 # call super remove to avoid recursion
+    #                 await super(RelatorCollection,
+    #                             rel_attr_value).remove(instance)
+    #             elif isinstance(rel_attr_value, RelatorItem):
+    #                 setattr(item, self.rel_attr, None)
+    #                 await context.txn.upsert(item)
 
 
 class RelatorItem(ItemReference):
@@ -94,10 +94,10 @@ class Relator1(Reference1, RelatorBase):
         if value:
             return RelatorItem(value, self)
 
-    async def on_create(self, instance, value):
-        ref_item = await super().on_create(instance, value)
-        if ref_item:
-            await self.add_reference(instance, ref_item)
+    # async def on_create(self, instance, value):
+    #     ref_item = await super().on_create(instance, value)
+    #     if ref_item:
+    #         await self.add_reference(instance, ref_item)
 
     async def on_change(self, instance, value, old_value):
         ref_item = await super().on_change(instance, value, old_value)
@@ -120,23 +120,23 @@ class Relator1(Reference1, RelatorBase):
                 await self.remove_reference(instance, ref_item)
 
 
-class RelatorCollection(ItemCollection):
-    def is_consistent(self, item):
-        descriptor, inst = self._desc, self._inst()
-        rel_attr = getattr(item, descriptor.rel_attr, None)
-        if rel_attr:
-            if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
-                return False
-            return True
-        return False
-
-    async def add(self, *items):
-        await super().add(*items)
-        await self._desc.add_reference(self._inst(), *items)
-
-    async def remove(self, *items):
-        await super().remove(*items)
-        await self._desc.remove_reference(self._inst(), *items)
+# class RelatorCollection(ItemCollection):
+#     def is_consistent(self, item):
+#         descriptor, inst = self._desc, self._inst()
+#         rel_attr = getattr(item, descriptor.rel_attr, None)
+#         if rel_attr:
+#             if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
+#                 return False
+#             return True
+#         return False
+#
+#     async def add(self, *items):
+#         await super().add(*items)
+#         await self._desc.add_reference(self._inst(), *items)
+#
+#     async def remove(self, *items):
+#         await super().remove(*items)
+#         await self._desc.remove_reference(self._inst(), *items)
 
 
 class RelatorN(ReferenceN, RelatorBase):
@@ -168,7 +168,7 @@ class RelatorN(ReferenceN, RelatorBase):
         RelatorBase.__init__(self, rel_attr, respects_references)
         self.t = ItemsTable(self)
 
-    @property
+    @cached_property
     def is_many_to_many(self):
         allowed_types = self.allowed_types
         if allowed_types:
@@ -220,16 +220,26 @@ class RelatorN(ReferenceN, RelatorBase):
     @lru_cache(maxsize=None)
     def query(self, query_type=QueryType.ITEMS):
         if self.is_many_to_many:
-            q = (
-                PorcupineQuery
-                .from_(self.associative_table, query_type=query_type)
-                .join(self.t)
-                .on(self.join_field == self.t.id)
-                .select()
-                .where(
-                    self.equality_field == Parameter(':instance_id')
+            if query_type is QueryType.RAW_ASSOCIATIVE:
+                q = (
+                    PorcupineQuery
+                    .from_(self.associative_table, query_type=query_type)
+                    .select()
+                    .where(
+                        self.equality_field == Parameter(':instance_id')
+                    )
                 )
-            )
+            else:
+                q = (
+                    PorcupineQuery
+                    .from_(self.associative_table, query_type=query_type)
+                    .join(self.t)
+                    .on(self.join_field == self.t.id)
+                    .select()
+                    .where(
+                        self.equality_field == Parameter(':instance_id')
+                    )
+                )
         else:
             rel_attr = self.rel_attr
             q = (
@@ -247,10 +257,10 @@ class RelatorN(ReferenceN, RelatorBase):
         # print(q)
         return q
 
-    async def on_create(self, instance, value):
-        added, _ = await super().on_create(instance, value)
-        if added:
-            await self.add_reference(instance, *added)
+    # async def on_create(self, instance, value):
+    #     added, _ = await super().on_create(instance, value)
+    #     if added:
+    #         await self.add_reference(instance, *added)
 
     # async def on_change(self, instance, value, old_value):
     #     added, removed = await super().on_change(instance, value, old_value)

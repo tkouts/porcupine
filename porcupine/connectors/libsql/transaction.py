@@ -41,7 +41,8 @@ class Transaction:
                  '_ext_upsertions',
                  '_deletions',
                  '_sd',
-                 '_appends',
+                 # '_appends',
+                 '_assoc',
                  # '_attr_locks',
                  '_committed')
 
@@ -58,7 +59,8 @@ class Transaction:
 
         # sub document mutations
         self._sd = defaultdict(dict)
-        self._appends = {}
+        # self._appends = {}
+        self._assoc = defaultdict(list)
 
         self._committed = False
 
@@ -88,15 +90,15 @@ class Transaction:
             return self._ext_insertions[key].value
         raise KeyError(key)
 
-    def get_key_append(self, item_id, key):
-        item_appends = self._appends.get(item_id)
-        if item_appends is not None and key in item_appends:
-            return ''.join(item_appends[key])
-        return ''
+    # def get_key_append(self, item_id, key):
+    #     item_appends = self._appends.get(item_id)
+    #     if item_appends is not None and key in item_appends:
+    #         return ''.join(item_appends[key])
+    #     return ''
 
-    def reset_key_append(self, key):
-        if key in self._appends:
-            del self._appends[key]
+    # def reset_key_append(self, key):
+    #     if key in self._appends:
+    #         del self._appends[key]
 
     def reset_mutations(self, item, key):
         if item.id in self._sd:
@@ -129,7 +131,7 @@ class Transaction:
             await item.on_change()
 
             # execute data types on_change handlers
-            locks = []
+            # locks = []
             on_change_handlers = []
             for key, new_value in item.__snapshot__.items():
                 data_type = utils.get_descriptor_by_storage_key(type(item), key)
@@ -162,10 +164,10 @@ class Transaction:
 
     async def touch(self, item):
         # touch has to be fast / no event handlers
-        now = date.utcnow()  # .isoformat()
+        now = date.utcnow()
         if item.__is_new__:
             item.__storage__.modified = now
-        elif 'md' not in item.__snapshot__:
+        elif 'modified' not in item.__snapshot__:
             item.__snapshot__['modified'] = now
             self.mutate(item, 'modified', SubDocument.UPSERT, now)
             # add to items map
@@ -224,13 +226,16 @@ class Transaction:
             default_json_encoder(value) or value,
         )
 
-    def append(self, item_id, key, value):
-        if key in self._ext_insertions:
-            self._ext_insertions[key].value += value
-        else:
-            item_appends = self._appends.setdefault(item_id, defaultdict(list))
-            if value not in item_appends[key]:
-                item_appends[key].append(value)
+    def mutate_collection(self, associative_table, mut_type, values):
+        self._assoc[associative_table].append((mut_type, values))
+
+    # def append(self, item_id, key, value):
+    #     if key in self._ext_insertions:
+    #         self._ext_insertions[key].value += value
+    #     else:
+    #         item_appends = self._appends.setdefault(item_id, defaultdict(list))
+    #         if value not in item_appends[key]:
+    #             item_appends[key].append(value)
 
     def insert_external(self, item_id, key, value):
         if key in self._ext_insertions:
@@ -364,6 +369,18 @@ class Transaction:
                 )
                 # rest_ops.append(SubDocumentMutation(item_id, mutations))
                 # print(item_id, mutations)
+
+        # collection mutations
+        # print(self._assoc)
+        for table, mutations in self._assoc.items():
+            for mut_type, values in mutations:
+                if mut_type == 1:
+                    insertions.append(
+                        libsql_client.Statement(
+                            f'insert or ignore into "{table}" values (?, ?)',
+                            values.values()
+                        )
+                    )
 
         # binary appends
         auto_splits = []

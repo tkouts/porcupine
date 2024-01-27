@@ -105,7 +105,10 @@ class LibSql:
         for table, fields in many_to_many.items():
             await self.db.execute(f'''
                 create table if not exists "{table.get_table_name()}" (
-                    {fields[0]} text not null REFERENCES items(id) ON DELETE CASCADE,
-                    {fields[1]} text not null REFERENCES items(id) ON DELETE CASCADE
+                    {fields[0]} text not null
+                        REFERENCES items(id) ON DELETE CASCADE,
+                    {fields[1]} text not null
+                        REFERENCES items(id) ON DELETE CASCADE,
+                    UNIQUE ({",".join(fields)})
                 )
             ''')

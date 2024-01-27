@@ -12,8 +12,9 @@ from porcupine.core.accesscontroller import resolve_visibility
 
 class QueryType(Enum):
     RAW = 0
-    PARTIAL = 1
-    ITEMS = 2
+    RAW_ASSOCIATIVE = 1
+    PARTIAL = 2
+    ITEMS = 3
 
 
 class Cursor(AsyncIterable):

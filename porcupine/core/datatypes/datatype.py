@@ -5,8 +5,7 @@ import cbor
 from porcupine import db, exceptions
 from porcupine.core.context import context
 from porcupine.core.schema.storage import UNSET
-from porcupine.response import json
-from porcupine.core.utils import get_key_of_unique
+# from porcupine.core.utils import get_key_of_unique
 from porcupine.connectors.mutations import SubDocument
 
 
@@ -115,19 +114,19 @@ class DataType:
     def clone(self, instance, memo):
         ...
 
-    async def add_unique(self, instance, value):
-        new_unique = get_key_of_unique(instance.parent_id,
-                                       self.name,
-                                       value)
-        context.txn.insert_external(instance.id,
-                                    new_unique,
-                                    instance.id)
+    # async def add_unique(self, instance, value):
+    #     new_unique = get_key_of_unique(instance.parent_id,
+    #                                    self.name,
+    #                                    value)
+    #     context.txn.insert_external(instance.id,
+    #                                 new_unique,
+    #                                 instance.id)
 
-    def remove_unique(self, instance, value):
-        unique_key = get_key_of_unique(instance.parent_id,
-                                       self.name,
-                                       value)
-        context.txn.delete_external(unique_key)
+    # def remove_unique(self, instance, value):
+    #     unique_key = get_key_of_unique(instance.parent_id,
+    #                                    self.name,
+    #                                    value)
+    #     context.txn.delete_external(unique_key)
 
     # event handlers
 
@@ -138,7 +137,7 @@ class DataType:
 
     async def on_change(self, instance, value, old_value):
         self.validate(value)
-        if self.storage == '__storage__':  # and not instance.__is_new__:
+        if self.storage == '__storage__' and not instance.__is_new__:
             # if self.unique:
             #     old_parent_id = instance.get_snapshot_of('parent_id')
             #     if instance.parent_id == old_parent_id:
@@ -147,11 +146,11 @@ class DataType:
             #         await self.add_unique(instance, value)
             #     # else:
             #     #     # parent_id on_change handler will do the job
-            if not instance.__is_new__:
-                context.txn.mutate(instance,
-                                   self.storage_key,
-                                   SubDocument.UPSERT,
-                                   value)
+            # if not instance.__is_new__:
+            context.txn.mutate(instance,
+                               self.storage_key,
+                               SubDocument.UPSERT,
+                               value)
 
     async def on_delete(self, instance, value):
         ...
@@ -178,7 +177,7 @@ class DataType:
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
         await instance.update()
-        return json(getattr(instance, self.name))
+        return getattr(instance, self.name)
 
 
 class MutableDataType(DataType):

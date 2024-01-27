@@ -13,7 +13,8 @@ from porcupine.core.accesscontroller import Roles
 from .counter import Counter
 from .atomicmap import AtomicMap, AtomicMapValue
 # from .reference import ReferenceN
-from .relator import RelatorN, Relator1, RelatorCollection
+from .relator import RelatorN, Relator1  # , RelatorCollection
+from .collection import ItemCollection
 # from pypika.terms import Parameter
 # from functools import cached_property
 
@@ -50,7 +51,7 @@ class Acl(AtomicMap):
         return instance.effective_acl
 
 
-class ChildrenCollection(RelatorCollection):
+class ChildrenCollection(ItemCollection):
     async def add(self, *items: TYPING.ANY_ITEM_CO):
         parent = self._inst()
         # parent_id = parent.id
