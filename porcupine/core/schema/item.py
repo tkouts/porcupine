@@ -182,8 +182,8 @@ class GenericItem(Removable, Elastic):
             if self.is_collection:
                 context.access_map[self.id] = self.access_record
 
-    async def touch(self) -> None:
-        await context.txn.touch(self)
+    def touch(self) -> None:
+        return context.txn.touch(self)
 
     async def update(self) -> bool:
         """
