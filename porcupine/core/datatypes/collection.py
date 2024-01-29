@@ -1,4 +1,5 @@
 from collections import OrderedDict
+
 from porcupine.hinting import TYPING
 from porcupine.exceptions import Forbidden, ContainmentError
 from porcupine.core.context import system_override, context
@@ -124,18 +125,20 @@ class ItemCollection(AsyncSetterValue):
         super(List, descriptor).__set__(instance, value)
 
     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
+        # return True
+        # print('has', self._inst().id, item_id)
         if self._desc.is_many_to_many:
             q = self.query(
                 QueryType.RAW_ASSOCIATIVE,
                 where=self._desc.join_field == item_id
-            ).select(Count(1))
+            ).select(1)
         else:
             q = self.query(
                 QueryType.RAW,
                 where=self.id == item_id
-            ).select(Count(1))
+            ).select(1)
         result = await q.execute(first_only=True)
-        return result[0] != 0
+        return result is not None
 
     async def count(self, where=None):
         if self._desc.is_many_to_many and where is None:
