@@ -1,5 +1,7 @@
 import hashlib
 
+from methodtools import lru_cache
+
 from porcupine import db
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import context_user
@@ -48,6 +50,8 @@ class Membership(Item):
     :type policies:
         L{Policies<org.innoscript.desktop.schema.properties.Policies>}
     """
+    __slots__ = '__is_admin'
+
     member_of = RelatorN(
         accepts=('Group', ),
         rel_attr='members'
@@ -58,6 +62,10 @@ class Membership(Item):
         ),
         rel_attr='granted_to'
     )
+
+    def __init__(self, dict_storage=None, **kwargs):
+        super().__init__(dict_storage, **kwargs)
+        self.__is_admin = None
 
     def is_member_of(self, group) -> bool:
         """
@@ -72,13 +80,16 @@ class Membership(Item):
         # group_ids = [group_id async for group_id in self.member_of]
         # return group.id in group_ids
 
-    def is_admin(self) -> bool:
+    async def is_admin(self) -> bool:
         """
         Checks if the user is direct member of the administrators group.
 
         @rtype: bool
         """
-        return self.member_of.has('administrators')
+        if self.__is_admin is None:
+            is_admin = await self.member_of.has('administrators')
+            self.__is_admin = is_admin
+        return self.__is_admin
         # group_ids = [group_id async for group_id in self.member_of]
         # return 'administrators' in group_ids
 
