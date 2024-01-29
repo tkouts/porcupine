@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import orjson
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.utils.collections import OptionalFrozenDict
-from porcupine.core.accesscontroller import resolve_acl
+from porcupine.core.accesscontroller import resolve_acl, AccessRecord
 from porcupine.core.context import ctx_sys
 from porcupine.core.schemaregistry import get_content_class
 
@@ -25,6 +25,15 @@ class PartialItem:
     @property
     def __is_new__(self):
         return False
+
+    @property
+    def access_record(self):
+        return AccessRecord(
+            self.parent_id,
+            self.acl.to_json(),
+            self.is_deleted,
+            self.expires_at
+        )
 
     @property
     def is_composite(self):

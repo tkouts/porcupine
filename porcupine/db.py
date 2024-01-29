@@ -5,13 +5,14 @@ from typing import Optional, AsyncIterable
 
 from sanic import Blueprint
 from sanic.request import Request
-from aiostream import stream, pipe
+# from aiostream import stream, pipe
 
 from porcupine import exceptions
 from porcupine.hinting import TYPING
-from porcupine.core.context import ctx_txn
+from porcupine.core.context import ctx_txn, context
 from porcupine.core.services import db_connector
-from porcupine.core.accesscontroller import resolve_visibility
+from porcupine.core.accesscontroller import resolve_visibility, Roles
+from porcupine.connectors.schematables import ItemsTable
 
 
 async def get_item(item_id: str, quiet: bool = True) -> Optional[
@@ -30,29 +31,21 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
 
     :rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
     """
-    connector = db_connector()
-    item = await connector.get(item_id, quiet=quiet)
+    item = await db_connector().get(item_id, quiet=quiet)
     if item is not None:
-        visibility = await resolve_visibility(item)
-        if visibility is not None:
-            if visibility:
-                return item
-            elif not quiet:
-                raise exceptions.Forbidden(
-                    f'Access to resource {item_id} is forbidden'
-                )
+        can_read = await item.can_read(context.user)
+        if can_read:
+            return item
         elif not quiet:
-            raise exceptions.NotFound(f'The resource {item_id} does not exist')
+            raise exceptions.Forbidden(
+                f'Access to resource {item_id} is forbidden.'
+            )
 
 
 async def get_multi(ids: TYPING.ID_LIST) -> AsyncIterable[TYPING.ANY_ITEM_CO]:
-    connector = db_connector()
-    streamer = (
-        stream.iterate(connector.get_multi(ids))
-        | pipe.filter(resolve_visibility)
-    )
-    async with streamer.stream() as items:
-        async for item in items:
+    async for item in db_connector().get_multi(ids):
+        can_read = await item.can_read(context.user)
+        if can_read:
             yield item
 
 

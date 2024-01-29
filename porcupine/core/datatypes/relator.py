@@ -7,7 +7,7 @@ from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.connectors.schematables import ItemsTable
-from porcupine.connectors.libsql.query import QueryType, PorcupineQuery
+from porcupine.connectors.libsql.query import QueryType
 from .reference import Reference1, ReferenceN, ItemReference
 # from .collection import ItemCollection
 from pypika import Parameter, Table
@@ -219,10 +219,11 @@ class RelatorN(ReferenceN, RelatorBase):
 
     @lru_cache(maxsize=None)
     def query(self, query_type=QueryType.ITEMS):
+        # Query = db_connector().Query
         if self.is_many_to_many:
             if query_type is QueryType.RAW_ASSOCIATIVE:
                 q = (
-                    PorcupineQuery
+                    db_connector().Query
                     .from_(self.associative_table, query_type=query_type)
                     .select()
                     .where(
@@ -231,7 +232,7 @@ class RelatorN(ReferenceN, RelatorBase):
                 )
             else:
                 q = (
-                    PorcupineQuery
+                    db_connector().Query
                     .from_(self.associative_table, query_type=query_type)
                     .join(self.t)
                     .on(self.join_field == self.t.id)
@@ -243,7 +244,7 @@ class RelatorN(ReferenceN, RelatorBase):
         else:
             rel_attr = self.rel_attr
             q = (
-                PorcupineQuery
+                db_connector().Query
                 .from_(self.t, query_type=query_type)
                 .select()
                 .where(

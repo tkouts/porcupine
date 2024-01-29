@@ -3,12 +3,14 @@ import time
 from collections import namedtuple, ChainMap
 from porcupine.core.services import db_connector
 # from porcupine.core.schema.partial import PartialItem
+# from porcupine import db
 from porcupine.core.context import (
     ctx_access_map,
-    ctx_user,
+    # ctx_user,
     ctx_sys,
     ctx_visibility_cache,
-    context_cacheable
+    context_cacheable,
+    # context_user
 )
 
 AccessRecord = namedtuple(
@@ -83,15 +85,15 @@ async def resolve_visibility(item) -> bool:
     parent_id = item.parent_id
 
     # check cache
-    user = ctx_user.get()
+    # user = ctx_user.get()
     visibility_cache = ctx_visibility_cache.get()
     use_cache = (
         parent_id is not None
         and not item.is_deleted
         and item.expires_at is None
-        and not item.acl.is_set()
+        # and not item.acl.is_set()
     )
-    cache_key = f'{parent_id}|{user.id if user else ""}'
+    cache_key = parent_id
     if use_cache and cache_key in visibility_cache:
         # print('using cache', item)
         return visibility_cache[cache_key]
@@ -99,7 +101,7 @@ async def resolve_visibility(item) -> bool:
     # update access map if needed
     access_map = ctx_access_map.get()
     if item.parent_id is None:
-        # ROOT container
+        # root container
         access_map[item.id] = item.access_record
     elif parent_id not in access_map:
         # print('fetching', parent_id)
@@ -115,23 +117,24 @@ async def resolve_visibility(item) -> bool:
             if row['id'] not in access_map
         })
 
-    can_read = True
+    is_visible = True
 
     if not item.is_system:
         # check recycled / expired
         deleted = _is_deleted(item)
         if deleted:
-            can_read = False
+            is_visible = False
         elif not connector.supports_ttl:
             expired = _is_expired(item)
             if expired:
-                can_read = False
-    can_read = can_read and await item.can_read(user)
+                is_visible = False
+
+    # can_read = can_read and await item.can_read(user)
 
     if use_cache:
-        visibility_cache[cache_key] = can_read
+        visibility_cache[cache_key] = is_visible
 
-    return can_read
+    return is_visible
 
 
 class Roles:
@@ -157,9 +160,11 @@ class Roles:
                 return acl[membership.id]
 
             # get membership
+            # async with context_user(db_connector().server.system_user):
+            print(item.id, membership.id)
             member_of.update({
                 group_id
-                async for group_id in membership.member_of
+                for group_id in await membership.member_of.ids()
             })
 
             if member_of:
@@ -183,11 +188,10 @@ class Roles:
     @context_cacheable(1024)
     async def _resolve_membership(group_ids: frozenset) -> set:
         extended_membership = set()
-        groups = [r async for r in db_connector().get_multi(group_ids)
-                  if r is not None]
-        for group in groups:
+        # groups = [r async for r in db_connector().get_multi(group_ids)]
+        async for group in db_connector().get_multi(group_ids):
             extended_membership.update({
-                group_id async for group_id in group.member_of
+                group_id for group_id in await group.member_of.ids()
             })
         if extended_membership:
             extended_membership.update(

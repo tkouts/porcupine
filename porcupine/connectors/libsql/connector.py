@@ -1,9 +1,11 @@
+# from typing import Optional
 import libsql_client
 from porcupine import log, context, exceptions
 from .transaction import Transaction
-# from .cursor import Cursor
-# from .virtual_tables import ItemsTable
-# from .query import PorcupineQuery
+from porcupine.connectors.schematables import ItemsTable
+from porcupine.core.accesscontroller import resolve_visibility
+# from porcupine.core.schema.partial import PartialItem
+from .query import PorcupineQuery, QueryType
 from porcupine.connectors.libsql import persist
 from porcupine.core import schemaregistry
 
@@ -14,6 +16,7 @@ class LibSql:
     active_txns = 0
     persist = persist
     supports_ttl = False
+    Query = PorcupineQuery
 
     def __init__(self, server):
         self.server = server
@@ -29,7 +32,7 @@ class LibSql:
             self.server.config.DB_HOST
         )
 
-    async def get(self, object_id, quiet=True, **kwargs):
+    async def get(self, object_id, quiet=True):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
         item = context.db_cache.get(object_id)
@@ -38,11 +41,14 @@ class LibSql:
             item = await self.get_raw(object_id)
             if item is not None:
                 item = self.persist.loads(item)
-            elif not quiet:
+                is_visible = await resolve_visibility(item)
+                if not is_visible:
+                    item = None
+            if not quiet and item is None:
                 raise exceptions.NotFound(
-                    f'The resource {object_id} does not exist'
+                    f'The resource {object_id} does not exist.'
                 )
-            context.db_cache[object_id] = item
+        context.db_cache[object_id] = item
         return item
 
     async def get_raw(self, item_id):
@@ -52,6 +58,21 @@ class LibSql:
         )
         if len(result) > 0:
             return result[0]
+
+    async def get_multi(self, item_ids):
+        print('get_multi')
+        t = ItemsTable(None)
+        q = (
+            self.Query
+            .from_(t, query_type=QueryType.RAW)
+            .select(t.star)
+            .where(t.id.isin(list(item_ids)))
+        )
+        async for result in q.cursor():
+            item = self.persist.loads(result)
+            is_visible = await resolve_visibility(item)
+            if is_visible:
+                yield item
 
     def fetch_access_map(self, item_id):
         return self.query('''
