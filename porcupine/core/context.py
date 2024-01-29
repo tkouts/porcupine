@@ -86,8 +86,6 @@ def with_context(identity=None, debug=False):
             user = identity
             if isinstance(user, str):
                 user = await connector.get(user)
-                if user is not None and user.is_deleted:
-                    user = None
             ctx_user.set(user)
             try:
                 return await task(*args, **kwargs)
@@ -147,8 +145,10 @@ class context_user:
     async def __aenter__(self):
         if isinstance(self.user, str):
             connector = db_connector()
-            should_switch = context.user is None \
+            should_switch = (
+                context.user is None
                 or context.user.id != self.user
+            )
             if should_switch:
                 self.user = await connector.get(self.user, quiet=False)
         else:
