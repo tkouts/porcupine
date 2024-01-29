@@ -75,7 +75,7 @@ class PorcupineQueryBuilder(QueryBuilder):
             return cursor
 
     async def execute(self, first_only=False, **kwargs):
-        results = await db_connector().db.execute(
+        results = await db_connector().query(
             self.get_sql(),
             {**kwargs, **self._params}
         )
