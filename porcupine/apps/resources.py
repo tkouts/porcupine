@@ -1,6 +1,5 @@
 import asyncio
 
-
 from porcupine import App, db, exceptions
 from porcupine.response import json, HTTPResponse
 from porcupine.core.schema.elastic import Elastic
