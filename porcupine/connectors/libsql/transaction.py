@@ -309,13 +309,13 @@ class Transaction:
         expiry_map = {}
 
         # insertions
-        insertions = []
+        statements = []
         for item_id, item in self._items.items():
             expiry_map[item_id] = await item.ttl
             if item.__is_new__:
                 inserted_items.append(item)
                 values = dumps(item)
-                insertions.append(
+                statements.append(
                     libsql_client.Statement(
                         'insert into items values '
                         f'({",".join(["?"] * len(values.keys()))})',
@@ -359,7 +359,7 @@ class Transaction:
                 #     f'{", ".join(attrs)} '
                 #     f'where id=?'
                 # )
-                insertions.append(
+                statements.append(
                     libsql_client.Statement(
                         'update items set '
                         f'{",".join(attrs)} '
@@ -375,7 +375,7 @@ class Transaction:
         for table, mutations in self._assoc.items():
             for mut_type, values in mutations:
                 if mut_type == 1:
-                    insertions.append(
+                    statements.append(
                         libsql_client.Statement(
                             f'insert or ignore into "{table}" values (?, ?)',
                             values.values()
@@ -418,7 +418,7 @@ class Transaction:
         # rest_ops.extend([Deletion(key) for key in self._attr_locks])
 
         return (
-            (insertions, rest_ops, auto_splits),
+            statements,
             (inserted_items, modified_items, deleted_items)
         )
 
@@ -429,16 +429,16 @@ class Transaction:
         @return: None
         """
         # prepare
-        db_ops, affected_items = await self.prepare()
-        insertions, rest_ops, auto_splits = db_ops
+        statements, affected_items = await self.prepare()
+        # insertions, rest_ops, auto_splits = db_ops
         # print(rest_ops)
         connector = self.connector
 
         # insertions
-        if insertions:
+        if statements:
             # first transaction phase - make sure all keys are non-existing
             # await self.insert_multi(insertions)
-            await connector.db.batch(insertions)
+            await connector.db.batch(statements)
 
         # if rest_ops:
         #     errors = await connector.batch_update(rest_ops)
@@ -466,10 +466,10 @@ class Transaction:
             asyncio.create_task(self._exec_post_handler('on_post_delete',
                                                         deleted_items, actor))
 
-        if auto_splits:
-            schema_service = get_service('schema')
-            for key, ttl in auto_splits:
-                await schema_service.auto_split(key, ttl)
+        # if auto_splits:
+        #     schema_service = get_service('schema')
+        #     for key, ttl in auto_splits:
+        #         await schema_service.auto_split(key, ttl)
 
         ctx_txn.set(None)
 
