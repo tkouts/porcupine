@@ -18,7 +18,7 @@ from porcupine.connectors.mutations import (
 )
 from porcupine.core import utils
 from porcupine.core.utils import date, default_json_encoder
-from porcupine.core.context import ctx_txn
+from porcupine.core.context import ctx_txn, ctx_access_map
 from porcupine.core.services import get_service
 from porcupine.core.context import system_override, context_user, context
 from porcupine.connectors.schematables import ItemsTable
@@ -108,10 +108,11 @@ class Transaction:
                     del mutations[path]
 
     async def insert(self, item: TYPING.ANY_ITEM_CO):
-        if item.id in self._items:
+        item_id = item.id
+        if item_id in self._items:
             self.connector.raise_exists(item.id)
 
-        self._items[item.id] = item
+        self._items[item_id] = item
 
         await item.on_create()
 
@@ -123,6 +124,9 @@ class Transaction:
             ])
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
+
+        if item.is_collection:
+            ctx_access_map.get()[item_id] = item.access_record
 
         item.__reset__()
 
@@ -343,14 +347,14 @@ class Transaction:
             if item_id not in self._deletions:
                 attrs = []
                 values = []
-                for attr_name, mutation in mutations.items():
+                for path, mutation in mutations.items():
                     mut_type, mut_value = mutation
-                    if attr_name in ItemsTable.columns:
-                        attrs.append(f'{attr_name}=?')
+                    if path in ItemsTable.columns:
+                        attrs.append(f'{path}=?')
                     else:
                         # TODO: implement mutation types - only upsert for now
                         attrs.append(
-                            f'data=(select json_set("data", \'$.{attr_name}\', ?) from items)'
+                            f'data=(select json_set("data", \'$.{path}\', ?) from items)'
                         )
                     values.append(mut_value)
                 values.append(item_id)
@@ -378,6 +382,15 @@ class Transaction:
                     statements.append(
                         libsql_client.Statement(
                             f'insert or ignore into "{table}" values (?, ?)',
+                            values.values()
+                        )
+                    )
+                else:
+                    fields = list(values.keys())
+                    statements.append(
+                        libsql_client.Statement(
+                            f'delete from "{table}" '
+                            f'where {fields[0]}=? and {fields[1]}=?',
                             values.values()
                         )
                     )

@@ -184,21 +184,14 @@ class ReferenceN(AsyncSetter, List, Acceptable):
     async def on_create(self, instance, value):
         # print('create', self.name, value)
         if value:
-            # TODO: Replace with get_multi
-            ref_items = [await db.get_item(oid) for oid in value]
-            # ref_items = [i async for i in db.get_multi(value)]
-            # check containment
-            for item in ref_items:
-                if not await self.accepts_item(item):
-                    raise exceptions.ContainmentError(instance,
-                                                      self.name, item)
+            ref_items = await db.get_multi(value).list()
+            # ref_items = [
+            #     item async for item in db_connector().get_multi(value)
+            # ]
         else:
             ref_items = []
-        # write external
-        # raw_value = ' '.join([i.__storage__.id for i in ref_items])
         await super().on_create(instance, [i.__storage__.id for i in ref_items])
         collection = self.__get__(instance, None)
-        # # with system_override():
         try:
             await collection.add(*ref_items)
         except exceptions.AttributeSetError as e:
@@ -206,21 +199,17 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         return ref_items, []
 
     async def on_change(self, instance, value, old_value):
-        print('change', value, old_value)
+        # print('change', value, old_value)
         # need to compute deltas
-        collection = getattr(instance, self.name)
-        new_value = frozenset(value)
+        collection = self.__get__(instance, None)
+        new_value = set(value)
         # compute old value leaving out non-accessible items
-        ref_items = [await db.get_item(oid) for oid in old_value]
-        old_value = frozenset([i.__storage__.id for i in ref_items])
+        ref_items = await db.get_multi(old_value).list()
+        old_value = set([i.__storage__.id for i in ref_items])
         added_ids = new_value.difference(old_value)
         removed_ids = old_value.difference(new_value)
-        # TODO: Replace with get_multi
-        added = [await db.get_item(oid) for oid in added_ids]
-        removed = [await db.get_item(oid) for oid in removed_ids]
-        # added = [i async for i in db.get_multi(added_ids)]
-        # removed = [i async for i in db.get_multi(removed_ids)]
-        # with system_override():
+        added = await db.get_multi(added_ids).list()
+        removed = await db.get_multi(removed_ids).list()
         try:
             await collection.add(*added)
         except exceptions.AttributeSetError as e:
@@ -287,8 +276,7 @@ class ReferenceN(AsyncSetter, List, Acceptable):
             return member
         else:
             if expand:
-                items = [item async for item in collection.items()]
-                return items
+                return await collection.items().list()
             return await collection.ids()
 
     @contract(accepts=str)
@@ -311,6 +299,7 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         return True
 
     @contract(accepts=list)
+    @db.transactional()
     async def put(self, instance, request):
         """
         Adds an item to the collection

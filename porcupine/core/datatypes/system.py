@@ -66,7 +66,6 @@ class ChildrenCollection(ItemCollection):
                 item.owner = user.id
                 item.created = item.modified = date.utcnow()
                 item.modified_by = user.name
-                # item.parent_id = parent_id
                 item.p_type = parent.content_class
 
             expire_times = [item.expires_at, parent.expires_at]
@@ -78,9 +77,6 @@ class ChildrenCollection(ItemCollection):
 
             # insert item to DB
             await context.txn.insert(item)
-            # update access map
-            if item.is_collection:
-                context.access_map[item.id] = item.access_record
 
         await super().add(*items)
 
@@ -102,8 +98,6 @@ class Children(RelatorN):
             rel_attr='parent_id',
             **kwargs
         )
-        # self.__query = None
-        # self.name = 'children'
 
     def getter(self, instance, value=None):
         return ChildrenCollection(self, instance)
@@ -173,28 +167,6 @@ class Children(RelatorN):
     put = None
 
 
-# class Items(Children):
-#     name = 'items'
-#
-#     @property
-#     def allowed_types(self):
-#         if not self.accepts_resolved:
-#             resolved = super().allowed_types
-#             self.accepts = tuple([x for x in resolved if not x.is_collection])
-#         return self.accepts
-#
-#
-# class Containers(Children):
-#     name = 'containers'
-#
-#     @property
-#     def allowed_types(self):
-#         if not self.accepts_resolved:
-#             resolved = super().allowed_types
-#             self.accepts = tuple([x for x in resolved if x.is_collection])
-#         return self.accepts
-
-
 class Deleted(Counter):
 
     def __init__(self):
@@ -224,8 +196,8 @@ class ParentId(Relator1):
 
     async def on_change(self, instance, value, old_value):
         await super().on_change(instance, value, old_value)
-        # remove_uniques(instance)
-        # await add_uniques(instance)
+        if instance.is_collection:
+            context.access_map[instance.id] = instance.access_record
         instance.reset_effective_acl()
 
     @contract(accepts=str)

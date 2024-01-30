@@ -5,14 +5,14 @@ from typing import Optional, AsyncIterable
 
 from sanic import Blueprint
 from sanic.request import Request
-# from aiostream import stream, pipe
+from aiostream import pipe, async_
 
 from porcupine import exceptions
 from porcupine.hinting import TYPING
 from porcupine.core.context import ctx_txn, context
 from porcupine.core.services import db_connector
-from porcupine.core.accesscontroller import resolve_visibility, Roles
-from porcupine.connectors.schematables import ItemsTable
+# from porcupine.core.accesscontroller import resolve_visibility, Roles
+# from porcupine.connectors.schematables import ItemsTable
 
 
 async def get_item(item_id: str, quiet: bool = True) -> Optional[
@@ -42,11 +42,16 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
             )
 
 
-async def get_multi(ids: TYPING.ID_LIST) -> AsyncIterable[TYPING.ANY_ITEM_CO]:
-    async for item in db_connector().get_multi(ids):
-        can_read = await item.can_read(context.user)
-        if can_read:
-            yield item
+def get_multi(ids: TYPING.ID_LIST):
+    from porcupine.core.stream.streamer import EmptyStreamer, BaseStreamer
+    if ids:
+        user = context.user
+        streamer = (
+            BaseStreamer(db_connector().get_multi(ids))
+            | pipe.filter(async_(lambda x: x.can_read(user)))
+        )
+        return streamer
+    return EmptyStreamer()
 
 
 def transactional(auto_commit=True):
@@ -77,7 +82,8 @@ def transactional(auto_commit=True):
                             copy.deepcopy(arg)
                             if not isinstance(arg, do_not_copy_types)
                             else arg
-                            for arg in args]
+                            for arg in args
+                        ]
                         keyword_args_copy = {
                             name: copy.deepcopy(value)
                             if not isinstance(value, do_not_copy_types)
@@ -106,7 +112,8 @@ def transactional(auto_commit=True):
                         raise
                 # maximum retries exceeded
                 raise exceptions.DBDeadlockError(
-                    'Maximum transaction retries exceeded')
+                    'Maximum transaction retries exceeded.'
+                )
                 # finally:
                 #     ctx_txn.set(None)
             else:

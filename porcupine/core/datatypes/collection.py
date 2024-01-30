@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from functools import cached_property
 
 from porcupine.hinting import TYPING
 from porcupine.exceptions import Forbidden, ContainmentError
@@ -8,6 +9,7 @@ from .asyncsetter import AsyncSetterValue
 # from .external import Text
 from .mutable import List
 from porcupine.connectors.libsql.query import QueryType
+from pypika import Parameter
 from pypika.functions import Count
 
 
@@ -19,6 +21,16 @@ class ItemCollection(AsyncSetterValue):
         self.__query_params = {
             'instance_id': instance.id
         }
+        # if descriptor.is_many_to_many:
+        #     self.__membership_check_query = self.query(
+        #         QueryType.RAW_ASSOCIATIVE,
+        #         where=self._desc.join_field == Parameter(':member_id')
+        #     ).select(1)
+        # else:
+        #     self.__membership_check_query = self.query(
+        #         QueryType.RAW,
+        #         where=self.id == Parameter(':member_id')
+        #     ).select(1)
 
     def __getattr__(self, item):
         return getattr(self._desc.t, item)
@@ -34,6 +46,18 @@ class ItemCollection(AsyncSetterValue):
         return q
 
     @property
+    def __membership_check_query(self):
+        if self._desc.is_many_to_many:
+            return self.query(
+                QueryType.RAW_ASSOCIATIVE,
+                where=self._desc.join_field == Parameter(':member_id')
+            ).select(1)
+        else:
+            return self.query(
+                QueryType.RAW,
+                where=self.id == Parameter(':member_id')
+            ).select(1)
+
     def is_fetched(self) -> bool:
         return getattr(self._inst().__externals__,
                        self._desc.storage_key) is not UNSET
@@ -62,14 +86,18 @@ class ItemCollection(AsyncSetterValue):
         return q.cursor(skip, take, resolve_shortcuts, **kwargs)
 
     async def ids(self):
-        if self._desc.is_many_to_many:
-            q = self.query(QueryType.RAW_ASSOCIATIVE)
-            q = q.select(self._desc.join_field.as_('id'))
-        else:
-            q = self.query(QueryType.RAW)
-            q = q.select(self.id)
-        results = await q.execute()
-        return [r['id'] for r in results]
+        if not self.is_fetched():
+            if self._desc.is_many_to_many:
+                q = self.query(QueryType.RAW_ASSOCIATIVE)
+                q = q.select(self._desc.join_field.as_('id'))
+            else:
+                q = self.query(QueryType.RAW)
+                q = q.select(self.id)
+            results = await q.execute()
+            ids = [r[0] for r in results]
+            setattr(self._inst().__externals__, self._desc.storage_key, ids)
+            return ids
+        return getattr(self._inst().__externals__, self._desc.storage_key)
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         # print('adding', self._inst.id, self._desc.name, items)
@@ -80,26 +108,26 @@ class ItemCollection(AsyncSetterValue):
             await instance.touch()
             # collection_key = descriptor.key_for(instance)
             is_many_to_many = descriptor.is_many_to_many
-            with system_override():
-                for item in items:
-                    if not await descriptor.accepts_item(item):
-                        raise ContainmentError(instance, descriptor.name, item)
-                    if is_many_to_many:
-                        assoc_table = self._desc.associative_table
-                        values = OrderedDict({
-                            f: None
-                            for f in self._desc.associative_table_fields
-                        })
-                        values[self._desc.equality_field.name] = instance.id
-                        values[self._desc.join_field.name] = item.id
-                        context.txn.mutate_collection(
-                            assoc_table.get_table_name(),
-                            1,
-                            values
-                        )
-                    else:
+            for item in items:
+                if not await descriptor.accepts_item(item):
+                    raise ContainmentError(instance, descriptor.name, item)
+                if is_many_to_many:
+                    assoc_table = self._desc.associative_table
+                    values = OrderedDict({
+                        f: None
+                        for f in self._desc.associative_table_fields
+                    })
+                    values[self._desc.equality_field.name] = instance.id
+                    values[self._desc.join_field.name] = item.id
+                    context.txn.mutate_collection(
+                        assoc_table.get_table_name(),
+                        1,
+                        values
+                    )
+                else:
+                    with system_override():
                         setattr(item, descriptor.rel_attr, instance.id)
-                        await context.txn.upsert(item)
+                    await context.txn.upsert(item)
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
@@ -108,37 +136,48 @@ class ItemCollection(AsyncSetterValue):
                 raise Forbidden('Forbidden')
             await instance.touch()
             # collection_key = descriptor.key_for(instance)
-            # for item in items:
-            #     item_id = item.id
-            #     context.txn.append(instance.id, collection_key, f' -{item_id}')
+            is_many_to_many = descriptor.is_many_to_many
+            for item in items:
+                if is_many_to_many:
+                    assoc_table = self._desc.associative_table
+                    values = OrderedDict({
+                        f: None
+                        for f in self._desc.associative_table_fields
+                    })
+                    values[self._desc.equality_field.name] = instance.id
+                    values[self._desc.join_field.name] = item.id
+                    context.txn.mutate_collection(
+                        assoc_table.get_table_name(),
+                        0,
+                        values
+                    )
+                else:
+                    with system_override():
+                        setattr(item, descriptor.rel_attr, None)
+                    await context.txn.upsert(item)
 
     async def reset(self, value: list) -> None:
         # print('reset', value)
         descriptor, instance = self._desc, self._inst()
         # remove collection appends
         # context.txn.reset_key_append(descriptor.key_for(instance))
-        if not self.is_fetched:
+        if not self.is_fetched():
             # fetch value from db
             storage = getattr(instance, descriptor.storage)
             setattr(storage, descriptor.storage_key, await self.ids())
-        # set collection
-        super(List, descriptor).__set__(instance, value)
+        await super().reset(value)
+        # super(List, descriptor).__set__(instance, value)
 
     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
-        # return True
-        # print('has', self._inst().id, item_id)
-        if self._desc.is_many_to_many:
-            q = self.query(
-                QueryType.RAW_ASSOCIATIVE,
-                where=self._desc.join_field == item_id
-            ).select(1)
+        if not self.is_fetched():
+            result = await self.__membership_check_query.execute(
+                first_only=True,
+                member_id=item_id
+            )
+            return result is not None
         else:
-            q = self.query(
-                QueryType.RAW,
-                where=self.id == item_id
-            ).select(1)
-        result = await q.execute(first_only=True)
-        return result is not None
+            return item_id in getattr(self._inst().__externals__,
+                                      self._desc.storage_key)
 
     async def count(self, where=None):
         if self._desc.is_many_to_many and where is None:

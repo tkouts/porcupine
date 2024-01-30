@@ -1,8 +1,8 @@
 from typing import Callable, AsyncIterable, Awaitable
 # from functools import partial
-from aiostream import stream, async_, StreamEmpty
+from aiostream import stream, async_
 
-from porcupine import db, exceptions, pipe
+from porcupine import pipe
 from porcupine.hinting import TYPING
 # from porcupine.core.services import db_connector, get_service
 from porcupine.core.context import ctx_user
@@ -42,7 +42,8 @@ class BaseStreamer(AsyncIterable):
         streamer = stream.iterate(self._iterator)
         for op in self._operators:
             streamer |= op
-        # if _reverse and not self.supports_reversed_iteration and self._reversed:
+        # if _reverse and not self.supports_reversed_iteration
+        # and self._reversed:
         #     streamer |= pipe.reverse()
         return streamer
 
@@ -92,7 +93,8 @@ class EmptyStreamer(BaseStreamer):
 #         if has_item_id:
 #             return await db.get_item(item_id, quiet=quiet)
 #         if not quiet:
-#             raise exceptions.NotFound(f'The resource {item_id} does not exist')
+#             raise exceptions.NotFound(f'The resource {item_id}
+#             does not exist')
 #
 #     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
 #         has_item = (
@@ -106,21 +108,22 @@ class EmptyStreamer(BaseStreamer):
 
 
 class PartialStreamer(BaseStreamer):
-    def __init__(self, cursor):
+    def __init__(self, cursor, _skip_acl_check=False):
         super().__init__(cursor)
         self._operators.append(pipe.map(PartialItem))
         self._operators.append(pipe.filter(resolve_visibility))
-        self._operators.append(pipe.filter(
-            async_(lambda x: x.can_read(ctx_user.get()))
-        ))
+        if not _skip_acl_check:
+            self._operators.append(pipe.filter(
+                async_(lambda x: x.can_read(ctx_user.get()))
+            ))
 
 
 class ItemStreamer(PartialStreamer):
     # supports_reversed_iteration = True
     # output_ids = False
 
-    def __init__(self, cursor):
-        super().__init__(cursor)
+    def __init__(self, cursor, _skip_acl_check=False):
+        super().__init__(cursor, _skip_acl_check)
         self._operators.append(pipe.map(Elastic.from_partial))
 
     # def reverse(self):

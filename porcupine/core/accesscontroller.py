@@ -160,8 +160,6 @@ class Roles:
                 return acl[membership.id]
 
             # get membership
-            # async with context_user(db_connector().server.system_user):
-            print(item.id, membership.id)
             member_of.update({
                 group_id
                 for group_id in await membership.member_of.ids()

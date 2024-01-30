@@ -3,6 +3,7 @@ from typing import AsyncIterable
 from pypika.queries import QueryBuilder, Query
 from porcupine import pipe
 from porcupine.core.schemaregistry import get_content_class
+from porcupine.core.context import ctx_user
 from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import ItemStreamer, PartialStreamer
 from porcupine.core.schema.partial import PartialItem
@@ -51,13 +52,20 @@ class PorcupineQueryBuilder(QueryBuilder):
     def set_params(self, params):
         self._params = params
 
-    def cursor(self, skip=0, take=None, resolve_shortcuts=False, **kwargs):
+    def cursor(
+        self,
+        skip=0,
+        take=None,
+        resolve_shortcuts=False,
+        _skip_acl_check=False,
+        **kwargs
+    ):
         cursor = Cursor(self, {
             **kwargs,
             **self._params
         })
         if self.type is QueryType.ITEMS:
-            items = ItemStreamer(cursor)
+            items = ItemStreamer(cursor, _skip_acl_check)
             if resolve_shortcuts:
                 items |= pipe.map(self._shortcut_resolver)
                 items |= pipe.if_not_none()
@@ -66,7 +74,7 @@ class PorcupineQueryBuilder(QueryBuilder):
             return items
         elif self.type is QueryType.PARTIAL:
             # TODO: check resolve_shortcuts is False
-            partials = PartialStreamer(cursor)
+            partials = PartialStreamer(cursor, _skip_acl_check)
             if skip or take:
                 partials |= pipe.skip_and_take(skip, take)
             return partials
@@ -80,9 +88,11 @@ class PorcupineQueryBuilder(QueryBuilder):
             {**kwargs, **self._params}
         )
         if self.type in (QueryType.ITEMS, QueryType.PARTIAL):
+            user = ctx_user.get()
             results = [
                 p for p in (PartialItem(r) for r in results)
                 if await resolve_visibility(p)
+                and await p.can_read(user)
             ]
             if self.type is QueryType.ITEMS:
                 results = [Elastic.from_partial(p) for p in results]
