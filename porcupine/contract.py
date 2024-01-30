@@ -23,7 +23,7 @@ def contract(accepts=None, predicate=None, optional=False):
                     if not isinstance(request.json, accepts):
                         # TODO: add support for tuple accepts
                         raise UnprocessableEntity(
-                            'Invalid payload, got {0} instead of {1}'.format(
+                            'Invalid payload, got {0} instead of {1}.'.format(
                                 type(request.json).__name__, accepts.__name__
                             ))
 
