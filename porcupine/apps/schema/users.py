@@ -90,8 +90,6 @@ class Membership(Item):
             is_admin = await self.member_of.has('administrators')
             self.__is_admin = is_admin
         return self.__is_admin
-        # group_ids = [group_id async for group_id in self.member_of]
-        # return 'administrators' in group_ids
 
 
 class User(Membership):
