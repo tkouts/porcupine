@@ -5,7 +5,6 @@ from sanic import Blueprint
 
 from porcupine import db, config
 from porcupine.core.schemaregistry import get_content_class
-from porcupine.core.services import db_connector
 from porcupine.core.server import server
 from porcupine.core.context import with_context, system_override
 
@@ -29,11 +28,10 @@ class App(Blueprint):
     @with_context(server.system_user)
     @db.transactional()
     async def __initialize_db(self, blueprint):
-        connector = db_connector()
         for item in blueprint:
-            await self.__process_item(connector, item, None)
+            await self.__process_item(item, None)
 
-    async def __process_item(self, connector, item_dict, parent):
+    async def __process_item(self, item_dict, parent):
         item_id = item_dict.pop('id', None)
         item_type = item_dict.pop('type', None)
         in_sync = item_dict.pop('keep_in_sync', False)
@@ -67,4 +65,4 @@ class App(Blueprint):
                     await item.update()
 
         for child_dict in children:
-            await self.__process_item(connector, child_dict, item)
+            await self.__process_item(child_dict, item)
