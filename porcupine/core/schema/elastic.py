@@ -170,8 +170,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         return f'{self.id}({self.content_class})'
 
     def __reset__(self) -> None:
-        self.__storage__.update(self.__snapshot__)
-        self.__externals__.update(self.__snapshot__)
+        snapshot = self.__snapshot__
+        self.__storage__.update(snapshot)
+        self.__externals__.update(snapshot)
         self.__snapshot__ = {}
 
     def __repr__(self) -> str:
