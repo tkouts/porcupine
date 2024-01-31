@@ -6,7 +6,7 @@ from porcupine.core.schemaregistry import get_content_class
 from porcupine.core.context import ctx_user
 from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import ItemStreamer, PartialStreamer
-from porcupine.core.schema.partial import PartialItem
+from porcupine.connectors.partial import PartialItem
 from porcupine.core.schema.elastic import Elastic
 from porcupine.core.accesscontroller import resolve_visibility
 
@@ -83,7 +83,8 @@ class PorcupineQueryBuilder(QueryBuilder):
             return cursor
 
     async def execute(self, first_only=False, **kwargs):
-        results = await db_connector().query(
+        connector = db_connector()
+        results = await connector.query(
             self.get_sql(),
             {**kwargs, **self._params}
         )
@@ -95,7 +96,8 @@ class PorcupineQueryBuilder(QueryBuilder):
                 and await p.can_read(user)
             ]
             if self.type is QueryType.ITEMS:
-                results = [Elastic.from_partial(p) for p in results]
+                loads = connector.persist.loads
+                results = [loads(p) for p in results]
         if first_only:
             if len(results) == 0:
                 return None

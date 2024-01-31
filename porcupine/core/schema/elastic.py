@@ -1,6 +1,5 @@
 import asyncio
 import copy
-import orjson
 from functools import lru_cache
 from typing import ClassVar, Type, Optional
 
@@ -109,26 +108,6 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         new_item = item_type()
         await new_item.apply_patch(dct, camel_to_snake)
         return new_item
-
-    @staticmethod
-    def from_partial(partial):
-        row = partial.raw_data
-        content_class = partial.clazz
-        storage = orjson.loads(row['data'])
-        storage['id'] = row['id']
-        storage['sig'] = row['sig']
-        if not content_class.is_composite:
-            storage['acl'] = partial.acl.to_json()
-            storage['name'] = row['name']
-            storage['created'] = row['created']
-            storage['modified'] = row['modified']
-            # params['is_collection'] = obj.is_collection
-            storage['is_system'] = row['is_system']
-            storage['parent_id'] = row['parent_id']
-            storage['p_type'] = row['p_type']
-            storage['expires_at'] = row['expires_at']
-            storage['is_deleted'] = row['is_deleted']
-        return content_class(storage)
 
     @classmethod
     @lru_cache(maxsize=None)

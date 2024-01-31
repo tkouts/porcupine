@@ -4,16 +4,11 @@ from aiostream import stream, async_
 
 from porcupine import pipe
 from porcupine.hinting import TYPING
-# from porcupine.core.services import db_connector, get_service
 from porcupine.core.context import ctx_user
-from porcupine.core.schema.elastic import Elastic
-from porcupine.core.schema.partial import PartialItem
+from porcupine.core.services import db_connector
+# from porcupine.core.schema.elastic import Elastic
+from porcupine.connectors.partial import PartialItem
 from porcupine.core.accesscontroller import resolve_visibility
-# from porcupine.core.utils.db import (
-#     resolve_visibility,
-#     is_consistent,
-#     get_with_id,
-# )
 
 
 class BaseStreamer(AsyncIterable):
@@ -124,7 +119,7 @@ class ItemStreamer(PartialStreamer):
 
     def __init__(self, cursor, _skip_acl_check=False):
         super().__init__(cursor, _skip_acl_check)
-        self._operators.append(pipe.map(Elastic.from_partial))
+        self._operators.append(pipe.map(db_connector().persist.loads))
 
     # def reverse(self):
     #     self._iterator.reverse()

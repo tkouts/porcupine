@@ -1,5 +1,4 @@
 from typing import Mapping
-from collections.abc import Sequence
 import orjson
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.utils.collections import OptionalFrozenDict
@@ -16,7 +15,7 @@ class AclProxy(OptionalFrozenDict):
 class PartialItem:
     __slots__ = '_partial', '_content_class', 'acl'
 
-    def __init__(self, partial=Sequence):
+    def __init__(self, partial: Mapping):
         self._partial = partial
         self._content_class = get_content_class(partial['type'])
         acl = partial['acl']
@@ -44,10 +43,6 @@ class PartialItem:
         return self._content_class.is_collection
 
     @property
-    def clazz(self):
-        return self._content_class
-
-    @property
     def raw_data(self):
         return self._partial
 
@@ -58,6 +53,9 @@ class PartialItem:
     @property
     def effective_acl(self):
         return resolve_acl(self)
+
+    def __getitem__(self, item):
+        return self._partial[item]
 
     def __getattr__(self, item):
         try:

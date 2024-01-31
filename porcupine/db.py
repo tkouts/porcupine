@@ -11,8 +11,7 @@ from porcupine import exceptions
 from porcupine.hinting import TYPING
 from porcupine.core.context import ctx_txn, context
 from porcupine.core.services import db_connector
-# from porcupine.core.accesscontroller import resolve_visibility, Roles
-# from porcupine.connectors.schematables import ItemsTable
+from porcupine.core.stream.streamer import EmptyStreamer, BaseStreamer
 
 
 async def get_item(item_id: str, quiet: bool = True) -> Optional[
@@ -43,7 +42,6 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
 
 
 def get_multi(ids: TYPING.ID_LIST):
-    from porcupine.core.stream.streamer import EmptyStreamer, BaseStreamer
     if ids:
         user = context.user
         streamer = (

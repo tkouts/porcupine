@@ -31,10 +31,6 @@
               description: System User
               type: SystemUser
               is_system: Yes
-            - id: admin
-              name: admin
-              password: admin
-              type: User
             - id: everyone
               name: Everyone Group
               type: EveryoneGroup
@@ -43,12 +39,20 @@
               name: Authenticated Users
               type: AuthUsersGroup
               is_system: Yes
+            - id: admin
+              name: admin
+              password: admin
+              type: User
+            - id: testgroup
+              name: Test Group
+              type: Group
             - id: administrators
               name: Administrators
               type: Group
               is_system: Yes
-#              members:
-#                - admin
+              keep_in_sync: Yes
+              members:
+                - admin
 
 - id: RB
   type: RecycleBin

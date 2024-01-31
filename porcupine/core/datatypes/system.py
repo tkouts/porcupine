@@ -68,6 +68,7 @@ class ChildrenCollection(ItemCollection):
                 item.modified_by = user.name
                 item.p_type = parent.content_class
 
+            # TODO: think this is not needed anymore
             expire_times = [item.expires_at, parent.expires_at]
             if isinstance(item, shortcut):
                 target = await item.get_target()
