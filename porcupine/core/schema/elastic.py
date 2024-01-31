@@ -4,7 +4,6 @@ from functools import lru_cache
 from typing import ClassVar, Type, Optional
 
 from porcupine.hinting import TYPING
-# from porcupine.config.default import DEFAULTS
 from porcupine.core.context import system_override
 from porcupine.core.services import get_service
 from porcupine.core import utils, schemaregistry

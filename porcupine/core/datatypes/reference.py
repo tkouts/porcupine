@@ -125,21 +125,8 @@ class Reference1(String, Acceptable):
 
 
 class ReferenceN(AsyncSetter, List, Acceptable):
-    # storage_info = '_refN_'
     safe_type = list, tuple
-    # allow_none = False
     storage = '__externals__'
-    # t = Table('items')
-    columns = (
-        'id', 'sig', 'type', 'name', 'created',
-        'modified', 'is_collection', 'is_system', 'acl',
-        'parent_id', 'p_type', 'expires_at', 'is_deleted'
-    )
-    # star_fields = (
-    #     'id', 'sig', 'type', 'name', 'created',
-    #     'modified', 'is_system', 'acl',
-    #     'parent_id', 'expires_at', 'is_deleted', 'data'
-    # )
 
     def __init__(self, default=(), accepts=(), cascade_delete=False, **kwargs):
         super(List, self).__init__(default, allow_none=False,
@@ -183,33 +170,35 @@ class ReferenceN(AsyncSetter, List, Acceptable):
 
     async def on_create(self, instance, value):
         # print('create', self.name, value)
-        if value:
-            ref_items = await db.get_multi(value).list()
-            # ref_items = [
-            #     item async for item in db_connector().get_multi(value)
-            # ]
-        else:
-            ref_items = []
-        await super().on_create(instance, [i.__storage__.id for i in ref_items])
+        # if value:
+        #     ref_items = await db.get_multi(value).list()
+        #     # ref_items = [
+        #     #     item async for item in db_connector().get_multi(value)
+        #     # ]
+        # else:
+        #     ref_items = []
+        await super().on_create(instance, value)
         collection = self.__get__(instance, None)
         try:
-            await collection.add(*ref_items)
+            await collection.add(*value)
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
-        return ref_items, []
+        return value, []
 
     async def on_change(self, instance, value, old_value):
         # print('change', value, old_value)
         # need to compute deltas
         collection = self.__get__(instance, None)
-        new_value = set(value)
+        new_ids = set([i.__storage__.id for i in value])
         # compute old value leaving out non-accessible items
-        ref_items = await db.get_multi(old_value).list()
-        old_value = set([i.__storage__.id for i in ref_items])
-        added_ids = new_value.difference(old_value)
-        removed_ids = old_value.difference(new_value)
-        added = await db.get_multi(added_ids).list()
-        removed = await db.get_multi(removed_ids).list()
+        # ref_items = await db.get_multi(old_value).list()
+        old_ids = set([i.__storage__.id for i in old_value])
+        added_ids = new_ids.difference(old_ids)
+        removed_ids = old_ids.difference(new_ids)
+        added = [i for i in value if i.id in added_ids]
+        # await db.get_multi(added_ids).list()
+        removed = [i for i in old_value if i.id in removed_ids]
+        # await db.get_multi(removed_ids).list()
         try:
             await collection.add(*added)
         except exceptions.AttributeSetError as e:
@@ -226,18 +215,18 @@ class ReferenceN(AsyncSetter, List, Acceptable):
 
         await super().on_delete(instance, value)
 
-        previous_chunk = self.current_chunk(instance) - 1
-        if previous_chunk > -1:
-            connector = db_connector()
-            while True:
-                external_key = utils.get_collection_key(instance.id,
-                                                        self.name,
-                                                        previous_chunk)
-                _, key_exists = await connector.exists(external_key)
-                if not key_exists:
-                    break
-                context.txn.delete_external(external_key)
-                previous_chunk -= 1
+        # previous_chunk = self.current_chunk(instance) - 1
+        # if previous_chunk > -1:
+        #     connector = db_connector()
+        #     while True:
+        #         external_key = utils.get_collection_key(instance.id,
+        #                                                 self.name,
+        #                                                 previous_chunk)
+        #         _, key_exists = await connector.exists(external_key)
+        #         if not key_exists:
+        #             break
+        #         context.txn.delete_external(external_key)
+        #         previous_chunk -= 1
 
     async def on_recycle(self, instance, value):
         await super().on_recycle(instance, value)
@@ -271,6 +260,7 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         expand = expand or 'expand' in request.args
         member_id = self.get_member_id(instance, request.path)
         collection = getattr(instance, self.name)
+        print(member_id)
         if member_id:
             member = await collection.get_item_by_id(member_id, quiet=False)
             return member

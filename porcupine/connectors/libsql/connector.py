@@ -63,7 +63,7 @@ class LibSql:
         if len(result) > 0:
             return result[0]
 
-    async def get_multi(self, item_ids):
+    async def get_multi(self, item_ids, quiet=True):
         t = ItemsTable(None)
         ordered_ids = OrderedDict()
 
@@ -88,6 +88,10 @@ class LibSql:
             ordered_ids[item.id] = item
 
         for oid, item in ordered_ids.items():
+            if not quiet and not item:
+                raise exceptions.NotFound(
+                    f'The resource {oid} does not exist.'
+                )
             if item is not False:
                 context.db_cache[oid] = item
                 if item is not None:

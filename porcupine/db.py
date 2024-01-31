@@ -41,12 +41,23 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
             )
 
 
-def get_multi(ids: TYPING.ID_LIST) -> BaseStreamer:
+def get_multi(ids: TYPING.ID_LIST, quiet: bool = True) -> BaseStreamer:
+    user = context.user
+
+    async def _check_read_permission(item):
+        can_read = await item.can_read(user)
+        if can_read:
+            return True
+        elif not quiet:
+            raise exceptions.Forbidden(
+                f'Access to resource {item.id} is forbidden.'
+            )
+        return False
+
     if ids:
-        user = context.user
         streamer = (
-            BaseStreamer(db_connector().get_multi(ids))
-            | pipe.filter(async_(lambda x: x.can_read(user)))
+            BaseStreamer(db_connector().get_multi(ids, quiet))
+            | pipe.filter(_check_read_permission)
         )
         return streamer
     return EmptyStreamer()

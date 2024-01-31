@@ -1,13 +1,13 @@
 from collections import OrderedDict
-from functools import cached_property
 
+from porcupine import db
 from porcupine.hinting import TYPING
 from porcupine.exceptions import Forbidden, ContainmentError
 from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
 # from .external import Text
-from .mutable import List
+# from .mutable import List
 from porcupine.connectors.libsql.query import QueryType
 from pypika import Parameter
 from pypika.functions import Count
@@ -21,16 +21,6 @@ class ItemCollection(AsyncSetterValue):
         self.__query_params = {
             'instance_id': instance.id
         }
-        # if descriptor.is_many_to_many:
-        #     self.__membership_check_query = self.query(
-        #         QueryType.RAW_ASSOCIATIVE,
-        #         where=self._desc.join_field == Parameter(':member_id')
-        #     ).select(1)
-        # else:
-        #     self.__membership_check_query = self.query(
-        #         QueryType.RAW,
-        #         where=self.id == Parameter(':member_id')
-        #     ).select(1)
 
     def __getattr__(self, item):
         return getattr(self._desc.t, item)
@@ -95,9 +85,12 @@ class ItemCollection(AsyncSetterValue):
                 q = q.select(self.id)
             results = await q.execute()
             ids = [r[0] for r in results]
-            setattr(self._inst().__externals__, self._desc.storage_key, ids)
+            # setattr(self._inst().__externals__, self._desc.storage_key, ids)
             return ids
-        return getattr(self._inst().__externals__, self._desc.storage_key)
+        return [
+            i.id for i in
+            getattr(self._inst().__externals__, self._desc.storage_key)
+        ]
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         # print('adding', self._inst.id, self._desc.name, items)
@@ -159,12 +152,18 @@ class ItemCollection(AsyncSetterValue):
     async def reset(self, value: list) -> None:
         # print('reset', value)
         descriptor, instance = self._desc, self._inst()
+        if value and type(value[0]) == str:
+            value = await db.get_multi(value, quiet=False).list()
         # remove collection appends
         # context.txn.reset_key_append(descriptor.key_for(instance))
         if not self.is_fetched():
             # fetch value from db
-            storage = getattr(instance, descriptor.storage)
-            setattr(storage, descriptor.storage_key, await self.ids())
+            # storage = getattr(instance, descriptor.storage)
+            setattr(
+                instance.__externals__,
+                descriptor.storage_key,
+                await self.items().list()
+            )
         await super().reset(value)
         # super(List, descriptor).__set__(instance, value)
 
@@ -176,8 +175,13 @@ class ItemCollection(AsyncSetterValue):
             )
             return result is not None
         else:
-            return item_id in getattr(self._inst().__externals__,
-                                      self._desc.storage_key)
+            items = getattr(self._inst().__externals__, self._desc.storage_key)
+            for item in items:
+                if item.id == item_id:
+                    return True
+            return False
+            # return item_id in getattr(self._inst().__externals__,
+            #                           self._desc.storage_key)
 
     async def count(self, where=None):
         if self._desc.is_many_to_many and where is None:
