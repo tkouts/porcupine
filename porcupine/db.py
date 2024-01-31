@@ -41,7 +41,7 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
             )
 
 
-def get_multi(ids: TYPING.ID_LIST) -> BaseStreamer[TYPING.ANY_ITEM_CO]:
+def get_multi(ids: TYPING.ID_LIST) -> BaseStreamer:
     if ids:
         user = context.user
         streamer = (
