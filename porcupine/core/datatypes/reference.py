@@ -250,7 +250,7 @@ class ReferenceN(AsyncSetter, List, Acceptable):
     # HTTP views
 
     def get_member_id(self, instance, request_path):
-        chunks = request_path.split('{0}/{1}'.format(instance.id, self.name))
+        chunks = request_path.split(f'{instance.id}/{self.name}')
         member_id = chunks[-1]
         if member_id.startswith('/'):
             member_id = member_id[1:]
@@ -261,7 +261,7 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         member_id = self.get_member_id(instance, request.path)
         collection = getattr(instance, self.name)
         if member_id:
-            member = await collection.get_item_by_id(member_id, quiet=False)
+            member = await collection.get_member_by_id(member_id, quiet=False)
             return member
         else:
             if expand:
@@ -305,5 +305,5 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         collection = getattr(instance, self.name)
         if not member_id:
             raise exceptions.MethodNotAllowed('Method not allowed')
-        member = await collection.get_item_by_id(member_id, quiet=False)
+        member = await collection.get_member_by_id(member_id, quiet=False)
         await collection.remove(member)

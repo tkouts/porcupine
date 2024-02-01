@@ -57,8 +57,8 @@ async def member_handler(request, item_id, path):
             elif isinstance(resolved, Composition):
                 collection = getattr(inst, resolved.name)
                 try:
-                    resolved = await collection.get_item_by_id(attr_name,
-                                                               quiet=False)
+                    resolved = await collection.get_member_by_id(attr_name,
+                                                                 quiet=False)
                 except exceptions.NotFound:
                     raise exceptions.NotFound(
                         'The resource {0} does not exist'.format(request_path))

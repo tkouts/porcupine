@@ -25,9 +25,9 @@ def get_path(desc, instance):
 class EmbeddedCollection(ItemCollection):
     __slots__ = ()
 
-    async def get_item_by_id(self, item_id: TYPING.ITEM_ID, quiet=True):
+    async def get_member_by_id(self, item_id: TYPING.ITEM_ID, quiet=True):
         with system_override():
-            return await super().get_item_by_id(item_id, quiet=quiet)
+            return await super().get_member_by_id(item_id, quiet=quiet)
 
     async def items(self, resolve_shortcuts=False) -> AsyncIterator[
                                                 TYPING.COMPOSITE_CO]:
@@ -152,7 +152,7 @@ class Composition(ReferenceN):
             composite_id = item_dict.pop('id', None)
             try:
                 if composite_id:
-                    composite = await collection.get_item_by_id(composite_id)
+                    composite = await collection.get_member_by_id(composite_id)
                     composite.reset()
                     await composite.apply_patch(item_dict)
                 else:

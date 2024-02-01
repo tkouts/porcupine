@@ -167,15 +167,15 @@ class ItemCollection(AsyncSetterValue):
         await super().reset(value)
         # super(List, descriptor).__set__(instance, value)
 
-    async def get_item_by_id(
+    async def get_member_by_id(
         self,
         item_id: TYPING.ITEM_ID,
         quiet=True
     ) -> TYPING.ANY_ITEM_CO:
         member = None
         if not self.is_fetched():
-            q = self.query(where=self.id == Parameter(':item_id'))
-            member = await q.execute(first_only=True, item_id=item_id)
+            q = self.query(where=self.id == Parameter(':member_id'))
+            member = await q.execute(first_only=True, member_id=item_id)
         else:
             items = getattr(self._inst().__externals__, self._desc.storage_key)
             for item in items:
@@ -196,7 +196,7 @@ class ItemCollection(AsyncSetterValue):
             )
             return result is not None
         else:
-            return self.get_item_by_id(item_id) is not None
+            return self.get_member_by_id(item_id) is not None
 
     async def count(self, where=None):
         if self._desc.is_many_to_many and where is None:
