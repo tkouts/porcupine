@@ -260,7 +260,6 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         expand = expand or 'expand' in request.args
         member_id = self.get_member_id(instance, request.path)
         collection = getattr(instance, self.name)
-        print(member_id)
         if member_id:
             member = await collection.get_item_by_id(member_id, quiet=False)
             return member
