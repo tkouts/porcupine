@@ -207,11 +207,11 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         return added, removed
 
     async def on_delete(self, instance, value):
-        if self.cascade_delete:
-            collection = self.__get__(instance, None)
-            with system_override():
-                async for ref_item in collection.items():
-                    await ref_item.remove()
+        # if self.cascade_delete:
+        #     collection = self.__get__(instance, None)
+        #     with system_override():
+        #         async for ref_item in collection.items():
+        #             await ref_item.remove()
 
         await super().on_delete(instance, value)
 

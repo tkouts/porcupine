@@ -99,14 +99,14 @@ class Relator1(Reference1, RelatorBase):
     #     if ref_item:
     #         await self.add_reference(instance, ref_item)
 
-    async def on_change(self, instance, value, old_value):
-        ref_item = await super().on_change(instance, value, old_value)
-        if ref_item:
-            await self.add_reference(instance, ref_item)
-        if old_value:
-            old_ref_item = await db_connector().get(old_value)
-            if old_ref_item:
-                await self.remove_reference(instance, old_ref_item)
+    # async def on_change(self, instance, value, old_value):
+    #     ref_item = await super().on_change(instance, value, old_value)
+    #     if ref_item:
+    #         await self.add_reference(instance, ref_item)
+    #     if old_value:
+    #         old_ref_item = await db_connector().get(old_value)
+    #         if old_ref_item:
+    #             await self.remove_reference(instance, old_ref_item)
 
     async def on_delete(self, instance, value):
         await super().on_delete(instance, value)
@@ -117,7 +117,7 @@ class Relator1(Reference1, RelatorBase):
                     raise exceptions.Forbidden(
                         f'{instance.friendly_name} can not be '
                         'removed because is referenced by other items.')
-                await self.remove_reference(instance, ref_item)
+                # await self.remove_reference(instance, ref_item)
 
 
 # class RelatorCollection(ItemCollection):
@@ -270,15 +270,15 @@ class RelatorN(ReferenceN, RelatorBase):
     #     if removed:
     #         await self.remove_reference(instance, *removed)
 
-    async def on_delete(self, instance, value):
-        collection = self.__get__(instance, None)
-        if not self.cascade_delete:
-            with system_override():
-                async for ref_item in collection.items():
-                    if self.respects_references:
-                        raise exceptions.Forbidden(
-                            f'{instance.friendly_name} can not be '
-                            'removed because is referenced by other items.')
-                    await self.remove_reference(instance, ref_item)
-        # remove collection documents
-        await super().on_delete(instance, value)
+    # async def on_delete(self, instance, value):
+    #     collection = self.__get__(instance, None)
+    #     if not self.cascade_delete:
+    #         with system_override():
+    #             async for ref_item in collection.items():
+    #                 if self.respects_references:
+    #                     raise exceptions.Forbidden(
+    #                         f'{instance.friendly_name} can not be '
+    #                         'removed because is referenced by other items.')
+    #                 # await self.remove_reference(instance, ref_item)
+    #     # remove collection documents
+    #     await super().on_delete(instance, value)

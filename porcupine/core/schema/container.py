@@ -93,7 +93,7 @@ class Container(Item):
 
         @rtype: list
         """
-        children = self.children.items(skip, take, resolve_shortcuts)
+        children = self.children.items(skip, take, None, resolve_shortcuts)
         return children.list()
 
     def get_items(self, skip=0, take=None,
@@ -124,21 +124,21 @@ class Container(Item):
         )
         return containers.list()
 
-    async def has_items(self) -> bool:
-        """
-        Checks if the container has at least one non-container child.
-
-        @rtype: bool
-        """
-        return not await self.items.items().is_empty()
-
-    async def has_containers(self) -> bool:
-        """
-        Checks if the container has at least one child container.
-
-        @rtype: bool
-        """
-        return not await self.containers.items().is_empty()
+    # async def has_items(self) -> bool:
+    #     """
+    #     Checks if the container has at least one non-container child.
+    #
+    #     @rtype: bool
+    #     """
+    #     return not await self.items.items().is_empty()
+    #
+    # async def has_containers(self) -> bool:
+    #     """
+    #     Checks if the container has at least one child container.
+    #
+    #     @rtype: bool
+    #     """
+    #     return not await self.containers.items().is_empty()
 
     # permissions providers
     can_append = Item.can_update

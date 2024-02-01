@@ -163,10 +163,7 @@ class Removable(TYPING.ITEM_TYPE):
         if self.parent_id is not None:
             parent = await db_connector().get(self.parent_id)
             if parent is not None:
-                if self.is_collection:
-                    await parent.containers.remove(self)
-                else:
-                    await parent.items.remove(self)
+                await parent.children.remove(self)
         else:
             # root item
             can_delete = await self.can_delete(context.user)

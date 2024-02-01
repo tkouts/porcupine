@@ -224,9 +224,11 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     def reset(self):
         data_types = list(self.__schema__.values())
         for data_type in data_types:
-            if not data_type.readonly \
-                    and data_type.name != 'acl' \
-                    and data_type.storage == '__storage__':
+            if (
+                not data_type.readonly
+                and data_type.name != 'acl'
+                and data_type.storage == '__storage__'
+            ):
                 setattr(self, data_type.name, data_type.default)
 
     async def clone(self, memo: dict = None) -> 'Elastic':

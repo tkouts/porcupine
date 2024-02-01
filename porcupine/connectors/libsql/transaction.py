@@ -178,10 +178,10 @@ class Transaction:
             self._items[item.id] = item
 
     async def delete(self, item):
-        if item.is_collection:
-            with system_override():
-                children = await item.get_children()
-                await asyncio.gather(*[self.delete(c) for c in children])
+        # if item.is_collection:
+        #     with system_override():
+        #         children = await item.get_children()
+        #         await asyncio.gather(*[self.delete(c) for c in children])
 
         await item.on_delete()
 
@@ -429,7 +429,15 @@ class Transaction:
             item for item in self._deletions.values()
             if item is not None
         ]
-        rest_ops.extend([Deletion(key) for key in self._deletions])
+        # rest_ops.extend([Deletion(key) for key in self._deletions])
+        for item in deleted_items:
+            statements.append(
+                libsql_client.Statement(
+                    f'delete from "items" '
+                    f'where id=?',
+                    [item.id]
+                )
+            )
         # remove locks
         # rest_ops.extend([Deletion(key) for key in self._attr_locks])
 
