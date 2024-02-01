@@ -2,15 +2,15 @@ from typing import Awaitable
 
 from pypika import Parameter
 
-from porcupine import db, exceptions, pipe
+# from porcupine import db, exceptions, pipe
 from porcupine.view import view
 from porcupine.core.datatypes.system import Children
-from porcupine.core.services import db_connector
-from porcupine.core import utils
+# from porcupine.core.services import db_connector
+# from porcupine.core import utils
 from porcupine.core.accesscontroller import AccessRecord
 from .item import Item
 from .shortcut import Shortcut
-from porcupine.connectors.libsql.query import QueryType
+# from porcupine.connectors.libsql.query import QueryType
 
 
 class Container(Item):
@@ -84,10 +84,7 @@ class Container(Item):
 
     def get_child_by_id(self, oid):
         # TODO: maybe use db.get_item to read our own writes?
-        q = self.children.query(
-            where=self.children.id == Parameter(':id')
-        )
-        return q.execute(first_only=True, id=oid)
+        return self.children.get_member_by_id(oid)
 
     def get_children(self, skip=0, take=None,
                      resolve_shortcuts=False) -> Awaitable[list]:
