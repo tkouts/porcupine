@@ -350,11 +350,14 @@ class Transaction:
                 for path, mutation in mutations.items():
                     mut_type, mut_value = mutation
                     if path in ItemsTable.columns:
-                        attrs.append(f'{path}=?')
+                        if mut_type is SubDocument.COUNTER:
+                            attrs.append(f'{path}={path} + ?')
+                        else:
+                            attrs.append(f'{path}=?')
                     else:
                         # TODO: implement mutation types - only upsert for now
                         attrs.append(
-                            f'data=(select json_set("data", \'$.{path}\', ?) from items)'
+                            f"data=(select json_set(data, '$.{path}', ?) from items)"
                         )
                     values.append(mut_value)
                 values.append(item_id)
