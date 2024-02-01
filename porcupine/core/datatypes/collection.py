@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 from porcupine import db
 from porcupine.hinting import TYPING
-from porcupine.exceptions import Forbidden, ContainmentError
+from porcupine.exceptions import Forbidden, ContainmentError, NotFound
 from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
@@ -167,6 +167,27 @@ class ItemCollection(AsyncSetterValue):
         await super().reset(value)
         # super(List, descriptor).__set__(instance, value)
 
+    async def get_item_by_id(
+        self,
+        item_id: TYPING.ITEM_ID,
+        quiet=True
+    ) -> TYPING.ANY_ITEM_CO:
+        member = None
+        if not self.is_fetched():
+            q = self.query(where=self.id == Parameter(':item_id'))
+            member = await q.execute(first_only=True, item_id=item_id)
+        else:
+            items = getattr(self._inst().__externals__, self._desc.storage_key)
+            for item in items:
+                if item.id == item_id:
+                    member = item
+        if member is None and not quiet:
+            raise NotFound(
+                f"Collection '{self._desc.name} '"
+                f"has no member with ID '{item_id}'."
+            )
+        return member
+
     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
         if not self.is_fetched():
             result = await self.__membership_check_query.execute(
@@ -175,13 +196,7 @@ class ItemCollection(AsyncSetterValue):
             )
             return result is not None
         else:
-            items = getattr(self._inst().__externals__, self._desc.storage_key)
-            for item in items:
-                if item.id == item_id:
-                    return True
-            return False
-            # return item_id in getattr(self._inst().__externals__,
-            #                           self._desc.storage_key)
+            return self.get_item_by_id(item_id) is not None
 
     async def count(self, where=None):
         if self._desc.is_many_to_many and where is None:
