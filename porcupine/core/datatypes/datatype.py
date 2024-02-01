@@ -42,7 +42,7 @@ class DataType:
     # def should_lock(self):
     #     return self.lock_on_update or self.unique
 
-    def get_value(self, instance, snapshot=True):
+    def get_value(self, instance, snapshot=True, use_default=True):
         storage_key = self.storage_key
         i_snapshot = instance.__snapshot__
         if snapshot and storage_key in i_snapshot:
@@ -50,7 +50,7 @@ class DataType:
             return i_snapshot[storage_key]
         storage = getattr(instance, self.storage)
         value = getattr(storage, storage_key)
-        if value is UNSET:
+        if use_default and value is UNSET:
             return self.default
         return value
 

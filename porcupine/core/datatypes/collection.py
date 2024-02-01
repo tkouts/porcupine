@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from typing import Tuple
 
 from porcupine import db
 from porcupine.hinting import TYPING
@@ -6,8 +7,6 @@ from porcupine.exceptions import Forbidden, ContainmentError, NotFound
 from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
-# from .external import Text
-# from .mutable import List
 from porcupine.connectors.libsql.query import QueryType
 from pypika import Parameter
 from pypika.functions import Count
@@ -49,8 +48,10 @@ class ItemCollection(AsyncSetterValue):
             ).select(1)
 
     def is_fetched(self) -> bool:
-        return getattr(self._inst().__externals__,
-                       self._desc.storage_key) is not UNSET
+        instance = self._inst()
+        return instance.__is_new__ or self._desc.get_value(
+            instance, use_default=False
+        ) is not UNSET
 
     # @property
     # def ttl(self):
@@ -75,7 +76,7 @@ class ItemCollection(AsyncSetterValue):
         q = self.query(where=where)
         return q.cursor(skip, take, resolve_shortcuts, **kwargs)
 
-    async def ids(self):
+    async def ids(self) -> Tuple[TYPING.ITEM_ID]:
         if not self.is_fetched():
             if self._desc.is_many_to_many:
                 q = self.query(QueryType.RAW_ASSOCIATIVE)
@@ -84,13 +85,12 @@ class ItemCollection(AsyncSetterValue):
                 q = self.query(QueryType.RAW)
                 q = q.select(self.id)
             results = await q.execute()
-            ids = [r[0] for r in results]
-            # setattr(self._inst().__externals__, self._desc.storage_key, ids)
+            ids = tuple(r[0] for r in results)
             return ids
-        return [
+        return tuple(
             i.id for i in
-            getattr(self._inst().__externals__, self._desc.storage_key)
-        ]
+            self._desc.get_value(self._inst())
+        )
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         # print('adding', self._inst.id, self._desc.name, items)
@@ -177,7 +177,7 @@ class ItemCollection(AsyncSetterValue):
             q = self.query(where=self.id == Parameter(':member_id'))
             member = await q.execute(first_only=True, member_id=item_id)
         else:
-            items = getattr(self._inst().__externals__, self._desc.storage_key)
+            items = self._desc.get_value(self._inst())
             for item in items:
                 if item.id == item_id:
                     member = item
