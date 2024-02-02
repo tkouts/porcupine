@@ -225,10 +225,14 @@ class Transaction:
                 )
 
     def mutate(self, item, path, mutation_type, value):
-        self._sd[item.id][path] = (
-            mutation_type,
-            default_json_encoder(value) or value,
-        )
+        item_mutations = self._sd[item.id]
+        if mutation_type is SubDocument.COUNTER and path in item_mutations:
+            item_mutations[path][1] += value
+        else:
+            item_mutations[path] = (
+                mutation_type,
+                default_json_encoder(value) or value,
+            )
 
     def mutate_collection(self, associative_table, mut_type, values):
         self._assoc[associative_table].append((mut_type, values))
@@ -355,10 +359,17 @@ class Transaction:
                         else:
                             attrs.append(f'{path}=?')
                     else:
-                        # TODO: implement mutation types - only upsert for now
-                        attrs.append(
-                            f"data=(select json_set(data, '$.{path}', ?) from items)"
-                        )
+                        # TODO: implement mutation types
+                        # only upsert, counter for now
+                        if mut_type is SubDocument.COUNTER:
+                            attrs.append(
+                                f"data=json_set(data, '$.{path}', "
+                                f"json_extract(data, '$.{path}') + ?)"
+                            )
+                        else:
+                            attrs.append(
+                                f"data=json_set(data, '$.{path}', ?)"
+                            )
                     values.append(mut_value)
                 values.append(item_id)
                 # print(
