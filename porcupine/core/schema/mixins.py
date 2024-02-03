@@ -22,7 +22,7 @@ class Cloneable(TYPING.ITEM_TYPE):
     @staticmethod
     async def _prepare_id_map(item: 'Cloneable',
                               id_map: Dict[str, str],
-                              is_root: bool = False) -> List['Cloneable']:
+                              is_root: bool = False) -> None:
         all_items = []
 
         id_map[item.id] = utils.generate_oid()
@@ -42,12 +42,16 @@ class Cloneable(TYPING.ITEM_TYPE):
 
         if item.is_collection:
             # runs with system override - exclude deleted
-            children = [Cloneable._prepare_id_map(child, id_map)
-                        for child in await item.get_children()
-                        if not child.is_deleted]
-            for items in await gather(*children):
-                all_items += items
-        return all_items
+            async for child in item.children.items():
+                if not child.is_deleted:
+                    await Cloneable._prepare_id_map(child, id_map)
+                    # all_items += items
+            # children = [Cloneable._prepare_id_map(child, id_map)
+            #             for child in await item.get_children()
+            #             if not child.is_deleted]
+            # for items in await gather(*children):
+            #     all_items += items
+        # return all_items
 
     @staticmethod
     async def _write_clone(item: 'Cloneable',
@@ -57,30 +61,29 @@ class Cloneable(TYPING.ITEM_TYPE):
         clone = await item.clone(memo)
 
         if target is not None:
-            # clone.inherit_roles = False
             copy_num = 1
             original_name = clone.name
             while await target.child_exists(clone.name):
                 copy_num += 1
-                clone.name = '{0} ({1})'.format(original_name, copy_num)
-            if clone.is_collection:
-                await target.containers.add(clone)
-            else:
-                await target.items.add(clone)
+                clone.name = f'{original_name} ({copy_num})'
+            await target.children.add(clone)
+            # if clone.is_collection:
+            #     await target.containers.add(clone)
+            # else:
+            #     await target.items.add(clone)
 
-        clone.parent_id = id_map[item.parent_id]
-        await context.txn.insert(clone)
+        # clone.parent_id = id_map[item.parent_id]
+        # await context.txn.insert(clone)
         return clone
 
     async def _copy(self,
                     target: TYPING.CONTAINER_CO,
                     memo: Dict) -> 'Cloneable':
-        all_children = await Cloneable._prepare_id_map(
-            self, memo['_id_map_'], is_root=True)
+        # await Cloneable._prepare_id_map(self, memo['_id_map_'], is_root=True)
         memo['_id_map_'][self.parent_id] = target.id
         clone = await Cloneable._write_clone(self, memo, target)
-        for item in all_children:
-            await Cloneable._write_clone(item, memo)
+        # for item in all_children:
+        #     await Cloneable._write_clone(item, memo)
         return clone
 
     async def copy_to(self, target: TYPING.CONTAINER_CO) -> 'Cloneable':
@@ -99,10 +102,15 @@ class Cloneable(TYPING.ITEM_TYPE):
         # check permissions on target folder
         if not await target.can_update(context.user):
             raise exceptions.Forbidden('Forbidden')
+
         with system_override():
-            return await self._copy(target,
-                                    {'_dup_ext_': True,
-                                     '_id_map_': {}})
+            return await self._copy(
+                target,
+                {
+                    '_dup_ext_': True,
+                    '_id_map_': {}
+                }
+            )
 
 
 class Movable(TYPING.ITEM_TYPE):
@@ -125,7 +133,8 @@ class Movable(TYPING.ITEM_TYPE):
         if self.is_collection and await target.is_contained_in(self):
             raise exceptions.InvalidUsage(
                 'Cannot move item to destination. '
-                'The destination is contained in the source.')
+                'The destination is contained in the source.'
+            )
 
         parent = await db_connector().get(self.parent_id)
 

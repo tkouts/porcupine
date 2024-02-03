@@ -2,16 +2,16 @@ from porcupine import db, exceptions
 from porcupine.contract import contract
 from porcupine.core.context import context, system_override
 from porcupine.core.services import db_connector
-from porcupine.core.schema.storage import UNSET
+# from porcupine.core.schema.storage import UNSET
 from porcupine.core.schemaregistry import get_content_class
-from porcupine.core import utils
+# from porcupine.core import utils
 from .collection import ItemCollection
 # from .datatype import DataType
 from .common import String
 from .mutable import List
 # from .external import Text, Blob
 from .asyncsetter import AsyncSetter
-from pypika import Table, Field
+from pypika import Table
 
 
 class Acceptable:
@@ -151,9 +151,13 @@ class ReferenceN(AsyncSetter, List, Acceptable):
     #     return utils.get_collection_key(instance.id, self.name, chunk)
 
     async def clone(self, instance, memo):
-        collection = getattr(instance, self.name)
-        super(List, self).__set__(instance, [memo['_id_map_'].get(oid, oid)
-                                             async for oid in collection])
+        collection = self.__get__(instance, None).items()
+        # print('cloning fetched', collection.is_fetched())
+        super(List, self).__set__(
+            instance,
+            [await item.clone(memo) async for item in collection]
+            # [memo['_id_map_'].get(oid, oid) for oid in await collection.ids()]
+        )
 
     # allow regular snapshots
     # snapshot = DataType.snapshot

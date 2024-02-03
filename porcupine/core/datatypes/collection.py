@@ -8,6 +8,7 @@ from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
 from porcupine.connectors.libsql.query import QueryType
+# from porcupine.connectors.mutations import SubDocument
 from pypika import Parameter
 from pypika.functions import Count
 
@@ -85,12 +86,12 @@ class ItemCollection(AsyncSetterValue):
                 q = self.query(QueryType.RAW)
                 q = q.select(self.id)
             results = await q.execute()
-            ids = tuple(r[0] for r in results)
+            ids = tuple([r[0] for r in results])
             return ids
-        return tuple(
+        return tuple([
             i.id for i in
             self._desc.get_value(self._inst())
-        )
+        ])
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
         # print('adding', self._inst.id, self._desc.name, items)
@@ -117,10 +118,26 @@ class ItemCollection(AsyncSetterValue):
                         1,
                         values
                     )
+                    # setattr(item.__storage__, descriptor.rel_attr, 1)
                 else:
                     with system_override():
                         setattr(item, descriptor.rel_attr, instance.id)
+                # if not item.__is_new__:
+                #     # print('mutating counter')
+                #     context.txn.mutate(instance,
+                #                        descriptor.storage_key,
+                #                        SubDocument.UPSERT,
+                #                        1)
                     await context.txn.upsert(item)
+            # update items inited flag
+            # current_count = getattr(instance.__storage__, descriptor.name)
+            # setattr(instance.__storage__, descriptor.name, 1)
+            # if not instance.__is_new__:
+            #     # print('mutating counter')
+            #     context.txn.mutate(instance,
+            #                        descriptor.storage_key,
+            #                        SubDocument.UPSERT,
+            #                        1)
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO) -> None:
         if items:
