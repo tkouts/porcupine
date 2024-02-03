@@ -1,4 +1,4 @@
-from collections import MutableSequence, MutableMapping
+from typing import MutableSequence, MutableMapping
 
 import cbor
 
@@ -60,20 +60,26 @@ class DataType:
                 if self.readonly and value != self.get_value(instance):
                     raise AttributeError(
                         'Attribute {0} of {1} is readonly'.format(
-                            self.name, type(instance).__name__))
+                            self.name, type(instance).__name__
+                        )
+                    )
                 elif self.immutable and not instance.__is_new__:
                     storage = getattr(instance, self.storage)
                     if getattr(storage, self.storage_key) is not UNSET:
                         raise AttributeError(
                             'Attribute {0} of {1} is immutable'.format(
-                                self.name, type(instance).__name__))
+                                self.name, type(instance).__name__
+                            )
+                        )
         if self.allow_none and value is None:
             return
         if not isinstance(value, self.safe_type):
             raise TypeError(
                 'Unsupported type {0} for {1}'.format(
                     type(value).__name__,
-                    self.name or type(self).__name__))
+                    self.name or type(self).__name__
+                )
+            )
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -138,15 +144,6 @@ class DataType:
     async def on_change(self, instance, value, old_value):
         self.validate(value)
         if self.storage == '__storage__' and not instance.__is_new__:
-            # if self.unique:
-            #     old_parent_id = instance.get_snapshot_of('parent_id')
-            #     if instance.parent_id == old_parent_id:
-            #         # item is not moved
-            #         self.remove_unique(instance, old_value)
-            #         await self.add_unique(instance, value)
-            #     # else:
-            #     #     # parent_id on_change handler will do the job
-            # if not instance.__is_new__:
             context.txn.mutate(instance,
                                self.storage_key,
                                SubDocument.UPSERT,
