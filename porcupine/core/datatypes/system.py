@@ -56,7 +56,7 @@ class ChildrenCollection(ItemCollection):
         parent = self._inst()
         # parent_id = parent.id
         user = context.user
-        shortcut = get_content_class('Shortcut')
+        # shortcut = get_content_class('Shortcut')
 
         for item in items:
             if not item.__is_new__:
@@ -69,12 +69,12 @@ class ChildrenCollection(ItemCollection):
                 item.p_type = parent.content_class
 
             # TODO: think this is not needed anymore
-            expire_times = [item.expires_at, parent.expires_at]
-            if isinstance(item, shortcut):
-                target = await item.get_target()
-                expire_times.append(target.expires_at)
-            if any(expire_times):
-                item.expires_at = min([t for t in expire_times if t])
+            # expire_times = [item.expires_at, parent.expires_at]
+            # if isinstance(item, shortcut):
+            #     target = await item.get_target()
+            #     expire_times.append(target.expires_at)
+            # if any(expire_times):
+            #     item.expires_at = min([t for t in expire_times if t])
 
             # insert item to DB
             await context.txn.insert(item)
