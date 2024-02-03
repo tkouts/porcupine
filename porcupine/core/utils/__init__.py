@@ -5,6 +5,7 @@ from typing import Union
 import hashlib
 import random
 import re
+import string
 
 import cbor
 import mmh3
@@ -14,12 +15,11 @@ from methodtools import lru_cache
 from porcupine.core.utils.collections import WriteOnceDict
 from porcupine.core.utils.date import DATE_TYPES
 
-VALID_ID_CHARS = [
-    chr(x) for x in
-    list(range(ord('a'), ord('z'))) +
-    list(range(ord('A'), ord('Z'))) +
-    list(range(ord('0'), ord('9')))
-]
+VALID_ID_CHARS = (
+    string.ascii_uppercase
+    + string.ascii_lowercase
+    + string.digits
+)
 
 
 def default_json_encoder(obj):
@@ -35,7 +35,7 @@ def generate_oid(length: int = 8) -> str:
 
     @rtype: str
     """
-    return ''.join(random.choice(VALID_ID_CHARS) for _ in range(length))
+    return ''.join(random.choices(VALID_ID_CHARS, k=length))
 
 
 @lru_cache(maxsize=None)
