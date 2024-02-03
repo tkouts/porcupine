@@ -43,6 +43,7 @@
               name: admin
               password: admin
               type: User
+            # TODO: for testing
             - id: testgroup
               name: Test Group
               type: Group
@@ -53,6 +54,10 @@
               keep_in_sync: Yes
               members:
                 - admin
+    # TODO: for testing
+    - id: testcontainer
+      name: Test Container
+      type: Container
 
 - id: RB
   type: RecycleBin
