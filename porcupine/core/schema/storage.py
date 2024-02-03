@@ -34,9 +34,11 @@ class Record:
         return all(item == iota for item, iota in zip(self, other))
 
     def __repr__(self):
-        fields = [f'{field}={repr(item)}'
-                  for field, item in zip(self.__slots__, self)]
-        return '%s(%s)' % (type(self).__name__, ', '.join(fields))
+        fields = [
+            f'{field}={repr(item)}'
+            for field, item in zip(self.__slots__, self)
+        ]
+        return f'{type(self).__name__}({", ".join(fields)})'
 
     def __getstate__(self):
         return tuple(self.as_dict().items())
@@ -48,8 +50,10 @@ class Record:
 
     def as_dict(self) -> dict:
         # do not persist UNSET as it is the default value
-        return {k: v for k, v in zip(self.__slots__, self)
-                if v is not UNSET}
+        return {
+            k: v for k, v in zip(self.__slots__, self)
+            if v is not UNSET
+        }
 
 
 def storage(typename, field_names) -> TYPING.STORAGE_TYPE:
