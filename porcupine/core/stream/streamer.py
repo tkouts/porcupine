@@ -42,8 +42,8 @@ class EmptyStreamer(BaseStreamer):
     def __repr__(self):
         return f'{self.__class__.__name__}()'
 
-    async def is_empty(self):
-        return True
+    # async def is_empty(self):
+    #     return True
 
 
 class PartialStreamer(BaseStreamer):
