@@ -165,10 +165,7 @@ class GenericItem(Removable, Elastic):
         @return: None
         """
         if parent is not None:
-            # if self.is_collection:
             await parent.children.add(self)
-            # else:
-            #     await parent.items.add(self)
         else:
             # ROOT item
             if not self.__is_new__:
