@@ -7,7 +7,7 @@ from porcupine import log, context, exceptions
 from .transaction import Transaction
 from porcupine.connectors.schematables import ItemsTable
 from porcupine.core.accesscontroller import resolve_visibility
-from porcupine.core.stream.streamer import BaseStreamer
+# from porcupine.core.stream.streamer import BaseStreamer
 # from porcupine.core.schema.partial import PartialItem
 from .query import PorcupineQuery, QueryType
 from porcupine.connectors.libsql import persist
