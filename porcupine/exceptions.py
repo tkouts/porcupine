@@ -58,12 +58,12 @@ class UnprocessableEntity(SanicException):
     status_code = 422
 
 
-class ContainmentError(TypeError):
+class ContainmentError(InvalidUsage, TypeError):
     def __init__(self, target_item, attribute, source_item):
         super().__init__(
             f"Attribute '{attribute}' of type "
             f"'{target_item.__class__.__name__}' "
-            f"does not accept objects of type '{source_item.content_class}'"
+            f"does not accept objects of type '{source_item.content_class}'."
         )
 
 
