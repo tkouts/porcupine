@@ -1,13 +1,13 @@
-from asyncio import gather
-from typing import Dict, List
+# from asyncio import gather
+# from typing import Dict, List
 
 from porcupine.hinting import TYPING
 from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.datatypes.system import Deleted
-from porcupine.core import utils
-from porcupine.datatypes import Embedded, Composition
+# from porcupine.core import utils
+# from porcupine.datatypes import Embedded, Composition
 
 
 class Cloneable(TYPING.ITEM_TYPE):
@@ -74,15 +74,14 @@ class Movable(TYPING.ITEM_TYPE):
 
         parent = await db_connector().get(self.parent_id)
 
-        if self.is_collection:
-            await super(type(parent.containers), parent.containers).remove(self)
-            await super(type(target.containers), target.containers).add(self)
-        else:
-            await super(type(parent.items), parent.items).remove(self)
-            await super(type(target.items), target.items).add(self)
+        await super(type(parent.children), parent.children).remove(self)
+        await super(type(target.children), target.children).add(self)
 
         with system_override():
-            self.parent_id = target.id
+            # item.modified = date.utcnow()
+            self.modified_by = context.user.name
+            self.p_type = target.content_class
+            # self.parent_id = target.id
         await self.touch()
         await context.txn.upsert(self)
 
