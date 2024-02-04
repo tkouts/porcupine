@@ -19,73 +19,6 @@ class Cloneable(TYPING.ITEM_TYPE):
     """
     __slots__ = ()
 
-    @staticmethod
-    async def _prepare_id_map(item: 'Cloneable',
-                              id_map: Dict[str, str],
-                              is_root: bool = False) -> None:
-        all_items = []
-
-        id_map[item.id] = utils.generate_oid()
-
-        if not is_root:
-            all_items.append(item)
-
-        for attr_name, data_type in item.__schema__.items():
-            if isinstance(data_type, Embedded):
-                embedded = await getattr(item, attr_name).item()
-                if embedded is not None:
-                    await Cloneable._prepare_id_map(embedded, id_map)
-            elif isinstance(data_type, Composition):
-                composites = getattr(item, attr_name).items()
-                await gather(*[Cloneable._prepare_id_map(c, id_map)
-                               async for c in composites])
-
-        if item.is_collection:
-            # runs with system override - exclude deleted
-            async for child in item.children.items():
-                if not child.is_deleted:
-                    await Cloneable._prepare_id_map(child, id_map)
-                    # all_items += items
-            # children = [Cloneable._prepare_id_map(child, id_map)
-            #             for child in await item.get_children()
-            #             if not child.is_deleted]
-            # for items in await gather(*children):
-            #     all_items += items
-        # return all_items
-
-    @staticmethod
-    async def _write_clone(item: 'Cloneable',
-                           memo: Dict,
-                           target: TYPING.CONTAINER_CO = None) -> 'Cloneable':
-        id_map = memo['_id_map_']
-        clone = await item.clone(memo)
-
-        if target is not None:
-            copy_num = 1
-            original_name = clone.name
-            while await target.child_exists(clone.name):
-                copy_num += 1
-                clone.name = f'{original_name} ({copy_num})'
-            await target.children.add(clone)
-            # if clone.is_collection:
-            #     await target.containers.add(clone)
-            # else:
-            #     await target.items.add(clone)
-
-        # clone.parent_id = id_map[item.parent_id]
-        # await context.txn.insert(clone)
-        return clone
-
-    async def _copy(self,
-                    target: TYPING.CONTAINER_CO,
-                    memo: Dict) -> 'Cloneable':
-        # await Cloneable._prepare_id_map(self, memo['_id_map_'], is_root=True)
-        memo['_id_map_'][self.parent_id] = target.id
-        clone = await Cloneable._write_clone(self, memo, target)
-        # for item in all_children:
-        #     await Cloneable._write_clone(item, memo)
-        return clone
-
     async def copy_to(self, target: TYPING.CONTAINER_CO) -> 'Cloneable':
         """
         Copies the item to the designated target.
@@ -94,23 +27,26 @@ class Cloneable(TYPING.ITEM_TYPE):
         @type target: L{Container}
         @return: L{Item}
         """
-        if self.is_collection and await target.is_contained_in(self):
-            raise exceptions.InvalidUsage(
-                'Cannot copy item to destination. '
-                'The destination is contained in the source.')
+        # if self.is_collection and await target.is_contained_in(self):
+        #     raise exceptions.InvalidUsage(
+        #         'Cannot copy item to destination. '
+        #         'The destination is contained in the source.')
 
         # check permissions on target folder
         if not await target.can_update(context.user):
             raise exceptions.Forbidden('Forbidden')
 
-        with system_override():
-            return await self._copy(
-                target,
-                {
-                    '_dup_ext_': True,
-                    '_id_map_': {}
-                }
-            )
+        clone = await self.clone({'_dup_ext_': True})
+
+        if target is not None:
+            copy_num = 1
+            original_name = clone.name
+            while await target.child_exists(clone.name):
+                copy_num += 1
+                clone.name = f'{original_name} ({copy_num})'
+            await target.children.add(clone)
+
+        return clone
 
 
 class Movable(TYPING.ITEM_TYPE):

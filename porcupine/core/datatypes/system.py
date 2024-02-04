@@ -103,6 +103,10 @@ class Children(RelatorN):
     def getter(self, instance, value=None):
         return ChildrenCollection(self, instance)
 
+    def clone(self, instance, memo):
+        # do not clone children
+        ...
+
     def __get__(self, instance, owner):
         if instance is None:
             if self.name not in owner.__dict__:

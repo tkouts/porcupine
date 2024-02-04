@@ -112,9 +112,9 @@ class Reference1(String, Acceptable):
                 with system_override():
                     await ref_item.restore()
 
-    def clone(self, instance, memo):
-        value = super().__get__(instance, None)
-        super().__set__(instance, memo['_id_map_'].get(value, value))
+    # def clone(self, instance, memo):
+    #     value = super().__get__(instance, None)
+    #     super().__set__(instance, memo['_id_map_'].get(value, value))
 
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
@@ -138,25 +138,12 @@ class ReferenceN(AsyncSetter, List, Acceptable):
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)
 
-    # def current_chunk(self, instance) -> int:
-    #     active_chunk_key = utils.get_active_chunk_key(self.name)
-    #     current_chunk = getattr(instance.__storage__, active_chunk_key)
-    #     if current_chunk is UNSET:
-    #         return 0
-    #     return current_chunk
-
-    # def key_for(self, instance, chunk=None):
-    #     if chunk is None:
-    #         chunk = self.current_chunk(instance)
-    #     return utils.get_collection_key(instance.id, self.name, chunk)
-
     async def clone(self, instance, memo):
         collection = self.__get__(instance, None).items()
-        # print('cloning fetched', collection.is_fetched())
+        # TODO: run as system to fetch all collection items
         super(List, self).__set__(
             instance,
-            [await item.clone(memo) async for item in collection]
-            # [memo['_id_map_'].get(oid, oid) for oid in await collection.ids()]
+            [item async for item in collection]
         )
 
     # allow regular snapshots

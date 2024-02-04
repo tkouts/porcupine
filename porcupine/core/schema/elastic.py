@@ -242,10 +242,9 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
         """
         if memo is None:
             memo = {
-                '_dup_ext_': True,
-                '_id_map_': {}
+                '_dup_ext_': True
             }
-        new_id = memo['_id_map_'].setdefault(self.id, utils.generate_oid())
+        new_id = utils.generate_oid()
         clone = copy.deepcopy(self)
         # call data types clone method
         for dt in self.__schema__.values():
