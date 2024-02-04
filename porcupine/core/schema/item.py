@@ -176,8 +176,6 @@ class GenericItem(Removable, Elastic):
                 self.created = self.modified = date.utcnow()
                 self.modified_by = user.name
             await context.txn.insert(self)
-            if self.is_collection:
-                context.access_map[self.id] = self.access_record
 
     def touch(self) -> None:
         return context.txn.touch(self)
