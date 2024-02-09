@@ -114,6 +114,10 @@ class Transaction:
 
         self._items[item_id] = item
 
+        # update access map
+        if item.is_collection:
+            ctx_access_map.get()[item_id] = item.access_record
+
         await item.on_create()
 
         # execute data types on_create handlers
@@ -124,9 +128,6 @@ class Transaction:
             ])
         except exceptions.AttributeSetError as e:
             raise exceptions.InvalidUsage(str(e))
-
-        if item.is_collection:
-            ctx_access_map.get()[item_id] = item.access_record
 
         item.__reset__()
 
