@@ -368,12 +368,12 @@ class Transaction:
                         # only upsert, counter for now
                         if mut_type is SubDocument.COUNTER:
                             attrs.append(
-                                f"data=json_set(data, '$.{path}', "
-                                f"json_extract(data, '$.{path}') + ?)"
+                                f"data=json_set(data,'$.{path}',"
+                                f"IFNULL(json_extract(data, '$.{path}'),0)+?)"
                             )
                         else:
                             attrs.append(
-                                f"data=json_set(data, '$.{path}', ?)"
+                                f"data=json_set(data,'$.{path}',?)"
                             )
                     values.append(mut_value)
                 values.append(item_id)
