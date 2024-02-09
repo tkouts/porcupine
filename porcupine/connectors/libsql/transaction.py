@@ -1,4 +1,5 @@
 import asyncio
+import orjson
 import random
 from typing import Dict, Optional
 from collections import defaultdict
@@ -358,22 +359,44 @@ class Transaction:
                 table = CompositesTable if item.is_composite else ItemsTable
                 for path, mutation in mutations.items():
                     mut_type, mut_value = mutation
-                    if path in table.columns:
+                    if '.' in path:
+                        attr, inner_path = path.split('.', 1)
+                    else:
+                        attr = path
+                        inner_path = ''
+
+                    # sanitize value
+                    is_json = False
+                    if isinstance(mut_value, dict):
+                        is_json = True
+                        mut_value = orjson.dumps(mut_value).decode('utf-8')
+
+                    # define column
+                    if attr in table.columns:
+                        column = attr
+                    else:
+                        column = 'data'
+                        inner_path = path
+
+                    if column != 'data' and not inner_path:
                         if mut_type is SubDocument.COUNTER:
-                            attrs.append(f'{path}={path} + ?')
+                            attrs.append(f'{column}={column} + ?')
                         else:
-                            attrs.append(f'{path}=?')
+                            attrs.append(f'{column}=?')
                     else:
                         # TODO: implement mutation types
                         # only upsert, counter for now
                         if mut_type is SubDocument.COUNTER:
                             attrs.append(
-                                f"data=json_set(data,'$.{path}',"
-                                f"IFNULL(json_extract(data, '$.{path}'),0)+?)"
+                                f"{column}=json_set({column}, '$.{inner_path}', "
+                                f"IFNULL(json_extract({column}, "
+                                f"'$.{inner_path}'), 0) + ?)"
                             )
                         else:
                             attrs.append(
-                                f"data=json_set(data,'$.{path}',?)"
+                                f"{column}=json_set({column}, "
+                                f"'$.{inner_path}', "
+                                f"{'json(?)' if is_json else '?'})"
                             )
                     values.append(mut_value)
                 values.append(item_id)
