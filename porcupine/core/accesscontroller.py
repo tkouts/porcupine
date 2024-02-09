@@ -98,12 +98,13 @@ async def resolve_visibility(item) -> bool:
         # print('using cache', item)
         return visibility_cache[cache_key]
 
-    # update access map if needed
     access_map = ctx_access_map.get()
-    if item.parent_id is None and item.is_collection:
-        # root container
+
+    if item.is_collection:
+        # update access map
         access_map[item.id] = item.access_record
-    elif parent_id not in access_map:
+
+    if parent_id is not None and parent_id not in access_map:
         # print('fetching', parent_id)
         container_id = item.id if item.is_collection else parent_id
         results = await connector.fetch_access_map(container_id)
