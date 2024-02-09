@@ -63,7 +63,8 @@ class AtomicMap(AsyncSetter, Dictionary):
             raise TypeError(
                 'Unsupported value type {0} for {1}'.format(
                     type(value).__name__,
-                    self.name or type(self).__name__))
+                    self.name or type(self).__name__)
+            )
         if isinstance(value, tuple):
             # make sure tuple elements are immutable
             try:
@@ -71,7 +72,8 @@ class AtomicMap(AsyncSetter, Dictionary):
             except TypeError:
                 raise TypeError(
                     'Tuple elements of atomic map {0} should be immutable'
-                    .format(self.name or type(self).__name__))
+                    .format(self.name or type(self).__name__)
+                )
 
     def validate_value(self, instance, value):
         super().validate_value(instance, value)
