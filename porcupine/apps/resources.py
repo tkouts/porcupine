@@ -51,9 +51,9 @@ async def member_handler(request, item_id, path):
                 if resolved is None:
                     raise exceptions.NotFound(
                         'The resource {0} does not exist'.format(request_path))
-                elif isinstance(resolved, Embedded):
-                    reference = getattr(inst, resolved.name)
-                    resolved = await reference.item() or resolved
+                # elif isinstance(resolved, Embedded):
+                #     reference = getattr(inst, resolved.name)
+                #     resolved = await reference.item() or resolved
             elif isinstance(resolved, Composition):
                 collection = getattr(inst, resolved.name)
                 try:

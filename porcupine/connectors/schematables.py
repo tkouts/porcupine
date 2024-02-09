@@ -10,12 +10,13 @@ class SchemaTable(Table):
     def __init__(
         self,
         collection,
+        name=None,
         schema=None,
         alias=None,
         query_cls=None,
     ):
         self.collection = collection
-        super().__init__(self.table_name, schema, alias, query_cls)
+        super().__init__(name or self.table_name, schema, alias, query_cls)
         self.data_field = super().field('data')
 
     def field(self, name: str):
@@ -50,3 +51,13 @@ class ItemsTable(SchemaTable):
     )
     table_name = 'items'
 
+
+class CompositesTable(SchemaTable):
+    columns = (
+        'id', 'sig', 'type', 'item_id'
+    )
+    # partial_fields = (
+    #     'id', 'parent_id', 'type', 'acl', 'is_system',
+    #     'is_deleted', 'expires_at'
+    # )
+    # table_name = 'composites'

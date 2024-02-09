@@ -59,7 +59,7 @@ class DataType:
             if not context.system_override:
                 if self.readonly and value != self.get_value(instance):
                     raise AttributeError(
-                        'Attribute {0} of {1} is readonly'.format(
+                        'Attribute {0} of {1} is readonly.'.format(
                             self.name, type(instance).__name__
                         )
                     )
@@ -67,7 +67,7 @@ class DataType:
                     storage = getattr(instance, self.storage)
                     if getattr(storage, self.storage_key) is not UNSET:
                         raise AttributeError(
-                            'Attribute {0} of {1} is immutable'.format(
+                            'Attribute {0} of {1} is immutable.'.format(
                                 self.name, type(instance).__name__
                             )
                         )
@@ -75,7 +75,7 @@ class DataType:
             return
         if not isinstance(value, self.safe_type):
             raise TypeError(
-                'Unsupported type {0} for {1}'.format(
+                'Unsupported type {0} for {1}.'.format(
                     type(value).__name__,
                     self.name or type(self).__name__
                 )
@@ -89,7 +89,7 @@ class DataType:
     def __set__(self, instance, value):
         if value is not None and self.xform is not None:
             value = self.xform(value)
-        self.validate_value(instance, value)
+        # self.validate_value(instance, value)
         self.snapshot(instance, value, self.get_value(instance, snapshot=False))
 
     def snapshot(self, instance, new_value, previous_value):
@@ -137,11 +137,13 @@ class DataType:
     # event handlers
 
     async def on_create(self, instance, value):
+        self.validate_value(instance, value)
         self.validate(value)
         # if self.unique and self.storage == '__storage__':
         #     await self.add_unique(instance, value)
 
     async def on_change(self, instance, value, old_value):
+        self.validate_value(instance, value)
         self.validate(value)
         if self.storage == '__storage__' and not instance.__is_new__:
             context.txn.mutate(instance,

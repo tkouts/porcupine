@@ -18,8 +18,9 @@ class PartialItem:
     def __init__(self, partial: Mapping):
         self._partial = partial
         self._content_class = get_content_class(partial['type'])
-        acl = partial['acl']
-        self.acl = AclProxy(acl and orjson.loads(acl))
+        if not self.is_composite:
+            acl = partial['acl']
+            self.acl = AclProxy(acl and orjson.loads(acl))
 
     @property
     def __is_new__(self):
@@ -79,6 +80,8 @@ class PartialItem:
         return d
 
     async def can_read(self, membership):
+        if self.is_composite:
+            return True
         if ctx_sys.get():
             return True
         user_role = await Roles.resolve(self, membership)

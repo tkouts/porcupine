@@ -100,7 +100,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @staticmethod
     async def new_from_dict(dct: dict,
                             camel_to_snake=False) -> TYPING.ANY_ITEM_CO:
-        item_type = dct.pop('type')
+        item_type = dct.pop('_type')
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
             item_type = schemaregistry.get_content_class(item_type)

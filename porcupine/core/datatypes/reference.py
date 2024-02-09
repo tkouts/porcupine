@@ -76,7 +76,7 @@ class Reference1(String, Acceptable):
             ref_item = await db_connector().get(value)
             if ref_item is None:
                 # TODO: change wording
-                raise exceptions.InvalidUsage('Invalid item {0}'.format(value))
+                raise exceptions.InvalidUsage(f'Invalid item {value}.')
             if not await self.accepts_item(ref_item):
                 raise exceptions.ContainmentError(instance, self.name, ref_item)
             return ref_item
@@ -119,7 +119,7 @@ class Reference1(String, Acceptable):
     async def get(self, instance, request, expand=False):
         expand = expand or 'expand' in request.args
         value = getattr(instance, self.name)
-        if expand:
+        if value and expand:
             return await value.item()
         return value
 
@@ -187,7 +187,6 @@ class ReferenceN(AsyncSetter, List, Acceptable):
         added_ids = new_ids.difference(old_ids)
         removed_ids = old_ids.difference(new_ids)
         added = [i for i in value if i.id in added_ids]
-        # await db.get_multi(added_ids).list()
         removed = [i for i in old_value if i.id in removed_ids]
         # await db.get_multi(removed_ids).list()
         try:

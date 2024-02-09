@@ -1,9 +1,10 @@
 from porcupine import db, exceptions
 from porcupine.contract import contract
-from porcupine.datatypes import String
+from porcupine.datatypes import String, Relator1, Composition, Embedded
 from porcupine.core.services import db_connector
-from porcupine.core.context import system_override, context
+from porcupine.core.context import context
 from .elastic import Elastic
+from .item import GenericItem
 
 
 class Composite(Elastic):
@@ -23,45 +24,53 @@ class Composite(Elastic):
     @see: L{porcupine.datatypes.Composition}
     """
     is_composite = True
-    path = String(required=True, readonly=True, protected=True, immutable=True)
 
-    @property
-    async def effective_acl(self):
-        item = await self.item
-        return await item.effective_acl
+    # these are initialized by schema registry
+    embedded_in = None
+    collection_name = None
 
-    @property
-    def item_id(self):
-        return self.path.split('.')[0]
+    item_id = String(
+        required=True,
+        readonly=True,
+        protected=True,
+        immutable=True
+    )
 
-    @property
-    def parent_id(self):
-        return self.path.split('.')[-2]
+    @classmethod
+    def table_name(cls):
+        return cls.__name__
 
-    @property
-    def property_name(self):
-        return self.path.split('.')[-1]
+    # @property
+    # async def effective_acl(self):
+    #     item = await self.item
+    #     return item.effective_acl
 
     @property
     async def item(self):
-        return await db_connector().get(self.item_id)
+        parent = await self.parent
+        while not isinstance(parent, GenericItem):
+            parent = await parent.parent
+        return parent
 
     @property
-    async def parent(self):
-        return await db_connector().get(self.parent_id)
+    def parent(self):
+        return db_connector().get(
+            self.item_id,
+            _table=self.embedded_in.table_name()
+        )
 
-    @property
-    async def ttl(self):
-        item = await self.item
-        return item.expires_at
+    # @property
+    # async def ttl(self):
+    #     item = await self.item
+    #     return item.expires_at
 
-    async def clone(self, memo: dict = None) -> 'Composite':
-        clone: 'Composite' = await super().clone(memo)
-        with system_override():
-            id_map = memo['_id_map_']
-            clone.path = '.'.join([id_map.get(oid, oid)
-                                   for oid in self.path.split('.')])
-        return clone
+    # async def clone(self, memo: dict = None) -> 'Composite':
+    #     clone: 'Composite' = await super().clone(memo)
+    #     with system_override():
+    #         id_map = memo['_id_map_']
+    #         clone.path = '.'.join([id_map.get(oid, oid)
+    #                                for oid in self.path.split('.')])
+    #     return clone
 
     async def touch(self):
         item = await self.item
@@ -84,16 +93,17 @@ class Composite(Elastic):
         return updated
 
     async def remove(self):
-        exploded_path = self.path.split('.')
-        comp_name = exploded_path[-1]
+        comp_name = self.collection_name
         parent = await self.parent
-        comp = getattr(parent, comp_name)
-        if hasattr(comp, 'remove'):
+        dt = getattr(self.embedded_in, comp_name)
+        if isinstance(dt, Composition):
+            comp = getattr(parent, comp_name)
             # composition
             await comp.remove(self)
         else:
             # embedded
-            await comp.reset(None)
+            # await comp.reset(None)
+            setattr(parent, comp_name, None)
             await parent.update()
             # setattr(parent, comp_name, None)
             # await context.txn.upsert(parent)

@@ -128,7 +128,8 @@ class ItemCollection(AsyncSetterValue):
                 #                        descriptor.storage_key,
                 #                        SubDocument.UPSERT,
                 #                        1)
-                    await context.txn.upsert(item)
+                    if not item.__is_new__:
+                        await context.txn.upsert(item)
             # update items inited flag
             # current_count = getattr(instance.__storage__, descriptor.name)
             # setattr(instance.__storage__, descriptor.name, 1)
@@ -164,7 +165,8 @@ class ItemCollection(AsyncSetterValue):
                 else:
                     with system_override():
                         setattr(item, descriptor.rel_attr, None)
-                    await context.txn.upsert(item)
+                    if not item.__is_new__:
+                        await context.txn.upsert(item)
 
     async def reset(self, value: list) -> None:
         # print('reset', value)

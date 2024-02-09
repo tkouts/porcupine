@@ -23,6 +23,24 @@ def get_many_to_many_relationships():
     return rels
 
 
+def get_compositions():
+    from porcupine.core.datatypes.composition import (
+        Composition,
+        Embedded
+    )
+    comp_types = Composition, Embedded
+    comps = []
+    for cls in _ELASTIC_MAP.values():
+        for dt in cls.__dict__.values():
+            if isinstance(dt, comp_types):
+                # print(dt.allowed_types)
+                for composite_class in dt.allowed_types:
+                    composite_class.embedded_in = cls
+                    composite_class.collection_name = dt.name
+                comps.append((cls, dt))
+    return comps
+
+
 def add_indexes(cls, indexes):
     _INDEXES[cls] = indexes
 

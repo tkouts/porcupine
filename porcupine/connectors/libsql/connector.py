@@ -36,13 +36,13 @@ class LibSql:
             self.server.config.DB_HOST
         )
 
-    async def get(self, object_id, quiet=True):
+    async def get(self, object_id, quiet=True, _table='items'):
         if context.txn is not None and object_id in context.txn:
             return context.txn[object_id]
         item = context.db_cache.get(object_id)
         if item is None:
             # print('getting', object_id)
-            item = await self.get_raw(object_id)
+            item = await self.get_raw(object_id, _table)
             if item is not None:
                 item = self.persist.loads(item)
                 is_visible = await resolve_visibility(item)
@@ -55,9 +55,9 @@ class LibSql:
             )
         return item
 
-    async def get_raw(self, item_id):
+    async def get_raw(self, item_id, table):
         result = await self.query(
-            'select * from items where id=?',
+            f'select * from "{table}" where id=?',
             [item_id]
         )
         if len(result) > 0:
@@ -137,10 +137,12 @@ class LibSql:
                 data json not null
             )
         ''')
+        # TODO: remove when indexes are implemented
         await self.db.execute('''
             create index if not exists idx_is_collection on
             items(parent_id, is_collection)
         ''')
+
         # many-to-many relations
         many_to_many = {
             d.associative_table: d.associative_table_fields
@@ -155,5 +157,18 @@ class LibSql:
                     {fields[1]} text not null
                         REFERENCES items(id) ON DELETE CASCADE,
                     UNIQUE ({",".join(fields)})
+                )
+            ''')
+
+        # compositions
+        for cls, composition in schemaregistry.get_compositions():
+            await self.db.execute(f'''
+                create table if not exists "{composition.t.get_table_name()}" (
+                    id text primary key not null,
+                    sig text not null,
+                    type text not null,
+                    item_id TEXT NOT NULL
+                        REFERENCES {cls.table_name()}(id) ON DELETE CASCADE,
+                    data json not null
                 )
             ''')

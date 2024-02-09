@@ -19,9 +19,9 @@ from porcupine.connectors.mutations import (
 from porcupine.core import utils
 from porcupine.core.utils import date, default_json_encoder
 from porcupine.core.context import ctx_txn, ctx_access_map
-from porcupine.core.services import get_service
+# from porcupine.core.services import get_service
 from porcupine.core.context import system_override, context_user, context
-from porcupine.connectors.schematables import ItemsTable
+from porcupine.connectors.schematables import ItemsTable, CompositesTable
 
 
 class ExternalDoc:
@@ -131,7 +131,7 @@ class Transaction:
         item.__reset__()
 
     async def upsert(self, item: TYPING.ANY_ITEM_CO):
-        if item.__snapshot__:
+        if item.__snapshot__ and item.id not in self._deletions:
             await item.on_change()
 
             # execute data types on_change handlers
@@ -163,8 +163,8 @@ class Transaction:
             #     # print('LOCKING', locks)
             #     await self.lock_attributes(item, *[u.name for u in locks])
 
-        item.__reset__()
-        self._items[item.id] = item
+            item.__reset__()
+            self._items[item.id] = item
 
     async def touch(self, item):
         # touch has to be fast / no event handlers
@@ -191,6 +191,7 @@ class Transaction:
             for dt in item.__schema__.values()
         ])
 
+        self._items.pop(item.id, None)
         self._deletions[item.id] = item
 
     async def recycle(self, item):
@@ -264,18 +265,18 @@ class Transaction:
             del self._ext_upsertions[key]
         self._deletions[key] = None
 
-    async def insert_multi(self, insertions):
-        connector = self.connector
-        errors = await connector.batch_update(insertions, ordered=True)
-        if any(errors):
-            # some insertion(s) failed - roll back
-            deletions = [
-                Deletion(i.key)
-                for (r, i) in zip(errors, insertions)
-                if r is None
-            ]
-            await connector.batch_update(deletions)
-            raise next(r for r in errors if r is not None)
+    # async def insert_multi(self, insertions):
+    #     connector = self.connector
+    #     errors = await connector.batch_update(insertions, ordered=True)
+    #     if any(errors):
+    #         # some insertion(s) failed - roll back
+    #         deletions = [
+    #             Deletion(i.key)
+    #             for (r, i) in zip(errors, insertions)
+    #             if r is None
+    #         ]
+    #         await connector.batch_update(deletions)
+    #         raise next(r for r in errors if r is not None)
 
     # async def lock_attributes(self, item, *attributes):
     #     lock_keys = [utils.get_attribute_lock_key(item.id, attr_name)
@@ -319,13 +320,14 @@ class Transaction:
         # insertions
         statements = []
         for item_id, item in self._items.items():
-            expiry_map[item_id] = await item.ttl
+            # expiry_map[item_id] = await item.ttl
             if item.__is_new__:
                 inserted_items.append(item)
                 values = dumps(item)
+                table_name = item.table_name()
                 statements.append(
                     libsql_client.Statement(
-                        'insert into items values '
+                        f'insert into {table_name} values '
                         f'({",".join(["?"] * len(values.keys()))})',
                         values.values()
                     )
@@ -351,9 +353,11 @@ class Transaction:
             if item_id not in self._deletions:
                 attrs = []
                 values = []
+                item = self._items[item_id]
+                table = CompositesTable if item.is_composite else ItemsTable
                 for path, mutation in mutations.items():
                     mut_type, mut_value = mutation
-                    if path in ItemsTable.columns:
+                    if path in table.columns:
                         if mut_type is SubDocument.COUNTER:
                             attrs.append(f'{path}={path} + ?')
                         else:
@@ -373,13 +377,14 @@ class Transaction:
                     values.append(mut_value)
                 values.append(item_id)
                 # print(
-                #     'update items set '
-                #     f'{", ".join(attrs)} '
-                #     f'where id=?'
+                #     f'update "{item.table_name()}" set '
+                #     f'{",".join(attrs)} '
+                #     f'where id=?',
+                #     values
                 # )
                 statements.append(
                     libsql_client.Statement(
-                        'update items set '
+                        f'update "{item.table_name()}" set '
                         f'{",".join(attrs)} '
                         f'where id=?',
                         values
@@ -442,9 +447,10 @@ class Transaction:
         ]
         # rest_ops.extend([Deletion(key) for key in self._deletions])
         for item in deleted_items:
+            table_name = item.table_name()
             statements.append(
                 libsql_client.Statement(
-                    f'delete from "items" '
+                    f'delete from "{table_name}" '
                     f'where id=?',
                     [item.id]
                 )

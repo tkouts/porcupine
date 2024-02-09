@@ -100,7 +100,7 @@ async def resolve_visibility(item) -> bool:
 
     # update access map if needed
     access_map = ctx_access_map.get()
-    if item.parent_id is None:
+    if item.parent_id is None and item.is_collection:
         # root container
         access_map[item.id] = item.access_record
     elif parent_id not in access_map:

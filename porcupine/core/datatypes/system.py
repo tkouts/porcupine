@@ -57,6 +57,7 @@ class ChildrenCollection(ItemCollection):
         # parent_id = parent.id
         user = context.user
         # shortcut = get_content_class('Shortcut')
+        await super().add(*items)
 
         for item in items:
             if not item.__is_new__:
@@ -79,12 +80,10 @@ class ChildrenCollection(ItemCollection):
             # insert item to DB
             await context.txn.insert(item)
 
-        await super().add(*items)
-
     async def remove(self, *items: TYPING.ANY_ITEM_CO):
-        await super().remove(*items)
         for item in items:
             await context.txn.delete(item)
+        await super().remove(*items)
 
     def is_consistent(self, item):
         return self._inst().id == item.parent_id

@@ -61,6 +61,10 @@ class GenericItem(Removable, Elastic):
         super().__init__(dict_storage, **kwargs)
         self.__effective_acl = None
 
+    @classmethod
+    def table_name(cls):
+        return 'items'
+
     @property
     def friendly_name(self):
         return f'{self.name}({self.content_class})'
