@@ -41,8 +41,8 @@ class SchemaTable(Table):
 
 class ItemsTable(SchemaTable):
     columns = (
-        'id', 'sig', 'type', 'name', 'created',
-        'modified', 'is_collection', 'acl',
+        'id', 'sig', 'type', 'acl', 'name', 'created',
+        'modified', 'is_collection', 'is_system',
         'parent_id', 'p_type', 'expires_at', 'is_deleted'
     )
     partial_fields = (

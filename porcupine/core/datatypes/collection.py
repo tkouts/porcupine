@@ -8,8 +8,10 @@ from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
 from porcupine.connectors.libsql.query import QueryType
+from porcupine.core.services import db_connector
 # from porcupine.connectors.mutations import SubDocument
-from pypika import Parameter
+from pypika import Parameter, Query
+from pypika.terms import ValueWrapper
 from pypika.functions import Count
 
 
@@ -31,6 +33,20 @@ class ItemCollection(AsyncSetterValue):
     def query(self, query_type=QueryType.ITEMS, where=None):
         q = self._desc.query(query_type)
         q.set_params(self.__query_params)
+        if context.txn is not None:
+            # READ YOUR OWN WRITES
+            instance, descr = self._inst(), self._desc
+            removals = context.txn.get_collection_removals(descr, instance)
+            if removals:
+                q = q.where(self.id.notin(removals))
+            additions = context.txn.get_collection_additions(descr, instance)
+            if additions:
+                dumps = db_connector().persist.dumps
+                for added_item in additions:
+                    q *= Query.select(
+                        *[ValueWrapper(i) for i in (dumps(added_item).values())]
+                    )
+                # print(q._q)
         if where is not None:
             q = q.where(where)
         return q

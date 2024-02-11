@@ -10,6 +10,7 @@ from porcupine.core.accesscontroller import resolve_visibility
 # from porcupine.core.stream.streamer import BaseStreamer
 # from porcupine.core.schema.partial import PartialItem
 from .query import PorcupineQuery, QueryType
+from pypika import Query
 from porcupine.connectors.libsql import persist
 from porcupine.core import schemaregistry
 
@@ -78,11 +79,12 @@ class LibSql:
             if ordered_ids[oid] is False
         ]
 
-        q = (
-            self.Query
-            .from_(t, query_type=QueryType.ITEMS)
+        q = self.Query(
+            Query
+            .from_(t)
             .select(t.star)
-            .where(t.id.isin(fetch_from_db))
+            .where(t.id.isin(fetch_from_db)),
+            QueryType.ITEMS
         )
         async for item in q.cursor(_skip_acl_check=True):
             ordered_ids[item.id] = item

@@ -7,10 +7,10 @@ from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.connectors.schematables import ItemsTable
-from porcupine.connectors.libsql.query import QueryType
+from porcupine.connectors.libsql.query import QueryType, PorcupineQuery
 from .reference import Reference1, ReferenceN, ItemReference
 # from .collection import ItemCollection
-from pypika import Parameter, Table
+from pypika import Parameter, Table, Field, Query
 from methodtools import lru_cache
 # from .asyncsetter import AsyncSetterValue
 
@@ -223,8 +223,9 @@ class RelatorN(ReferenceN, RelatorBase):
         if self.is_many_to_many:
             if query_type is QueryType.RAW_ASSOCIATIVE:
                 q = (
-                    db_connector().Query
-                    .from_(self.associative_table, query_type=query_type)
+                    Query
+                    .from_(self.associative_table,
+                           wrap_set_operation_queries=False)
                     .select()
                     .where(
                         self.equality_field == Parameter(':instance_id')
@@ -232,8 +233,9 @@ class RelatorN(ReferenceN, RelatorBase):
                 )
             else:
                 q = (
-                    db_connector().Query
-                    .from_(self.associative_table, query_type=query_type)
+                    Query
+                    .from_(self.associative_table,
+                           wrap_set_operation_queries=False)
                     .join(self.t)
                     .on(self.join_field == self.t.id)
                     .select()
@@ -244,19 +246,21 @@ class RelatorN(ReferenceN, RelatorBase):
         else:
             rel_attr = self.rel_attr
             q = (
-                db_connector().Query
-                .from_(self.t, query_type=query_type)
+                Query
+                .from_(self.t,
+                       wrap_set_operation_queries=False)
                 .select()
                 .where(
                     getattr(self.t, rel_attr) == Parameter(':instance_id')
                 )
             )
         if query_type is QueryType.ITEMS:
-            q = q.select(self.t.star)
+            columns = self.t.columns + ('data', )
+            q = q.select(*[Field(name, table=self.t) for name in columns])
         elif query_type is QueryType.PARTIAL:
             q = q.select(*self.t.partial_fields)
         # print(q)
-        return q
+        return PorcupineQuery(q, query_type=query_type)
 
     # async def on_create(self, instance, value):
     #     added, _ = await super().on_create(instance, value)

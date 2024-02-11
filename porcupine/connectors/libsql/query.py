@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import AsyncIterable
+
 from pypika.queries import QueryBuilder, Query
 from porcupine import pipe
 from porcupine.core.schemaregistry import get_content_class
@@ -7,7 +8,6 @@ from porcupine.core.context import ctx_user
 from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import ItemStreamer, PartialStreamer
 from porcupine.connectors.partial import PartialItem
-from porcupine.core.schema.elastic import Elastic
 from porcupine.core.accesscontroller import resolve_visibility
 
 
@@ -19,7 +19,7 @@ class QueryType(Enum):
 
 
 class Cursor(AsyncIterable):
-    def __init__(self, query, params):
+    def __init__(self, query: QueryBuilder, params):
         self.query = query
         self.params = params
 
@@ -32,15 +32,16 @@ class Cursor(AsyncIterable):
             yield row
 
 
-class PorcupineQueryBuilder(QueryBuilder):
+class PorcupineQuery:
     def __init__(
         self,
+        query: QueryBuilder,
         query_type=QueryType.ITEMS,
-        **kwargs
+        params=None
     ):
-        super().__init__(**kwargs)
+        self._q = query
         self.type = query_type
-        self._params = {}
+        self._params = params or {}
 
     @staticmethod
     async def _shortcut_resolver(i):
@@ -52,6 +53,21 @@ class PorcupineQueryBuilder(QueryBuilder):
     def set_params(self, params):
         self._params = params
 
+    def __getattr__(self, item):
+        return getattr(self._q, item)
+
+    def where(self, criterion):
+        q = self._q.where(criterion)
+        return PorcupineQuery(q, self.type, {**self._params})
+
+    def select(self, *args, **kwargs):
+        q = self._q.select(*args, **kwargs)
+        return PorcupineQuery(q, self.type, {**self._params})
+
+    def __mul__(self, other: 'QueryBuilder'):
+        q = self._q * other
+        return PorcupineQuery(q, self.type, {**self._params})
+
     def cursor(
         self,
         skip=0,
@@ -60,7 +76,7 @@ class PorcupineQueryBuilder(QueryBuilder):
         _skip_acl_check=False,
         **kwargs
     ):
-        cursor = Cursor(self, {
+        cursor = Cursor(self._q, {
             **kwargs,
             **self._params
         })
@@ -85,7 +101,7 @@ class PorcupineQueryBuilder(QueryBuilder):
     async def execute(self, first_only=False, **kwargs):
         connector = db_connector()
         results = await connector.query(
-            self.get_sql(),
+            self._q.get_sql(),
             {**kwargs, **self._params}
         )
         if self.type in (QueryType.ITEMS, QueryType.PARTIAL):
@@ -103,9 +119,3 @@ class PorcupineQueryBuilder(QueryBuilder):
                 return None
             return results[0]
         return results
-
-
-class PorcupineQuery(Query):
-    @classmethod
-    def _builder(cls, **kwargs) -> PorcupineQueryBuilder:
-        return PorcupineQueryBuilder(**kwargs)

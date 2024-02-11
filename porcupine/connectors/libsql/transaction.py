@@ -240,6 +240,38 @@ class Transaction:
     def mutate_collection(self, associative_table, mut_type, values):
         self._assoc[associative_table].append((mut_type, values))
 
+    def get_collection_removals(self, dt, instance):
+        removed_ids = []
+        # TODO: implement one to many
+        if dt.is_many_to_many:
+            associative_table = dt.associative_table.get_table_name()
+            if associative_table in self._assoc:
+                for mut_type, values in self._assoc[associative_table]:
+                    collection_owner = values[dt.equality_field.name]
+                    if collection_owner == instance.id:
+                        if mut_type == 0:
+                            removed_ids.append(values[dt.join_field.name])
+        return removed_ids
+
+    def get_collection_additions(self, dt, instance):
+        added_items = []
+        # TODO: implement one to many
+        if dt.is_many_to_many:
+            associative_table = dt.associative_table.get_table_name()
+            if associative_table in self._assoc:
+                for mut_type, values in self._assoc[associative_table]:
+                    collection_owner = values[dt.equality_field.name]
+                    if (
+                        collection_owner == instance.id
+                        and mut_type == 1
+                    ):
+                        added_id = values[dt.join_field.name]
+                        if (
+                            added_id in self._items
+                        ):
+                            added_items.append(self._items[added_id])
+        return added_items
+
     # def append(self, item_id, key, value):
     #     if key in self._ext_insertions:
     #         self._ext_insertions[key].value += value
@@ -367,6 +399,7 @@ class Transaction:
 
                     # sanitize value
                     is_json = False
+                    # TODO: jsonify additional types
                     if isinstance(mut_value, dict):
                         is_json = True
                         mut_value = orjson.dumps(mut_value).decode('utf-8')
