@@ -10,7 +10,7 @@ from .asyncsetter import AsyncSetterValue
 from porcupine.connectors.libsql.query import QueryType
 from porcupine.core.services import db_connector
 # from porcupine.connectors.mutations import SubDocument
-from pypika import Parameter, Query
+from pypika import Parameter, Query, Order
 from pypika.terms import ValueWrapper
 from pypika.functions import Count
 
@@ -30,7 +30,8 @@ class ItemCollection(AsyncSetterValue):
     def __getitem__(self, item):
         return self._desc.t[item]
 
-    def query(self, query_type=QueryType.ITEMS, where=None):
+    def query(self, query_type=QueryType.ITEMS, where=None,
+              order_by=None, order=Order.asc):
         q = self._desc.query(query_type)
         q.set_params(self.__query_params)
         if context.txn is not None:
@@ -49,6 +50,8 @@ class ItemCollection(AsyncSetterValue):
                 # print(q._q)
         if where is not None:
             q = q.where(where)
+        if order_by is not None:
+            q = q.orderby(order_by, order=order)
         return q
 
     @property
@@ -87,10 +90,12 @@ class ItemCollection(AsyncSetterValue):
         skip=0,
         take=None,
         where=None,
+        order_by=None,
+        order=Order.asc,
         resolve_shortcuts=False,
         **kwargs
     ):
-        q = self.query(where=where)
+        q = self.query(where=where, order_by=order_by, order=order)
         return q.cursor(skip, take, resolve_shortcuts, **kwargs)
 
     async def ids(self) -> Tuple[TYPING.ITEM_ID]:

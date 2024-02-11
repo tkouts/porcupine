@@ -64,6 +64,10 @@ class PorcupineQuery:
         q = self._q.select(*args, **kwargs)
         return PorcupineQuery(q, self.type, {**self._params})
 
+    def orderby(self, *args, **kwargs):
+        q = self._q.orderby(*args, **kwargs)
+        return PorcupineQuery(q, self.type, {**self._params})
+
     def __mul__(self, other: 'QueryBuilder'):
         q = self._q * other
         return PorcupineQuery(q, self.type, {**self._params})

@@ -1,6 +1,6 @@
 from typing import Awaitable
 
-from pypika import Parameter
+from pypika import Parameter, Order
 
 # from porcupine import db, exceptions, pipe
 from porcupine.view import view
@@ -92,17 +92,18 @@ class Container(Item):
         # TODO: maybe use db.get_item to read our own writes?
         return self.children.get_member_by_id(oid)
 
-    def get_children(self, skip=0, take=None,
+    def get_children(self, skip=0, take=None, order_by=None, order=Order.asc,
                      resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns all the children of the container.
 
         @rtype: list
         """
-        children = self.children.items(skip, take, None, resolve_shortcuts)
+        children = self.children.items(skip, take, None, order_by, order,
+                                       resolve_shortcuts)
         return children.list()
 
-    def get_items(self, skip=0, take=None,
+    def get_items(self, skip=0, take=None, order_by=None, order=Order.asc,
                   resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns the children that are not containers.
@@ -112,12 +113,14 @@ class Container(Item):
         items = self.children.items(
             skip, take,
             self.children.is_collection == Parameter(':is_collection'),
+            order_by, order,
             resolve_shortcuts,
             is_collection=False
         )
         return items.list()
 
-    def get_containers(self, skip=0, take=None) -> Awaitable[list]:
+    def get_containers(self, skip=0, take=None,
+                       order_by=None, order=Order.asc) -> Awaitable[list]:
         """
         This method returns the children that are containers.
 
@@ -126,6 +129,7 @@ class Container(Item):
         containers = self.children.items(
             skip, take,
             self.children.is_collection == Parameter(':is_collection'),
+            order_by, order,
             is_collection=True
         )
         return containers.list()
