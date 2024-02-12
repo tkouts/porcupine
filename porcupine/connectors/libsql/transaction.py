@@ -400,7 +400,7 @@ class Transaction:
                     # sanitize value
                     is_json = False
                     # TODO: jsonify additional types
-                    if isinstance(mut_value, dict):
+                    if isinstance(mut_value, (dict, list)):
                         is_json = True
                         mut_value = orjson.dumps(mut_value).decode('utf-8')
 
