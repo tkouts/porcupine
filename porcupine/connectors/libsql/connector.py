@@ -79,15 +79,16 @@ class LibSql:
             if ordered_ids[oid] is False
         ]
 
-        q = self.Query(
-            Query
-            .from_(t)
-            .select(t.star)
-            .where(t.id.isin(fetch_from_db)),
-            QueryType.ITEMS
-        )
-        async for item in q.cursor(_skip_acl_check=True):
-            ordered_ids[item.id] = item
+        if fetch_from_db:
+            q = self.Query(
+                Query
+                .from_(t)
+                .select(t.star)
+                .where(t.id.isin(fetch_from_db)),
+                QueryType.ITEMS
+            )
+            async for item in q.cursor(_skip_acl_check=True):
+                ordered_ids[item.id] = item
 
         for oid, item in ordered_ids.items():
             if not quiet and not item:
@@ -116,7 +117,7 @@ class LibSql:
     #     return Cursor(self, query, **params)
 
     def query(self, query, params):
-        # print(query, params)
+        print(query, params)
         return self.db.execute(query, params)
 
     async def prepare_indexes(self):
