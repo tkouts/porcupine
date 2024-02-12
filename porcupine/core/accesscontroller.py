@@ -9,7 +9,8 @@ from porcupine.core.context import (
     # ctx_user,
     ctx_sys,
     ctx_visibility_cache,
-    context_cacheable,
+    ctx_membership_cache,
+    # context_cacheable,
     # context_user
 )
 
@@ -160,20 +161,32 @@ class Roles:
             if membership.id in acl:
                 return acl[membership.id]
 
-            # get membership
-            member_of.update({
-                group_id
-                for group_id in await membership.member_of.ids()
-            })
+            should_resolve_membership = [
+                k for k in acl if k not in ('everyone', 'authusers')
+            ]
+            if should_resolve_membership:
+                membership_cache = ctx_membership_cache.get()
+                if membership.id in membership_cache:
+                    member_of.update(membership_cache[membership.id])
+                else:
+                    # resolve membership
+                    resolved_membership = set()
+                    resolved_membership.update({
+                        group_id
+                        for group_id in await membership.member_of.ids()
+                    })
 
-            if member_of:
-                # resolve nested groups membership
-                member_of.update(
-                    await Roles._resolve_membership(frozenset(member_of))
-                )
+                    if resolved_membership:
+                        # resolve nested groups membership
+                        resolved_membership.update(
+                            await Roles._resolve_membership(frozenset(member_of))
+                        )
 
-            if hasattr(membership, 'authenticate'):
-                member_of.add('authusers')
+                    membership_cache[membership.id] = resolved_membership
+                    member_of.update(resolved_membership)
+
+        if membership is not None and hasattr(membership, 'authenticate'):
+            member_of.add('authusers')
 
         # last add everyone
         member_of.add('everyone')
@@ -184,7 +197,7 @@ class Roles:
         return max(perms)
 
     @staticmethod
-    @context_cacheable(1024)
+    # @context_cacheable(1024)
     async def _resolve_membership(group_ids: frozenset) -> set:
         extended_membership = set()
         # groups = [r async for r in db_connector().get_multi(group_ids)]
