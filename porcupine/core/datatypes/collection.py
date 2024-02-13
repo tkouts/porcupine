@@ -236,7 +236,7 @@ class ItemCollection(AsyncSetterValue):
             )
             return result is not None
         else:
-            return self.get_member_by_id(item_id) is not None
+            return await self.get_member_by_id(item_id) is not None
 
     async def count(self, where=None):
         if self._desc.is_many_to_many and where is None:
