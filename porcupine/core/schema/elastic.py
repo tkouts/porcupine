@@ -22,7 +22,7 @@ class ElasticMeta(type):
         schema = {}
         field_spec = []
         ext_spec = []
-        externals_info = {}
+        defaults = {}
         for attr_name in dir(cls):
             try:
                 attr = getattr(cls, attr_name)
@@ -31,18 +31,19 @@ class ElasticMeta(type):
                     attr.name = attr_name
                     if attr.storage == '__storage__':
                         field_spec.append(attr.storage_key)
+                        defaults[attr.storage_key] = attr.default
                     else:
                         ext_spec.append(attr.storage_key)
                         if hasattr(attr, 'storage_info'):
                             field_spec.append(attr.storage_key)
-                            externals_info[attr.storage_key] = attr.storage_info
+                            defaults[attr.storage_key] = attr.storage_info
             except AttributeError:
                 continue
         cls.__schema__ = schema
         cls.__record__ = storage(cls.__name__, field_spec)
         cls.__ext_record__ = storage(cls.__name__, ext_spec)
         cls.__sig__ = utils.hash_series(*schema.keys())
-        cls.__externals_info__ = externals_info
+        cls.__default_record__ = defaults
 
         # add indexes
         if cls.is_collection:
@@ -87,7 +88,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     __sig__: ClassVar[str] = ''
     __record__: TYPING.STORAGE = None
     __ext_record__: TYPING.STORAGE = None
-    __externals_info__: ClassVar[dict] = {}
+    __default_record__: ClassVar[dict] = {}
 
     _id_size_: ClassVar[int] = 8
     is_collection: ClassVar[bool] = False
@@ -136,7 +137,7 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             # new item
             clazz = type(self)
             # initialize storage with default values
-            self.__storage__ = self.__record__(clazz.__externals_info__)
+            self.__storage__ = self.__record__(clazz.__default_record__)
             current_sig = clazz.__sig__
             self.__storage__.id = utils.generate_oid(self._id_size_)
             self.__storage__.sig = current_sig
