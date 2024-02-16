@@ -4,7 +4,7 @@ Porcupine reference data types
 """
 from functools import cached_property
 from porcupine import exceptions
-from porcupine.core.context import system_override, context
+# from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.connectors.schematables import ItemsTable
 from porcupine.connectors.libsql.query import QueryType, PorcupineQuery

@@ -38,10 +38,6 @@ class DataType:
     def storage_key(self):
         return self.store_as or self.name
 
-    # @property
-    # def should_lock(self):
-    #     return self.lock_on_update or self.unique
-
     def get_value(self, instance, snapshot=True, use_default=True):
         storage_key = self.storage_key
         i_snapshot = instance.__snapshot__
@@ -120,23 +116,10 @@ class DataType:
     def clone(self, instance, memo):
         ...
 
-    # async def add_unique(self, instance, value):
-    #     new_unique = get_key_of_unique(instance.parent_id,
-    #                                    self.name,
-    #                                    value)
-    #     context.txn.insert_external(instance.id,
-    #                                 new_unique,
-    #                                 instance.id)
-
-    # def remove_unique(self, instance, value):
-    #     unique_key = get_key_of_unique(instance.parent_id,
-    #                                    self.name,
-    #                                    value)
-    #     context.txn.delete_external(unique_key)
-
     # event handlers
 
     async def on_create(self, instance, value):
+        # TODO: merge validate_value and validate
         self.validate_value(instance, value)
         self.validate(value)
         # if self.unique and self.storage == '__storage__':

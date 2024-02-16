@@ -103,7 +103,8 @@ class Container(Item):
                                        resolve_shortcuts)
         return children.list()
 
-    def get_items(self, skip=0, take=None, order_by=None, order=Order.asc,
+    def get_items(self, skip=0, take=None,
+                  order_by=None, order=Order.asc,
                   resolve_shortcuts=False) -> Awaitable[list]:
         """
         This method returns the children that are not containers.
