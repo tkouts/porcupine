@@ -45,18 +45,18 @@ class ElasticMeta(type):
         cls.__sig__ = utils.hash_series(*schema.keys())
         cls.__default_record__ = defaults
 
-        # add indexes
-        if cls.is_collection:
-            if (
-                hasattr(cls, 'indexes')
-                and 'indexes' in cls.__dict__
-            ):
-                schemaregistry.add_indexes(cls, cls.indexes)
-            if (
-                hasattr(cls, 'full_text_indexes')
-                and 'full_text_indexes' in cls.__dict__
-            ):
-                schemaregistry.add_fts_indexes(cls, cls.full_text_indexes)
+        # # add indexes
+        # if cls.is_collection:
+        #     if (
+        #         hasattr(cls, 'indexes')
+        #         and 'indexes' in cls.__dict__
+        #     ):
+        #         schemaregistry.add_indexes(cls, cls.indexes)
+        #     if (
+        #         hasattr(cls, 'full_text_indexes')
+        #         and 'full_text_indexes' in cls.__dict__
+        #     ):
+        #         schemaregistry.add_fts_indexes(cls, cls.full_text_indexes)
 
         # register content class
         schemaregistry.register(cls)
@@ -101,12 +101,13 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
     @staticmethod
     async def new_from_dict(dct: dict,
                             camel_to_snake=False) -> TYPING.ANY_ITEM_CO:
-        item_type = dct.pop('_type', dct.pop('type'))
+        patch = {**dct}
+        item_type = patch.pop('_type', patch.pop('type'))
         if isinstance(item_type, str):
             # TODO: handle invalid type exception
             item_type = schemaregistry.get_content_class(item_type)
         new_item = item_type()
-        await new_item.apply_patch(dct, camel_to_snake)
+        await new_item.apply_patch(patch, camel_to_snake)
         return new_item
 
     @classmethod

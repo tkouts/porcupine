@@ -64,8 +64,8 @@ def get_multi(ids: TYPING.ID_LIST, quiet: bool = True) -> BaseStreamer:
 
 
 def transactional(auto_commit=True):
-    min_sleep_time = 0.010
-    max_sleep_time = 0.288
+    min_sleep_time = 0.020
+    max_sleep_time = 0.320
     do_not_copy_types = (Request, Blueprint, str, int, float, bool, tuple)
 
     def transactional_decorator(func):
@@ -83,7 +83,6 @@ def transactional(auto_commit=True):
                 # try:
                 while retries < max_retries:
                     # print('trying.... %d' % retries)
-                    # context.txn = txn = connector.get_transaction()
                     txn = connector.get_transaction()
                     ctx_txn.set(txn)
                     try:
