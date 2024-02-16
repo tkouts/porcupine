@@ -536,7 +536,14 @@ class Transaction:
         if statements:
             # first transaction phase - make sure all keys are non-existing
             # await self.insert_multi(insertions)
-            await connector.db.batch(statements)
+            try:
+                await connector.db.batch(statements)
+            except libsql_client.client.LibsqlError as e:
+                message = e.args[0]
+                if message.startswith('SQLITE_BUSY'):
+                    raise exceptions.DBDeadlockError(message)
+                else:
+                    raise
 
         # if rest_ops:
         #     errors = await connector.batch_update(rest_ops)
