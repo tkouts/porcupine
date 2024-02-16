@@ -117,7 +117,7 @@ class LibSql:
     #     return Cursor(self, query, **params)
 
     def query(self, query, params):
-        print(query, params)
+        # print(query, params)
         return self.db.execute(query, params)
 
     async def prepare_indexes(self):
@@ -175,3 +175,87 @@ class LibSql:
                     data json not null
                 )
             ''')
+
+        # full text indexes
+        fts_indexes = schemaregistry.get_fts_indexes()
+
+        def get_fts_trigger_select(prefix, attrs, p_types, fts_oper=''):
+            selects = []
+            if fts_oper:
+                selects.append(f"'{fts_oper}'")
+            selects.append(f'{prefix}.ROWID')
+            for schema_attr, alias in attrs:
+                selects.append(f'{prefix}.{schema_attr} {alias}')
+            return (
+                f'SELECT {",".join(selects)} '
+                f'WHERE {prefix}."p_type" in ({",".join(p_types)});'
+            )
+
+        for cls, indexed_attributes, subclasses in fts_indexes:
+            print(cls, indexed_attributes, subclasses)
+            fts_table_name = f'{cls.__name__}_fts'
+            quoted_indexed_attributes = [f'"{a}"' for a in indexed_attributes]
+            quoted_subclasses = [f"'{s}'" for s in subclasses]
+            # TODO: add contentless_delete=1 option once libsql is upgraded
+            items_table = ItemsTable(cls.children)
+            await self.db.execute(f'''
+                create virtual table if not exists "{fts_table_name}"
+                using fts5(
+                    {','.join(quoted_indexed_attributes)},
+                    content='',
+                    tokenize=porter
+                )
+            ''')
+            # add triggers for keeping fts table in sync
+            schema_attributes = [
+                str(getattr(items_table, a))
+                for a in indexed_attributes
+            ]
+            insert_select = get_fts_trigger_select(
+                'new',
+                zip(schema_attributes, quoted_indexed_attributes),
+                quoted_subclasses
+            )
+            delete_select = get_fts_trigger_select(
+                'old',
+                zip(schema_attributes, quoted_indexed_attributes),
+                quoted_subclasses,
+                'delete'
+            )
+            await self.db.execute(f'''
+                CREATE TRIGGER IF NOT EXISTS {fts_table_name}_sync_AFTER_INSERT
+                AFTER INSERT ON items BEGIN
+                  INSERT INTO {fts_table_name}(
+                    rowid, {','.join(quoted_indexed_attributes)}
+                  )
+                  {insert_select}
+                END
+            ''')
+            await self.db.execute(f'''
+                CREATE TRIGGER IF NOT EXISTS {fts_table_name}_sync_AFTER_DELETE
+                AFTER DELETE ON items BEGIN
+                  INSERT INTO {fts_table_name}(
+                    {fts_table_name}, rowid,
+                    {','.join(quoted_indexed_attributes)}
+                  )
+                  {delete_select}
+                END
+            ''')
+            await self.db.execute(f'''
+                CREATE TRIGGER IF NOT EXISTS {fts_table_name}_sync_AFTER_UPDATE
+                AFTER UPDATE ON items BEGIN
+                  INSERT INTO {fts_table_name}(
+                    {fts_table_name}, rowid,
+                    {','.join(quoted_indexed_attributes)}
+                  )
+                  {delete_select}
+                  INSERT INTO {fts_table_name}(
+                    rowid, {','.join(quoted_indexed_attributes)}
+                  )
+                  {insert_select}
+                END
+            ''')
+            # TODO: populate FTS index
+            # for attr in indexed_attributes:
+            #     print(items_table.field(attr).as_(attr).get_sql())
+

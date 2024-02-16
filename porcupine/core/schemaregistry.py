@@ -1,8 +1,8 @@
 from porcupine.core.utils.collections import WriteOnceDict
 
 _ELASTIC_MAP = WriteOnceDict()
-_INDEXES = {}
-_FULL_TEST_INDEXES = {}
+# _INDEXES = {}
+# _FULL_TEST_INDEXES = {}
 
 
 def register(cls):
@@ -41,9 +41,29 @@ def get_compositions():
     return comps
 
 
-def add_indexes(cls, indexes):
-    _INDEXES[cls] = indexes
+def get_fts_indexes():
+    fts_indexes = []
+    for cls in _ELASTIC_MAP.values():
+        if cls.is_collection and 'full_text_indexes' in cls.__dict__:
+            fts_indexes.append((
+                cls,
+                cls.full_text_indexes,
+                [cls.__name__ for cls in get_all_subclasses(cls)]
+            ))
+    return fts_indexes
 
 
-def add_fts_indexes(cls, fts_indexes):
-    _FULL_TEST_INDEXES[cls] = fts_indexes
+def get_all_subclasses(cls):
+    subclasses = [cls]
+    for subclass in cls.__subclasses__():
+        subclasses.extend(get_all_subclasses(subclass))
+    return subclasses
+
+
+
+# def add_indexes(cls, indexes):
+#     _INDEXES[cls] = indexes
+#
+#
+# def add_fts_indexes(cls, fts_indexes):
+#     _FULL_TEST_INDEXES[cls] = fts_indexes
