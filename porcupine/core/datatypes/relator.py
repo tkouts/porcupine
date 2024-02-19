@@ -182,11 +182,11 @@ class RelatorN(ReferenceN, RelatorBase):
             ref_class = self.allowed_types[0]
             other_relator = getattr(ref_class, self.rel_attr)
             classes = [
-                f'{ref_class.__name__}.{self.rel_attr}',
-                f'{other_relator.allowed_types[0].__name__}.{self.name}'
+                f'{ref_class.__name__.lower()}_{self.rel_attr}',
+                f'{other_relator.allowed_types[0].__name__.lower()}_{self.name}'
             ]
             classes.sort()
-            return Table('<->'.join(classes))
+            return Table('_x_'.join(classes))
 
     @property
     def associative_table_fields(self):

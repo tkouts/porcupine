@@ -1,5 +1,6 @@
 from pypika import Table
-from porcupine.core.utils import get_storage_key_from_attr_name
+from pypika.functions import Cast
+from porcupine.core.schemaregistry import get_datatype_from_attr_name
 
 
 class SchemaTable(Table):
@@ -21,22 +22,24 @@ class SchemaTable(Table):
 
     def field(self, name: str):
         if name in self.columns:
+            # return column
             return super().field(name)
         else:
-            alias = None
             if '.' in name:
-                attr, path = name.split('.', 1)
-                storage_key = get_storage_key_from_attr_name(
+                attr, *path = name.split('.')
+                dt = get_datatype_from_attr_name(
                     self.collection.accepts, attr
-                ) or attr
-                full_path = '.'.join([storage_key, path])
+                )
+                full_path = ','.join([dt.storage_key, *path])
+                return self.data_field.get_path_text_value(f'{{{full_path}}}')
             else:
-                storage_key = get_storage_key_from_attr_name(
+                dt = get_datatype_from_attr_name(
                     self.collection.accepts, name
-                ) or name
-                full_path = storage_key
-                alias = name
-            return self.data_field.get_text_value(full_path).as_(alias)
+                )
+                return Cast(
+                    self.data_field.get_text_value(dt.storage_key),
+                    dt.db_cast_type
+                ).as_(name)
 
 
 class ItemsTable(SchemaTable):

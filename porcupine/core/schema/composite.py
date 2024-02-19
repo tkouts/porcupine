@@ -39,7 +39,7 @@ class Composite(Elastic):
     @classmethod
     def table_name(cls):
         composition = getattr(cls.embedded_in, cls.collection_name)
-        return composition.allowed_types[0].__name__
+        return composition.allowed_types[0].__name__.lower()
 
     # @property
     # async def effective_acl(self):

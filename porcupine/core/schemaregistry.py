@@ -1,3 +1,4 @@
+from methodtools import lru_cache
 from porcupine.core.utils.collections import WriteOnceDict
 
 _ELASTIC_MAP = WriteOnceDict()
@@ -23,14 +24,16 @@ def get_many_to_many_relationships():
     return rels
 
 
-def get_compositions():
+def get_compositions(root_cls=None):
     from porcupine.core.datatypes.composition import (
         Composition,
         Embedded
     )
+    from porcupine.core.schema.item import GenericItem
     comp_types = Composition, Embedded
     comps = []
-    for cls in _ELASTIC_MAP.values():
+    print(root_cls)
+    for cls in get_all_subclasses(root_cls or GenericItem)[1:]:
         for dt in cls.__dict__.values():
             if isinstance(dt, comp_types):
                 # print(dt.allowed_types)
@@ -38,6 +41,7 @@ def get_compositions():
                     composite_class.embedded_in = cls
                     composite_class.collection_name = dt.name
                 comps.append((cls, dt))
+                comps.extend(get_compositions(cls))
     return comps
 
 
@@ -60,6 +64,15 @@ def get_all_subclasses(cls):
     return subclasses
 
 
+@lru_cache(maxsize=None)
+def get_datatype_from_attr_name(classes, name):
+    for cls in classes:
+        if name in cls.__schema__:
+            return cls.__schema__[name]
+        key = get_datatype_from_attr_name(cls.__subclasses__(), name)
+        if key:
+            return key
+    return None
 
 # def add_indexes(cls, indexes):
 #     _INDEXES[cls] = indexes

@@ -57,7 +57,7 @@ class Composition(RelatorN):
         super().__init__(rel_attr='item_id', **kwargs)
         accepts = self.accepts[0]
         table_name = accepts if isinstance(accepts, str) else accepts.__name__
-        self.t = CompositesTable(self, name=table_name)
+        self.t = CompositesTable(self, name=table_name.lower())
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -205,7 +205,7 @@ class Embedded(Relator1):
         super().__init__(rel_attr='item_id', **kwargs)
         accepts = self.accepts[0]
         table_name = accepts if isinstance(accepts, str) else accepts.__name__
-        self.t = CompositesTable(self, name=table_name)
+        self.t = CompositesTable(self, name=table_name.lower())
 
     async def fetch(self, embedded_id):
         with system_override():
