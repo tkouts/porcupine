@@ -15,6 +15,7 @@ class DataType:
     """
     safe_type = object
     storage = '__storage__'
+    db_cast_type = 'text'
 
     def __init__(self, default=None, required=False, allow_none=False,
                  readonly=False, immutable=False, protected=False,

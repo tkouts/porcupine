@@ -19,6 +19,7 @@ class String(DataType):
 class Integer(DataType):
     """Integer data type"""
     safe_type = int
+    db_cast_type = 'int'
 
     def __init__(self, default=0, **kwargs):
         super().__init__(default, **kwargs)
@@ -27,6 +28,7 @@ class Integer(DataType):
 class Float(DataType):
     """Float data type"""
     safe_type = float
+    db_cast_type = 'double'
 
     def __init__(self, default=0.0, **kwargs):
         super().__init__(default, **kwargs)
@@ -35,6 +37,7 @@ class Float(DataType):
 class Boolean(DataType):
     """Boolean data type"""
     safe_type = bool
+    db_cast_type = 'boolean'
 
     def __init__(self, default=False, **kwargs):
         super().__init__(default, **kwargs)
