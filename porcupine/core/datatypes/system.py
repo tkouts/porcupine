@@ -78,11 +78,11 @@ class ChildrenCollection(ItemCollection):
             #     item.expires_at = min([t for t in expire_times if t])
 
             # insert item to DB
-            await context.txn.insert(item)
+            await context.db.txn.insert(item)
 
     async def remove(self, *items: TYPING.ANY_ITEM_CO):
         for item in items:
-            await context.txn.delete(item)
+            await context.db.txn.delete(item)
         await super().remove(*items)
 
     def is_consistent(self, item):

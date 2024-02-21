@@ -55,7 +55,7 @@ class Composite(Elastic):
 
     @property
     def parent(self):
-        return db_connector().get(
+        return context.db.get(
             self.item_id,
             _table=self.embedded_in.table_name()
         )
@@ -85,7 +85,7 @@ class Composite(Elastic):
             # data_type = item.__schema__[prop_name]
             # if isinstance(data_type, ReferenceN):
             #     # composition
-            await context.txn.upsert(self)
+            await context.db.txn.upsert(self)
             # else:
             #     # embedded
             #     setattr(item, prop_name, self)

@@ -6,11 +6,11 @@ from porcupine.core.services import db_connector
 from .log import porcupine_log
 
 ctx_user = ContextVar('user', default=None)
-ctx_txn = ContextVar('txn', default=None)
+# ctx_txn = ContextVar('txn', default=None)
 ctx_sys = ContextVar('__sys__', default=False)
-ctx_db_cache = ContextVar('db_cache')
 ctx_visibility_cache = ContextVar('visibility_cache')
 ctx_membership_cache = ContextVar('membership_cache')
+ctx_db = ContextVar('db')
 # ctx_caches = ContextVar('caches')
 ctx_access_map = ContextVar('access_map')
 # ctx_item_meta_cache = ContextVar('item_meta')
@@ -30,12 +30,12 @@ class PContext:
         ctx_user.set(user)
 
     @property
-    def txn(self):
-        return ctx_txn.get()
+    def db(self):
+        return ctx_db.get()
 
-    @property
-    def db_cache(self):
-        return ctx_db_cache.get()
+    # @property
+    # def txn(self):
+    #     return ctx_txn.get()
 
     # @property
     # def item_meta(self):
@@ -51,8 +51,6 @@ class PContext:
 
     @staticmethod
     def prepare():
-        connector = db_connector()
-        ctx_db_cache.set(LRU(connector.cache_size))
         ctx_visibility_cache.set(LRU(128))
         ctx_membership_cache.set(LRU(16))
         ctx_access_map.set({})
@@ -84,19 +82,21 @@ def with_context(identity=None, debug=False):
         async def context_wrapper(*args, **kwargs):
             connector = db_connector()
             context.prepare()
-            user = identity
-            if isinstance(user, str):
-                user = await connector.get(user)
-            ctx_user.set(user)
-            try:
-                return await task(*args, **kwargs)
-            finally:
-                if debug:
-                    size = len(context.db_cache)
-                    hits, misses = context.db_cache.get_stats()
-                    porcupine_log.debug(
-                        f'Cache Size: {size} Hits: {hits} Misses: {misses}'
-                    )
+            async with connector.acquire() as db_connection:
+                ctx_db.set(db_connection)
+                user = identity
+                if isinstance(user, str):
+                    user = await db_connection.get(user)
+                ctx_user.set(user)
+                try:
+                    return await task(*args, **kwargs)
+                finally:
+                    if debug:
+                        size = len(db_connection.cache)
+                        hits, misses = db_connection.cache.get_stats()
+                        porcupine_log.debug(
+                            f'Cache Size: {size} Hits: {hits} Misses: {misses}'
+                        )
         return context_wrapper
     return decorator
 
@@ -145,16 +145,18 @@ class context_user:
 
     async def __aenter__(self):
         if isinstance(self.user, str):
-            connector = db_connector()
+            db = ctx_db.get().db
             should_switch = (
                 context.user is None
                 or context.user.id != self.user
             )
             if should_switch:
-                self.user = await connector.get(self.user, quiet=False)
+                self.user = await db.get(self.user, quiet=False)
         else:
-            should_switch = (context.user and context.user.id) != \
-                            (self.user and self.user.id)
+            should_switch = (
+                (context.user and context.user.id)
+                != (self.user and self.user.id)
+            )
         if should_switch:
             self.token = ctx_user.set(self.user)
         return self

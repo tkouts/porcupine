@@ -4,7 +4,7 @@ from aiostream import stream, async_
 
 from porcupine import pipe
 from porcupine.hinting import TYPING
-from porcupine.core.context import ctx_user
+from porcupine.core.context import ctx_user, ctx_db
 from porcupine.core.services import db_connector
 from porcupine.connectors.partial import PartialItem
 from porcupine.core.accesscontroller import resolve_visibility
@@ -60,4 +60,4 @@ class PartialStreamer(BaseStreamer):
 class ItemStreamer(PartialStreamer):
     def __init__(self, cursor, _skip_acl_check=False):
         super().__init__(cursor, _skip_acl_check)
-        self._operators.append(pipe.map(db_connector().persist.loads))
+        self._operators.append(pipe.map(ctx_db.get().persist.loads))

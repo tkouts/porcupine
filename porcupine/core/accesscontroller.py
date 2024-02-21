@@ -1,12 +1,13 @@
 import orjson
 import time
 from collections import namedtuple, ChainMap
-from porcupine.core.services import db_connector
+# from porcupine.core.services import db_connector
 # from porcupine.core.schema.partial import PartialItem
 # from porcupine import db
 from porcupine.core.context import (
     ctx_access_map,
     # ctx_user,
+    ctx_db,
     ctx_sys,
     ctx_visibility_cache,
     ctx_membership_cache,
@@ -78,10 +79,10 @@ async def resolve_visibility(item) -> bool:
     if item.__is_new__ or ctx_sys.get():
         return True
 
-    connector = db_connector()
+    db = ctx_db.get()
 
     if item.is_composite:
-        return await resolve_visibility(await connector.get(item.item_id))
+        return await resolve_visibility(await db.get(item.item_id))
 
     parent_id = item.parent_id
 
@@ -108,7 +109,7 @@ async def resolve_visibility(item) -> bool:
     if parent_id is not None and parent_id not in access_map:
         # print('fetching', parent_id)
         container_id = item.id if item.is_collection else parent_id
-        results = await connector.fetch_access_map(container_id)
+        results = await db.fetch_access_map(container_id)
         access_map.update({
             row['id']: AccessRecord(row['parent_id'],
                                     row['acl'] and
@@ -126,7 +127,7 @@ async def resolve_visibility(item) -> bool:
         deleted = _is_deleted(item)
         if deleted:
             is_visible = False
-        elif not connector.supports_ttl:
+        elif not db.supports_ttl:
             expired = _is_expired(item)
             if expired:
                 is_visible = False
@@ -199,9 +200,10 @@ class Roles:
     @staticmethod
     # @context_cacheable(1024)
     async def _resolve_membership(group_ids: frozenset) -> set:
+        db = ctx_db.get()
         extended_membership = set()
         # groups = [r async for r in db_connector().get_multi(group_ids)]
-        async for group in db_connector().get_multi(group_ids):
+        async for group in db.get_multi(group_ids):
             extended_membership.update({
                 group_id for group_id in await group.member_of.ids()
             })

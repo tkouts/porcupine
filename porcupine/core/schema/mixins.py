@@ -72,7 +72,7 @@ class Movable(TYPING.ITEM_TYPE):
                 'The destination is contained in the source.'
             )
 
-        parent = await db_connector().get(self.parent_id)
+        parent = await context.db.get(self.parent_id)
 
         await super(type(parent.children), parent.children).remove(self)
         await super(type(target.children), target.children).add(self)
@@ -83,7 +83,7 @@ class Movable(TYPING.ITEM_TYPE):
             self.p_type = target.content_class
             # self.parent_id = target.id
         await self.touch()
-        await context.txn.upsert(self)
+        await context.db.txn.upsert(self)
 
 
 class Removable(TYPING.ITEM_TYPE):
@@ -105,7 +105,7 @@ class Removable(TYPING.ITEM_TYPE):
         @return: None
         """
         if self.parent_id is not None:
-            parent = await db_connector().get(self.parent_id)
+            parent = await context.db.get(self.parent_id)
             if parent is not None:
                 await parent.children.remove(self)
         else:
@@ -113,7 +113,7 @@ class Removable(TYPING.ITEM_TYPE):
             can_delete = await self.can_delete(context.user)
             if not can_delete:
                 raise exceptions.Forbidden('Forbidden')
-            await context.txn.delete(self)
+            await context.db.txn.delete(self)
 
 
 class Recyclable(TYPING.ITEM_TYPE):
@@ -128,8 +128,8 @@ class Recyclable(TYPING.ITEM_TYPE):
 
         with system_override():
             self.is_deleted -= 1
-        await context.txn.upsert(self)
-        await context.txn.restore(self)
+        await context.db.txn.upsert(self)
+        await context.db.txn.restore(self)
 
     async def recycle_to(self, recycle_bin: TYPING.RECYCLE_BIN_CO) -> None:
         """
@@ -156,5 +156,5 @@ class Recyclable(TYPING.ITEM_TYPE):
             await deleted.append_to(recycle_bin)
             # mark as deleted
             self.is_deleted += 1
-        await context.txn.upsert(self)
-        await context.txn.recycle(self)
+        await context.db.txn.upsert(self)
+        await context.db.txn.recycle(self)

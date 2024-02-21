@@ -10,7 +10,7 @@ from porcupine.core.datatypes.system import Children
 from porcupine.core.accesscontroller import AccessRecord
 from .item import Item
 from .shortcut import Shortcut
-from porcupine.connectors.libsql.query import QueryType
+from porcupine.connectors.postgresql.query import QueryType
 
 
 class Container(Item):

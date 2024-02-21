@@ -10,7 +10,9 @@ class Counter(Integer):
     async def on_change(self, instance, value, old_value):
         delta = value - old_value
         if delta and not instance.__is_new__:
-            context.txn.mutate(instance,
-                               self.storage_key,
-                               SubDocument.COUNTER,
-                               delta)
+            context.db.txn.mutate(
+                instance,
+                self.storage_key,
+                SubDocument.COUNTER,
+                delta
+            )

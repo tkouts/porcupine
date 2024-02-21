@@ -68,7 +68,7 @@ class PartialItem:
             )
 
     def __repr__(self) -> str:
-        d = self._partial.asdict()
+        d = dict(self._partial)
         fields = [f'{k}={repr(v)}' for k, v in d.items()]
         return f"Partial[{self.content_class}]({' '.join(fields)})"
 

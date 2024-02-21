@@ -5,7 +5,7 @@ from porcupine.core.datatypes.mutable import Dictionary
 from porcupine.core.datatypes.asyncsetter import AsyncSetter, AsyncSetterValue
 from porcupine.connectors.mutations import SubDocument
 
-IMMUTABLE_TYPES = (str, int, float, bool, tuple)
+IMMUTABLE_TYPES = str, int, float, bool, tuple
 
 
 class AtomicMapValue(AsyncSetterValue, OptionalFrozenDict):
@@ -21,10 +21,12 @@ class AtomicMapValue(AsyncSetterValue, OptionalFrozenDict):
         await instance.touch()
         self._dct[key] = value
         if not instance.__is_new__:
-            context.txn.mutate(instance,
-                               f'{descriptor.storage_key}.{key}',
-                               SubDocument.UPSERT,
-                               value)
+            context.db.txn.mutate(
+                instance,
+                f'{descriptor.storage_key}.{key}',
+                SubDocument.UPSERT,
+                value
+            )
 
     async def delete(self, key: str):
         descriptor, instance = self._desc, self._inst()
@@ -33,9 +35,11 @@ class AtomicMapValue(AsyncSetterValue, OptionalFrozenDict):
         await instance.touch()
         del self._dct[key]
         if not instance.__is_new__:
-            context.txn.mutate(instance,
-                               f'{descriptor.storage_key}.{key}',
-                               SubDocument.REMOVE, None)
+            context.db.txn.mutate(
+                instance,
+                f'{descriptor.storage_key}.{key}',
+                SubDocument.REMOVE, None
+            )
 
     async def reset(self, value, replace=False):
         if replace and value is not None:
@@ -86,8 +90,12 @@ class AtomicMap(AsyncSetter, Dictionary):
         if not instance.__is_new__:
             replace = value and value.pop('__replace__', False)
             if value is None or old_value is None or replace:
-                context.txn.mutate(instance, self.storage_key,
-                                   SubDocument.UPSERT, value)
+                context.db.txn.mutate(
+                    instance,
+                    self.storage_key,
+                    SubDocument.UPSERT,
+                    value
+                )
             else:
                 changed_keys = [
                     key for key in value
@@ -100,12 +108,17 @@ class AtomicMap(AsyncSetter, Dictionary):
                 ]
                 for key in changed_keys:
                     path = f'{self.storage_key}.{key}'
-                    context.txn.mutate(instance,
-                                       path,
-                                       SubDocument.UPSERT,
-                                       value[key])
+                    context.db.txn.mutate(
+                        instance,
+                        path,
+                        SubDocument.UPSERT,
+                        value[key]
+                    )
                 for key in removed_keys:
                     path = f'{self.storage_key}.{key}'
-                    context.txn.mutate(instance,
-                                       path,
-                                       SubDocument.REMOVE, None)
+                    context.db.txn.mutate(
+                        instance,
+                        path,
+                        SubDocument.REMOVE,
+                        None
+                    )

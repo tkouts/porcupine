@@ -1,6 +1,6 @@
 from porcupine import db, exceptions
 from porcupine.contract import contract
-from porcupine.core.context import context, system_override
+from porcupine.core.context import context, system_override, ctx_db
 from porcupine.core.services import db_connector
 # from porcupine.core.schema.storage import UNSET
 from porcupine.core.schemaregistry import get_content_class
@@ -73,7 +73,7 @@ class Reference1(String, Acceptable):
     async def on_create(self, instance, value):
         await super().on_create(instance, value)
         if value:
-            ref_item = await db_connector().get(value)
+            ref_item = await ctx_db.get().get(value)
             if ref_item is None:
                 # TODO: change wording
                 raise exceptions.InvalidUsage(f'Invalid item {value}.')
@@ -88,7 +88,7 @@ class Reference1(String, Acceptable):
     async def on_delete(self, instance, value):
         await super().on_delete(instance, value)
         if value and self.cascade_delete:
-            ref_item = await db_connector().get(value)
+            ref_item = await ctx_db.get().get(value)
             if ref_item:
                 with system_override():
                     await ref_item.remove()
@@ -96,18 +96,18 @@ class Reference1(String, Acceptable):
     async def on_recycle(self, instance, value):
         await super().on_recycle(instance, value)
         if value and self.cascade_delete:
-            ref_item = await db_connector().get(value)
+            ref_item = await ctx_db.get().get(value)
             if ref_item:
                 with system_override():
                     # mark as deleted
                     ref_item.is_deleted += 1
-                    await context.txn.upsert(ref_item)
-                    await context.txn.recycle(ref_item)
+                    await context.db.txn.upsert(ref_item)
+                    await context.db.txn.recycle(ref_item)
 
     async def on_restore(self, instance, value):
         await super().on_restore(instance, value)
         if value and self.cascade_delete:
-            ref_item = await db_connector().get(value)
+            ref_item = await ctx_db.get().get(value)
             if ref_item:
                 with system_override():
                     await ref_item.restore()
@@ -226,8 +226,8 @@ class ReferenceN(AsyncSetter, List, Acceptable):
                 async for ref_item in collection.items():
                     # mark as deleted
                     ref_item.is_deleted += 1
-                    await context.txn.upsert(ref_item)
-                    await context.txn.recycle(ref_item)
+                    await context.db.txn.upsert(ref_item)
+                    await context.db.txn.recycle(ref_item)
 
     async def on_restore(self, instance, value):
         await super().on_restore(instance, value)

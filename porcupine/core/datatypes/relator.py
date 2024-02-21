@@ -4,10 +4,10 @@ Porcupine reference data types
 """
 from functools import cached_property
 from porcupine import exceptions
-# from porcupine.core.context import system_override, context
+from porcupine.core.context import context
 from porcupine.core.services import db_connector
 from porcupine.connectors.schematables import ItemsTable
-from porcupine.connectors.libsql.query import QueryType, PorcupineQuery
+from porcupine.connectors.postgresql.query import QueryType, PorcupineQuery
 from .reference import Reference1, ReferenceN, ItemReference
 # from .collection import ItemCollection
 from pypika import Parameter, Table, Field, Query
@@ -111,7 +111,7 @@ class Relator1(Reference1, RelatorBase):
     async def on_delete(self, instance, value):
         await super().on_delete(instance, value)
         if value and not self.cascade_delete:
-            ref_item = await db_connector().get(value)
+            ref_item = await context.db.get(value)
             if ref_item:
                 if self.respects_references:
                     raise exceptions.Forbidden(

@@ -130,10 +130,12 @@ class DataType:
         self.validate_value(instance, value)
         self.validate(value)
         if self.storage == '__storage__' and not instance.__is_new__:
-            context.txn.mutate(instance,
-                               self.storage_key,
-                               SubDocument.UPSERT,
-                               value)
+            context.db.txn.mutate(
+                instance,
+                self.storage_key,
+                SubDocument.UPSERT,
+                value
+            )
 
     async def on_delete(self, instance, value):
         ...

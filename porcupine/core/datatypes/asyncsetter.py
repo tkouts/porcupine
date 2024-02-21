@@ -18,7 +18,7 @@ class AsyncSetterValue:
         descriptor, instance = self._desc, self._inst()
         if not await descriptor.can_modify(instance):
             raise exceptions.Forbidden('Forbidden')
-        context.txn.reset_mutations(instance, f'{descriptor.storage_key}.')
+        context.db.txn.reset_mutations(instance, f'{descriptor.storage_key}.')
         super(AsyncSetter, descriptor).__set__(instance, value)
 
 

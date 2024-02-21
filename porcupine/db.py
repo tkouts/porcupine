@@ -1,15 +1,15 @@
 import asyncio
 import copy
 from functools import wraps
-from typing import Optional, AsyncIterable
+from typing import Optional
 
 from sanic import Blueprint
 from sanic.request import Request
-from aiostream import pipe, async_
+from aiostream import pipe
 
 from porcupine import exceptions
 from porcupine.hinting import TYPING
-from porcupine.core.context import ctx_txn, context
+from porcupine.core.context import ctx_db, context
 from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import EmptyStreamer, BaseStreamer
 
@@ -30,7 +30,8 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
 
     :rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
     """
-    item = await db_connector().get(item_id, quiet=quiet)
+    db = ctx_db.get()
+    item = await db.get(item_id, quiet=quiet)
     if item is not None:
         can_read = await item.can_read(context.user)
         if can_read:
@@ -43,6 +44,7 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
 
 def get_multi(ids: TYPING.ID_LIST, quiet: bool = True) -> BaseStreamer:
     user = context.user
+    db = ctx_db.get()
 
     async def _check_read_permission(item):
         can_read = await item.can_read(user)
@@ -56,7 +58,7 @@ def get_multi(ids: TYPING.ID_LIST, quiet: bool = True) -> BaseStreamer:
 
     if ids:
         streamer = (
-            BaseStreamer(db_connector().get_multi(ids, quiet))
+            BaseStreamer(db.get_multi(ids, quiet))
             | pipe.filter(_check_read_permission)
         )
         return streamer
@@ -74,17 +76,18 @@ def transactional(auto_commit=True):
         """
         @wraps(func)
         async def transactional_wrapper(*args, **kwargs):
-            if ctx_txn.get() is None:
+            db = ctx_db.get()
+            if db.txn is None:
                 # top level co-routine
                 connector = db_connector()
+                connector.active_txns += 1
                 retries = 0
                 sleep_time = min_sleep_time
                 max_retries = connector.txn_max_retries
                 # try:
                 while retries < max_retries:
-                    # print('trying.... %d' % retries)
-                    txn = connector.get_transaction()
-                    ctx_txn.set(txn)
+                    print('trying.... %d' % retries)
+                    txn = db.get_transaction()
                     try:
                         args_copy = [
                             copy.deepcopy(arg)
@@ -98,6 +101,8 @@ def transactional(auto_commit=True):
                             else value
                             for name, value in kwargs.items()
                         }
+                        if not auto_commit:
+                            keyword_args_copy['txn'] = txn
                         if retries > 0:
                             await asyncio.sleep(sleep_time)
                             sleep_time *= 2
@@ -118,12 +123,12 @@ def transactional(auto_commit=True):
                     except Exception:
                         await txn.abort()
                         raise
+                    finally:
+                        connector.active_txns -= 1
                 # maximum retries exceeded
                 raise exceptions.DBDeadlockError(
-                    'Maximum transaction retries exceeded.'
+                    'Maximum number of transaction retries exceeded.'
                 )
-                # finally:
-                #     ctx_txn.set(None)
             else:
                 # pass through
                 return await func(*args, **kwargs)

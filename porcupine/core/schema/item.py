@@ -9,6 +9,7 @@ from porcupine.contract import contract
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
+from porcupine.core.context import ctx_db
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import date
 from porcupine.core.accesscontroller import resolve_acl
@@ -179,10 +180,10 @@ class GenericItem(Removable, Elastic):
                 self.owner = user.id
                 self.created = self.modified = date.utcnow()
                 self.modified_by = user.name
-            await context.txn.insert(self)
+            await context.db.txn.insert(self)
 
     def touch(self) -> None:
-        return context.txn.touch(self)
+        return context.db.txn.touch(self)
 
     async def update(self) -> bool:
         """
@@ -192,11 +193,12 @@ class GenericItem(Removable, Elastic):
         """
         if self.__snapshot__:
             user = context.user
+            db_ = context.db
             if not await self.can_update(user):
                 raise exceptions.Forbidden('Forbidden')
 
             if self.parent_id is not None:
-                parent = await db_connector().get(self.parent_id)
+                parent = await db_.get(self.parent_id)
                 await parent.touch()
 
             with system_override():
@@ -204,7 +206,7 @@ class GenericItem(Removable, Elastic):
                 self.modified = date.utcnow()
 
             # await self.touch()
-            await context.txn.upsert(self)
+            await db_.txn.upsert(self)
             return True
         return False
 

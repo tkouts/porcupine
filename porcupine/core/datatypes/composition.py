@@ -9,12 +9,11 @@ from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 from porcupine.contract import contract
 from porcupine.response import no_content
-from porcupine.core.context import context, system_override
+from porcupine.core.context import context, system_override, ctx_db
 from porcupine.core import utils
 from .datatype import DataType
 from .reference import ItemCollection
 from .relator import RelatorN, Relator1
-from porcupine.core.services import db_connector
 from porcupine.connectors.schematables import CompositesTable
 from .mutable import List
 
@@ -38,11 +37,11 @@ class EmbeddedCollection(ItemCollection):
             # print(composite)
             if not composite.__is_new__:
                 raise TypeError('Can only add new items to composition')
-            await context.txn.insert(composite)
+            await context.db.txn.insert(composite)
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
         for composite in composites:
-            await context.txn.delete(composite)
+            await context.db.txn.delete(composite)
         await super().remove(*composites)
 
 
@@ -97,7 +96,7 @@ class Composition(RelatorN):
             for composite in composites:
                 if not composite.__is_new__ and composite not in removed:
                     # update composite
-                    await context.txn.upsert(composite)
+                    await context.db.txn.upsert(composite)
         # collection = getattr(instance, self.name)
         # old_ids = frozenset(old_value)
         # new_ids = frozenset([c.__storage__.id for c in composites])
@@ -202,14 +201,14 @@ class Embedded(Relator1):
     # TODO: disallow unique
 
     def __init__(self, **kwargs):
-        super().__init__(rel_attr='item_id', **kwargs)
+        super().__init__(rel_attr='item_id', protected=True, **kwargs)
         accepts = self.accepts[0]
         table_name = accepts if isinstance(accepts, str) else accepts.__name__
         self.t = CompositesTable(self, name=table_name.lower())
 
     async def fetch(self, embedded_id):
         with system_override():
-            return await db_connector().get(
+            return await ctx_db.get().get(
                 embedded_id,
                 # quiet=quiet,
                 _table=self.t.get_table_name()
@@ -244,7 +243,7 @@ class Embedded(Relator1):
             composite_id = composite.id
             with system_override():
                 setattr(composite, self.rel_attr, instance.id)
-                await context.txn.insert(composite)
+                await context.db.txn.insert(composite)
                 # validate value
                 await super().on_create(instance, composite_id)
             # keep composite id in snapshot
@@ -267,12 +266,12 @@ class Embedded(Relator1):
         )
         if old_composite_id is not None:
             with system_override():
-                composite = await db_connector().get(
+                composite = await context.db.get(
                     old_composite_id,
                     _table=self.t.get_table_name()
                 )
                 if composite is not None:
-                    await context.txn.delete(composite)
+                    await context.db.txn.delete(composite)
             # await self.on_delete(instance, old_composite_id)
 
     # async def on_delete(self, instance, value: Optional[str]):

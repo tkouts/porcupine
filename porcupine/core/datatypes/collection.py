@@ -7,7 +7,7 @@ from porcupine.exceptions import Forbidden, ContainmentError, NotFound
 from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
-from porcupine.connectors.libsql.query import QueryType
+from porcupine.connectors.postgresql.query import QueryType
 from porcupine.core.services import db_connector
 # from porcupine.connectors.mutations import SubDocument
 from pypika import Parameter, Query, Order
@@ -34,15 +34,16 @@ class ItemCollection(AsyncSetterValue):
               order_by=None, order=Order.asc):
         q = self._desc.query(query_type)
         q.set_params(self.__query_params)
-        if context.txn is not None:
+        db = context.db
+        if db.txn is not None:
             # READ YOUR OWN WRITES
             instance, descr = self._inst(), self._desc
-            removals = context.txn.get_collection_removals(descr, instance)
+            removals = db.txn.get_collection_removals(descr, instance)
             if removals:
                 q = q.where(self.id.notin(removals))
-            additions = context.txn.get_collection_additions(descr, instance)
+            additions = db.txn.get_collection_additions(descr, instance)
             if additions:
-                dumps = db_connector().persist.dumps
+                dumps = db.persist.dumps
                 for added_item in additions:
                     q *= Query.select(
                         *[ValueWrapper(i) for i in (dumps(added_item).values())]
@@ -134,7 +135,7 @@ class ItemCollection(AsyncSetterValue):
                     })
                     values[self._desc.equality_field.name] = instance.id
                     values[self._desc.join_field.name] = item.id
-                    context.txn.mutate_collection(
+                    context.db.txn.mutate_collection(
                         assoc_table.get_table_name(),
                         1,
                         values
@@ -150,7 +151,7 @@ class ItemCollection(AsyncSetterValue):
                 #                        SubDocument.UPSERT,
                 #                        1)
                     if not item.__is_new__:
-                        await context.txn.upsert(item)
+                        await context.db.txn.upsert(item)
             # update items inited flag
             # current_count = getattr(instance.__storage__, descriptor.name)
             # setattr(instance.__storage__, descriptor.name, 1)
@@ -178,7 +179,7 @@ class ItemCollection(AsyncSetterValue):
                     })
                     values[self._desc.equality_field.name] = instance.id
                     values[self._desc.join_field.name] = item.id
-                    context.txn.mutate_collection(
+                    context.db.txn.mutate_collection(
                         assoc_table.get_table_name(),
                         0,
                         values
@@ -187,7 +188,7 @@ class ItemCollection(AsyncSetterValue):
                     with system_override():
                         setattr(item, descriptor.rel_attr, None)
                     if not item.__is_new__:
-                        await context.txn.upsert(item)
+                        await context.db.txn.upsert(item)
 
     async def reset(self, value: list) -> None:
         # print('reset', value)
