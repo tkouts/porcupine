@@ -52,7 +52,7 @@ class GenericItem(Removable, Elastic):
     acl: AclValue = Acl()
 
     # common attributes
-    name = String(required=True, unique=True)
+    name = String(required=True)
     owner = String(required=True, default=None, allow_none=True,
                    readonly=True, store_as='own')
     modified_by = String(required=True, readonly=True, store_as='mdby')

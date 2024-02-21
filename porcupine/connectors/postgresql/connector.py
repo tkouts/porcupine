@@ -8,6 +8,7 @@ from porcupine import log, exceptions
 from .transaction import Transaction
 from porcupine.connectors.schematables import ItemsTable
 from porcupine.core.accesscontroller import resolve_visibility
+from porcupine.core.utils import hash_series
 # from porcupine.core.stream.streamer import BaseStreamer
 # from porcupine.core.schema.partial import PartialItem
 from .query import PorcupineQuery, QueryType
@@ -75,7 +76,44 @@ class Postgresql:
                 items(parent_id, is_collection)
             ''')
 
+            ##############
+            # compositions
+            ##############
+            for cls, composition in schemaregistry.get_compositions():
+                await db.execute(f'''
+                    create table if not exists {composition.t.get_table_name()} (
+                        id text primary key not null,
+                        sig text not null,
+                        type text not null,
+                        item_id TEXT NOT NULL
+                            REFERENCES {cls.table_name()}(id) ON DELETE CASCADE,
+                        data jsonb not null
+                    )
+                ''')
+
+            ####################
+            # unique constraints
+            ####################
+            for cls, attr, subclasses in schemaregistry.get_unique_constraints():
+                items_table = ItemsTable(cls.children)
+                quoted_subclasses = [f"'{s}'" for s in subclasses]
+                index_name = (
+                    f'UX'
+                    f'_{cls.__name__.lower()}'
+                    f'_{hash_series(subclasses)[:8]}'
+                    f'_{attr}'
+                )
+                await db.execute(f'''
+                    create unique index if not exists {index_name}
+                    on {items_table.get_table_name()}
+                    (parent_id, {getattr(items_table, attr)})
+                    where p_type in ({",".join(quoted_subclasses)});
+                ''')
+                # print(dt.name, hash_series(subclasses))
+
+            ########################
             # many-to-many relations
+            ########################
             many_to_many = {
                 d.associative_table: d.associative_table_fields
                 for d in schemaregistry.get_many_to_many_relationships()
@@ -92,22 +130,10 @@ class Postgresql:
                     )
                 ''')
 
-            # compositions
-            for cls, composition in schemaregistry.get_compositions():
-                await db.execute(f'''
-                    create table if not exists {composition.t.get_table_name()} (
-                        id text primary key not null,
-                        sig text not null,
-                        type text not null,
-                        item_id TEXT NOT NULL
-                            REFERENCES {cls.table_name()}(id) ON DELETE CASCADE,
-                        data jsonb not null
-                    )
-                ''')
-
+            ###################
             # full text indexes
+            ###################
             fts_indexes = schemaregistry.get_fts_indexes()
-
             for cls, indexed_attributes, subclasses in fts_indexes:
                 print(cls, indexed_attributes, subclasses)
                 quoted_subclasses = [f"'{s}'" for s in subclasses]
@@ -117,9 +143,15 @@ class Postgresql:
                     for a in indexed_attributes
                 ]
                 for attr_name, attr in zip(indexed_attributes, schema_attributes):
+                    index_name = (
+                        f'FTS'
+                        f'_{cls.__name__.lower()}'
+                        f'_{hash_series(subclasses)[:8]}'
+                        f'_{attr_name.replace(".", "_")}'
+                    )
                     await db.execute(
-                        'CREATE INDEX IF NOT EXISTS '
-                        f'{cls.__name__}_{attr_name.replace(".", "_")}_fts_idx ON items '
+                        f'CREATE INDEX IF NOT EXISTS {index_name}'
+                        ' ON items '
                         f'USING GIN (to_tsvector(\'english\', {attr})) '
                         f'where p_type in ({",".join(quoted_subclasses)});'
                     )

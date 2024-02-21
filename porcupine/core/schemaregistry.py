@@ -2,8 +2,6 @@ from methodtools import lru_cache
 from porcupine.core.utils.collections import WriteOnceDict
 
 _ELASTIC_MAP = WriteOnceDict()
-# _INDEXES = {}
-# _FULL_TEST_INDEXES = {}
 
 
 def register(cls):
@@ -32,7 +30,7 @@ def get_compositions(root_cls=None):
     from porcupine.core.schema.item import GenericItem
     comp_types = Composition, Embedded
     comps = []
-    print(root_cls)
+    # print(root_cls)
     for cls in get_all_subclasses(root_cls or GenericItem)[1:]:
         for dt in cls.__dict__.values():
             if isinstance(dt, comp_types):
@@ -43,6 +41,25 @@ def get_compositions(root_cls=None):
                 comps.append((cls, dt))
                 comps.extend(get_compositions(cls))
     return comps
+
+
+def get_unique_constraints():
+    # from porcupine.core.datatypes.datatype import DataType
+    uniques = []
+    for cls in _ELASTIC_MAP.values():
+        # for dt in cls.__dict__.values():
+        if cls.is_collection and 'unique_constraints' in cls.__dict__:
+            for attr in cls.unique_constraints:
+                uniques.append((
+                    cls,
+                    attr,
+                    [
+                        cls.__name__
+                        for cls in get_all_subclasses(cls)
+                        if attr in cls.unique_constraints
+                    ]
+                ))
+    return uniques
 
 
 def get_fts_indexes():
@@ -72,11 +89,4 @@ def get_datatype_from_attr_name(classes, name):
         key = get_datatype_from_attr_name(cls.__subclasses__(), name)
         if key:
             return key
-    return None
-
-# def add_indexes(cls, indexes):
-#     _INDEXES[cls] = indexes
-#
-#
-# def add_fts_indexes(cls, fts_indexes):
-#     _FULL_TEST_INDEXES[cls] = fts_indexes
+    raise NameError(f"Unknown schema attribute '{name}'.")

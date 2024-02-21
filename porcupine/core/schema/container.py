@@ -27,7 +27,8 @@ class Container(Item):
     containment = (Item, )
     children = Children()
 
-    indexes = ('is_collection', )
+    unique_constraints = 'name',
+    indexes = 'is_collection',
 
     @property
     def access_record(self):

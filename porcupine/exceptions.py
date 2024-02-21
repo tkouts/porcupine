@@ -28,15 +28,11 @@ class OqlError(ServerError):
 
 
 class DBError(Exception):
-    def __init__(self, message=None, mutation=None):
+    def __init__(self, message=None):
         super().__init__(message)
-        self.mutation = mutation
 
     def __repr__(self):
-        return (
-            f"{self.__class__.__name__}(cause={self.__cause__} "
-            f"mutation={self.mutation})"
-        )
+        return f"{self.args[0]} (cause={self.__cause__})"
 
     def __str__(self):
         return self.__repr__()

@@ -9,7 +9,6 @@ from .container import Container
 
 class DeletedItem(GenericItem):
     location = String(immutable=True, required=True)
-    name = String(required=True, unique=False)
 
     def __init__(self, dict_storage=None, deleted_item=None, **kwargs):
         super().__init__(dict_storage, **kwargs)
@@ -55,4 +54,5 @@ class DeletedItem(GenericItem):
 
 
 class RecycleBin(Container):
-    containment = (DeletedItem, )
+    unique_constraints = ()
+    containment = DeletedItem,

@@ -5,7 +5,7 @@ from .common import Integer
 
 class Counter(Integer):
     def __init__(self, default=0, **kwargs):
-        super().__init__(default, unique=False, required=False, **kwargs)
+        super().__init__(default, required=False, **kwargs)
 
     async def on_change(self, instance, value, old_value):
         delta = value - old_value

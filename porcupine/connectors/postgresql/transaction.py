@@ -1,12 +1,13 @@
 import asyncio
 import orjson
+import re
 # import random
 from typing import Dict, Optional
 from collections import defaultdict
 from functools import reduce
 # from datetime import timedelta
 # import libsql_client
-from asyncpg.exceptions import DeadlockDetectedError
+from asyncpg.exceptions import DeadlockDetectedError, UniqueViolationError
 
 from porcupine.hinting import TYPING
 from porcupine import exceptions, log, server
@@ -48,6 +49,12 @@ class Transaction:
                  '_assoc',
                  # '_attr_locks',
                  '_committed')
+
+    @staticmethod
+    def raise_exists(unique_attr, cause):
+        raise exceptions.DBAlreadyExists(
+            f"A resource having the same '{unique_attr}' already exists."
+        ) from cause
 
     def __init__(self, connector, **options):
         self.connector = connector
@@ -539,6 +546,18 @@ class Transaction:
                 for statement, params in statements:
                     try:
                         await db.execute(statement, *params)
+                    except UniqueViolationError as e:
+                        # extract unique attr name
+                        message = e.args[0]
+                        index_name_match = re.search('"([^"]+)"', message)
+                        unique_attr = 'UNKNOWN'
+                        if index_name_match:
+                            index_name = index_name_match.group(1)
+                            if index_name.endswith('_pkey'):
+                                unique_attr = 'ID'
+                            else:
+                                unique_attr = index_name.split('_', 3)[-1]
+                        self.raise_exists(unique_attr, e)
                     except DeadlockDetectedError as e:
                         raise exceptions.DBDeadlockError(e.args[0])
 
