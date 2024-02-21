@@ -145,7 +145,7 @@ class context_user:
 
     async def __aenter__(self):
         if isinstance(self.user, str):
-            db = ctx_db.get().db
+            db = ctx_db.get()
             should_switch = (
                 context.user is None
                 or context.user.id != self.user
