@@ -6,14 +6,11 @@ from porcupine.core.services import db_connector
 from .log import porcupine_log
 
 ctx_user = ContextVar('user', default=None)
-# ctx_txn = ContextVar('txn', default=None)
 ctx_sys = ContextVar('__sys__', default=False)
 ctx_visibility_cache = ContextVar('visibility_cache')
 ctx_membership_cache = ContextVar('membership_cache')
-ctx_db = ContextVar('db')
-# ctx_caches = ContextVar('caches')
 ctx_access_map = ContextVar('access_map')
-# ctx_item_meta_cache = ContextVar('item_meta')
+ctx_db = ContextVar('db')
 
 
 class PContext:
@@ -33,14 +30,6 @@ class PContext:
     def db(self):
         return ctx_db.get()
 
-    # @property
-    # def txn(self):
-    #     return ctx_txn.get()
-
-    # @property
-    # def item_meta(self):
-    #     return ctx_item_meta_cache.get()
-
     @property
     def access_map(self):
         return ctx_access_map.get()
@@ -54,8 +43,6 @@ class PContext:
         ctx_visibility_cache.set(LRU(128))
         ctx_membership_cache.set(LRU(16))
         ctx_access_map.set({})
-        # ctx_caches.set({})
-        # ctx_item_meta_cache.set({})
 
 
 context = PContext()
@@ -99,32 +86,6 @@ def with_context(identity=None, debug=False):
                         )
         return context_wrapper
     return decorator
-
-
-# def context_cacheable(size=128):
-#     """
-#     Caches the result of a coroutine in the context scope
-#     :return: asyncio.Task
-#     """
-#     def cache_decorator(co_routine):
-#         @wraps(co_routine)
-#         async def cache_wrapper(*args):
-#             # initialize cache
-#             cache_name = f'{co_routine.__module__}.{co_routine.__qualname__}'
-#             caches = ctx_caches.get()
-#             if cache_name not in caches:
-#                 caches[cache_name] = LRU(size)
-#             cache = caches[cache_name]
-#             cache_key = args
-#             # print('CACHE KEY', cache_key)
-#             if cache_key in cache:
-#                 # print('CACHE HIT')
-#                 return cache[cache_key]
-#             result = await co_routine(*args)
-#             cache[cache_key] = result
-#             return result
-#         return cache_wrapper
-#     return cache_decorator
 
 
 class context_user:

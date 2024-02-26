@@ -6,7 +6,7 @@ from porcupine import exceptions
 from porcupine.core.context import system_override, context
 from porcupine.core.services import db_connector
 from porcupine.core.datatypes.system import Deleted
-# from porcupine.core import utils
+from porcupine.core.utils import date
 # from porcupine.datatypes import Embedded, Composition
 
 
@@ -74,16 +74,17 @@ class Movable(TYPING.ITEM_TYPE):
 
         parent = await context.db.get(self.parent_id)
 
+        with system_override():
+            self.modified = date.utcnow()
+            self.modified_by = context.user.name
+            self.p_type = target.content_class
+
         await super(type(parent.children), parent.children).remove(self)
         await super(type(target.children), target.children).add(self)
 
-        with system_override():
-            # item.modified = date.utcnow()
-            self.modified_by = context.user.name
-            self.p_type = target.content_class
             # self.parent_id = target.id
-        await self.touch()
-        await context.db.txn.upsert(self)
+        # await self.touch()
+        # await context.db.txn.upsert(self)
 
 
 class Removable(TYPING.ITEM_TYPE):

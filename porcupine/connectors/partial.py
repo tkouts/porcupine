@@ -73,7 +73,7 @@ class PartialItem:
         return f"Partial[{self.content_class}]({' '.join(fields)})"
 
     def to_json(self):
-        d = self._partial.asdict()
+        d = dict(self._partial)
         remove = 'parent_id', 'acl'
         for k in remove:
             d.pop(k)

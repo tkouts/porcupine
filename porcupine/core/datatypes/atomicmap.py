@@ -38,7 +38,8 @@ class AtomicMapValue(AsyncSetterValue, OptionalFrozenDict):
             context.db.txn.mutate(
                 instance,
                 f'{descriptor.storage_key}.{key}',
-                SubDocument.REMOVE, None
+                SubDocument.REMOVE,
+                None
             )
 
     async def reset(self, value, replace=False):

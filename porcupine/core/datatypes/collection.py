@@ -8,7 +8,7 @@ from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
 from porcupine.connectors.postgresql.query import QueryType
-from porcupine.core.services import db_connector
+# from porcupine.core.services import db_connector
 # from porcupine.connectors.mutations import SubDocument
 from pypika import Parameter, Query, Order
 from pypika.terms import ValueWrapper
@@ -34,19 +34,20 @@ class ItemCollection(AsyncSetterValue):
               order_by=None, order=Order.asc):
         q = self._desc.query(query_type)
         q.set_params(self.__query_params)
-        db = context.db
-        if db.txn is not None:
+        _db = context.db
+        if _db.txn is not None:
             # READ YOUR OWN WRITES
             instance, descr = self._inst(), self._desc
-            removals = db.txn.get_collection_removals(descr, instance)
+            removals = _db.txn.get_collection_removals(descr, instance)
             if removals:
                 q = q.where(self.id.notin(removals))
-            additions = db.txn.get_collection_additions(descr, instance)
+            additions = _db.txn.get_collection_additions(descr, instance)
             if additions:
-                dumps = db.persist.dumps
+                dumps = _db.persist.dumps
                 for added_item in additions:
+                    values = dumps(added_item, read_uncommitted=True)
                     q *= Query.select(
-                        *[ValueWrapper(i) for i in (dumps(added_item).values())]
+                        *[ValueWrapper(i) for i in (values.values())]
                     )
                 # print(q._q)
         if where is not None:
@@ -116,7 +117,6 @@ class ItemCollection(AsyncSetterValue):
         ])
 
     async def add(self, *items: TYPING.ANY_ITEM_CO) -> None:
-        # print('adding', self._inst.id, self._desc.name, items)
         if items:
             descriptor, instance = self._desc, self._inst()
             if not await descriptor.can_add(instance, *items):
@@ -190,23 +190,38 @@ class ItemCollection(AsyncSetterValue):
                     if not item.__is_new__:
                         await context.db.txn.upsert(item)
 
-    async def reset(self, value: list) -> None:
+    async def reset(self, value: list):
         # print('reset', value)
         descriptor, instance = self._desc, self._inst()
+        # TODO: remove this after all calls are fixed
         if value and type(value[0]) == str:
             value = await db.get_multi(value, quiet=False).list()
         # remove collection appends
         # context.txn.reset_key_append(descriptor.key_for(instance))
         if not self.is_fetched():
             # fetch value from db
-            # storage = getattr(instance, descriptor.storage)
             setattr(
                 instance.__externals__,
                 descriptor.storage_key,
                 await self.items().list()
             )
         await super().reset(value)
+
+        old_value = descriptor.get_value(instance, snapshot=False)
+
+        new_ids = set([i.id for i in value])
+        old_ids = set([i.id for i in old_value])
+        added_ids = new_ids.difference(old_ids)
+        removed_ids = old_ids.difference(new_ids)
+        added = [i for i in value if i.id in added_ids]
+        removed = [i for i in old_value if i.id in removed_ids]
+
+        with system_override():
+            await self.add(*added)
+            await self.remove(*removed)
+
         # super(List, descriptor).__set__(instance, value)
+        return added, removed
 
     async def get_member_by_id(
         self,

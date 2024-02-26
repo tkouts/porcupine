@@ -2,7 +2,7 @@ from porcupine import db, exceptions
 from porcupine.response import json
 from porcupine.hinting import TYPING
 from porcupine.contract import contract
-from porcupine.core.context import system_override, context
+from porcupine.core.context import system_override, context, ctx_access_map
 from porcupine.core.services import db_connector
 from porcupine.core.utils import date
 from porcupine.core.schemaregistry import get_content_class
@@ -26,11 +26,26 @@ class AclValue(AtomicMapValue):
     def is_partial(self) -> bool:
         return self._dct is not None and '__partial__' in self._dct
 
+    def _update_access_map(self):
+        instance = self._inst()
+        # update access map
+        if instance.is_collection:
+            ctx_access_map.get()[instance.id] = instance.access_record
+
+    async def delete(self, key: str):
+        await super().delete(key)
+        self._update_access_map()
+
+    async def set(self, key: str, value):
+        await super().set(key, value)
+        self._update_access_map()
+
     async def reset(self, acl, partial=False, replace=False):
         if partial:
             acl['__partial__'] = True
         # set acl
         await super().reset(acl, replace=replace)
+        # self._update_access_map()
 
 
 class Acl(AtomicMap):
@@ -194,15 +209,15 @@ class ParentId(Relator1):
                          accepts=('Container', ),
                          readonly=True)
 
-    async def on_create(self, instance, value):
-        await super().on_create(instance, value)
-        instance.reset_effective_acl()
+    # async def on_create(self, instance, value):
+    #     await super().on_create(instance, value)
+    #     instance.reset_effective_acl()
 
-    async def on_change(self, instance, value, old_value):
-        await super().on_change(instance, value, old_value)
-        if instance.is_collection:
-            context.access_map[instance.id] = instance.access_record
-        instance.reset_effective_acl()
+    # async def on_change(self, instance, value, old_value):
+    #     await super().on_change(instance, value, old_value)
+    #     if instance.is_collection:
+    #         context.access_map[instance.id] = instance.access_record
+    #     instance.reset_effective_acl()
 
     @contract(accepts=str)
     @db.transactional()

@@ -44,6 +44,13 @@ class EmbeddedCollection(ItemCollection):
             await context.db.txn.delete(composite)
         await super().remove(*composites)
 
+    async def reset(self, value: list):
+        added, removed = await super().reset(value)
+        for composite in value:
+            if not composite.__is_new__ and composite not in removed:
+                # update composite
+                await context.db.txn.upsert(composite)
+
 
 class Composition(RelatorN):
     """
@@ -83,20 +90,20 @@ class Composition(RelatorN):
     #     with system_override():
     #         await super().on_create(instance, value)
 
-    async def on_change(self,
-                        instance: TYPING.ANY_ITEM_CO,
-                        composites: ListType[TYPING.COMPOSITE_CO],
-                        old_value: TYPING.ID_LIST):
-        with system_override():
-            added, removed = await super().on_change(
-                instance,
-                composites,
-                old_value
-            )
-            for composite in composites:
-                if not composite.__is_new__ and composite not in removed:
-                    # update composite
-                    await context.db.txn.upsert(composite)
+    # async def on_change(self,
+    #                     instance: TYPING.ANY_ITEM_CO,
+    #                     composites: ListType[TYPING.COMPOSITE_CO],
+    #                     old_value: TYPING.ID_LIST):
+    #     with system_override():
+    #         added, removed = await super().on_change(
+    #             instance,
+    #             composites,
+    #             old_value
+    #         )
+    #         for composite in composites:
+    #             if not composite.__is_new__ and composite not in removed:
+    #                 # update composite
+    #                 await context.db.txn.upsert(composite)
         # collection = getattr(instance, self.name)
         # old_ids = frozenset(old_value)
         # new_ids = frozenset([c.__storage__.id for c in composites])

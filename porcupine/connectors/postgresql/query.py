@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import AsyncIterable
+from typing import AsyncIterable, Union
 
-from pypika.queries import QueryBuilder, Query
+from pypika.queries import QueryBuilder, Selectable
 from porcupine import pipe
 from porcupine.core.schemaregistry import get_content_class
 from porcupine.core.context import ctx_user, ctx_db
@@ -36,7 +36,7 @@ class Cursor(AsyncIterable):
                 statement = statement.replace(f':{param}', f'${i}')
                 positional.append(value)
                 i += 1
-        async with db.transaction():
+        async with db.transaction(readonly=True):
             cursor = await db.cursor(
                 statement,
                 *positional
@@ -52,7 +52,7 @@ class Cursor(AsyncIterable):
 class PorcupineQuery:
     def __init__(
         self,
-        query: QueryBuilder,
+        query: Union[QueryBuilder, Selectable],
         query_type=QueryType.ITEMS,
         params=None
     ):

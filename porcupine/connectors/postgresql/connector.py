@@ -20,11 +20,6 @@ from porcupine.core import schemaregistry
 
 
 class Postgresql:
-    # active_txns = 0
-    # persist = persist
-    # supports_ttl = False
-    # Query = PorcupineQuery
-
     def __init__(self, server):
         self.server = server
         self.txn_max_retries = int(server.config.DB_TXN_MAX_RETRIES)
@@ -53,6 +48,25 @@ class Postgresql:
         async with self.pool.acquire() as db:
             await db.execute('''
                 create table if not exists items (
+                    id text primary key not null,
+                    sig text not null,
+                    type text not null,
+                    acl jsonb,
+                    name text not null,
+                    created text not null,
+                    modified text not null,
+                    is_collection boolean,
+                    is_system boolean,
+                    parent_id text REFERENCES items(id) ON DELETE CASCADE,
+                    p_type text,
+                    expires_at integer,
+                    is_deleted integer,
+                    data jsonb not null
+                )
+            ''')
+
+            await db.execute('''
+                create table if not exists tmp (
                     id text primary key not null,
                     sig text not null,
                     type text not null,
@@ -139,10 +153,11 @@ class Postgresql:
                 quoted_subclasses = [f"'{s}'" for s in subclasses]
                 items_table = ItemsTable(cls.children)
                 schema_attributes = [
-                    f'({str(getattr(items_table, a))})::text'
+                    str(getattr(items_table, a))
                     for a in indexed_attributes
                 ]
-                for attr_name, attr in zip(indexed_attributes, schema_attributes):
+                for attr_name, attr in zip(indexed_attributes,
+                                           schema_attributes):
                     index_name = (
                         f'FTS'
                         f'_{cls.__name__.lower()}'

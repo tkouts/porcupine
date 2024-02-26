@@ -57,6 +57,8 @@ class App(Blueprint):
         if item_dict:
             if item.__is_new__ or in_sync:
                 with system_override():
+                    if 'id' in item_dict:
+                        item.id = item_dict.pop('id')
                     await item.apply_patch(item_dict)
 
                 if item.__is_new__:

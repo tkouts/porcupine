@@ -33,7 +33,7 @@ class OptionalFrozenDict(FrozenDict):
 
     def __iter__(self):
         if self._dct is None:
-            raise StopIteration
+            return iter({})
         return super().__iter__()
 
     def __len__(self):

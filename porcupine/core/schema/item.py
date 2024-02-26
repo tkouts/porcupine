@@ -12,7 +12,7 @@ from porcupine.core.services import db_connector
 from porcupine.core.context import ctx_db
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import date
-from porcupine.core.accesscontroller import resolve_acl
+from porcupine.core.accesscontroller import resolve_acl, is_contained_in
 from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
@@ -38,7 +38,7 @@ class GenericItem(Removable, Elastic):
     :cvar description: A short description.
     :type description: str
     """
-    __slots__ = '__effective_acl'
+    # __slots__ = '__effective_acl'
 
     # system attributes
     parent_id = ParentId()
@@ -58,9 +58,9 @@ class GenericItem(Removable, Elastic):
     modified_by = String(required=True, readonly=True, store_as='mdby')
     description = String(store_as='desc')
 
-    def __init__(self, dict_storage=None, **kwargs):
-        super().__init__(dict_storage, **kwargs)
-        self.__effective_acl = None
+    # def __init__(self, dict_storage=None, **kwargs):
+    #     super().__init__(dict_storage, **kwargs)
+    #     self.__effective_acl = None
 
     @classmethod
     def table_name(cls):
@@ -72,10 +72,11 @@ class GenericItem(Removable, Elastic):
 
     @property
     def effective_acl(self) -> Mapping:
-        if self.__effective_acl is None:
-            self.__effective_acl = resolve_acl(self)
-        # print(self.__effective_acl.to_json())
-        return self.__effective_acl
+        return resolve_acl(self)
+        # if self.__effective_acl is None:
+        #     self.__effective_acl = resolve_acl(self)
+        # # print(self.__effective_acl.to_json())
+        # return self.__effective_acl
 
     @property
     async def ttl(self):
@@ -103,12 +104,13 @@ class GenericItem(Removable, Elastic):
         @type item: Elastic
         @rtype: bool
         """
-        parent = await self.get_parent()
-        while parent:
-            if parent.id == item.id:
-                return True
-            parent = await parent.get_parent()
-        return False
+        return is_contained_in(self, item)
+        # parent = await self.get_parent()
+        # while parent:
+        #     if parent.id == item.id:
+        #         return True
+        #     parent = await parent.get_parent()
+        # return False
 
     async def get_parent(self) -> Optional[TYPING.CONTAINER_CO]:
         """

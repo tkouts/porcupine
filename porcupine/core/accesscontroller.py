@@ -75,6 +75,15 @@ def resolve_acl(item):
     return ChainMap(*acls) if len(acls) > 1 else acls[0]
 
 
+def is_contained_in(item, container):
+    if item.parent_id is not None:
+        parent_ids = _iter_access_item(item.parent_id, 'parent_id')
+        for parent_id in parent_ids:
+            if parent_id == container.id:
+                return True
+    return False
+
+
 async def resolve_visibility(item) -> bool:
     if item.__is_new__ or ctx_sys.get():
         return True
@@ -93,7 +102,6 @@ async def resolve_visibility(item) -> bool:
         parent_id is not None
         and not item.is_deleted
         and item.expires_at is None
-        # and not item.acl.is_set()
     )
     cache_key = parent_id
     if use_cache and cache_key in visibility_cache:
@@ -198,11 +206,9 @@ class Roles:
         return max(perms)
 
     @staticmethod
-    # @context_cacheable(1024)
     async def _resolve_membership(group_ids: frozenset) -> set:
         db = ctx_db.get()
         extended_membership = set()
-        # groups = [r async for r in db_connector().get_multi(group_ids)]
         async for group in db.get_multi(group_ids):
             extended_membership.update({
                 group_id for group_id in await group.member_of.ids()

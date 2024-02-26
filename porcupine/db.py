@@ -86,7 +86,7 @@ def transactional(auto_commit=True):
                 max_retries = connector.txn_max_retries
                 # try:
                 while retries < max_retries:
-                    print('trying.... %d' % retries)
+                    # print('trying.... %d' % retries)
                     txn = db.get_transaction()
                     try:
                         args_copy = [

@@ -3,7 +3,7 @@ import orjson
 import re
 # import random
 from typing import Dict, Optional
-from collections import defaultdict
+from collections import defaultdict, ChainMap
 from functools import reduce
 # from datetime import timedelta
 # import libsql_client
@@ -23,7 +23,6 @@ from porcupine.connectors.mutations import (
 from porcupine.core import utils
 from porcupine.core.utils import date, default_json_encoder
 from porcupine.core.context import ctx_access_map, ctx_db
-# from porcupine.core.services import get_service
 from porcupine.core.context import system_override, context_user, context
 from porcupine.connectors.schematables import ItemsTable, CompositesTable
 
@@ -40,10 +39,13 @@ class ExternalDoc:
 class Transaction:
     __slots__ = ('connector',
                  'options',
-                 '_items',
+
+                 '_inserted_items',
+                 '_updated_items',
+                 '_deleted_items',
+
                  '_ext_insertions',
                  '_ext_upsertions',
-                 '_deletions',
                  '_sd',
                  # '_appends',
                  '_assoc',
@@ -59,14 +61,18 @@ class Transaction:
     def __init__(self, connector, **options):
         self.connector = connector
         self.options = options
-        self._items: Dict[str, TYPING.ANY_ITEM_CO] = {}
+
+        self._inserted_items: ChainMap[str, TYPING.ANY_ITEM_CO] = ChainMap({})
+        self._updated_items: ChainMap[str, TYPING.ANY_ITEM_CO] = ChainMap({})
+        self._deleted_items: ChainMap[str, Optional[TYPING.ANY_ITEM_CO]] = \
+            ChainMap({})
+
         self._ext_insertions: Dict[str, ExternalDoc] = {}
         self._ext_upsertions: Dict[str, ExternalDoc] = {}
 
-        self._deletions: Dict[str, Optional[TYPING.ANY_ITEM_CO]] = {}
-
         # sub document mutations
         self._sd = defaultdict(dict)
+
         # self._appends = {}
         self._assoc = defaultdict(list)
 
@@ -77,9 +83,11 @@ class Transaction:
         return self._committed
 
     def __contains__(self, key):
-        if key in self._deletions:
+        if key in self._deleted_items:
             return True
-        elif key in self._items:
+        elif key in self._updated_items:
+            return True
+        elif key in self._inserted_items:
             return True
         elif key in self._ext_upsertions:
             return True
@@ -88,10 +96,12 @@ class Transaction:
         return False
 
     def __getitem__(self, key):
-        if key in self._deletions:
+        if key in self._deleted_items:
             return None
-        elif key in self._items:
-            return self._items[key]
+        elif key in self._inserted_items:
+            return self._inserted_items[key]
+        elif key in self._updated_items:
+            return self._updated_items[key]
         elif key in self._ext_upsertions:
             return self._ext_upsertions[key].value
         elif key in self._ext_insertions:
@@ -117,63 +127,27 @@ class Transaction:
 
     async def insert(self, item: TYPING.ANY_ITEM_CO):
         item_id = item.id
-        if item_id in self._items:
+        if item_id in self._inserted_items or not item.__is_new__:
             self.connector.raise_exists(item.id)
 
-        self._items[item_id] = item
+        self._inserted_items[item_id] = item
 
         # update access map
         if item.is_collection:
             ctx_access_map.get()[item_id] = item.access_record
 
-        await item.on_create()
-
-        # execute data types on_create handlers
-        try:
-            await asyncio.gather(*[
-                data_type.on_create(item, data_type.get_value(item))
-                for data_type in item.__schema__.values()
-            ])
-        except exceptions.AttributeSetError as e:
-            raise exceptions.InvalidUsage(str(e))
-
-        item.__reset__()
-
     async def upsert(self, item: TYPING.ANY_ITEM_CO):
-        if item.__snapshot__ and item.id not in self._deletions:
-            await item.on_change()
+        item_id = item.id
+        if (
+            item.__snapshot__
+            and not item.__is_new__
+            and item_id not in self._deleted_items
+        ):
+            self._updated_items[item.id] = item
 
-            # execute data types on_change handlers
-            # locks = []
-            on_change_handlers = []
-            for key, new_value in item.__snapshot__.items():
-                data_type = utils.get_descriptor_by_storage_key(type(item), key)
-                # if data_type.should_lock:
-                #     locks.append(data_type)
-                on_change_handlers.append(
-                    data_type.on_change(
-                        item,
-                        new_value,
-                        data_type.get_value(item, snapshot=False)
-                    )
-                )
-
-            try:
-                await asyncio.gather(*on_change_handlers)
-            except exceptions.AttributeSetError as e:
-                raise exceptions.InvalidUsage(str(e))
-
-            # if (
-            #     not item.__is_new__
-            #     and locks
-            #     and item.__storage__.pid is not None
-            # ):
-            #     # try to lock attributes
-            #     # print('LOCKING', locks)
-            #     await self.lock_attributes(item, *[u.name for u in locks])
-
-            item.__reset__()
-            self._items[item.id] = item
+        # update access map
+        if item.is_collection:
+            ctx_access_map.get()[item_id] = item.access_record
 
     async def touch(self, item):
         # touch has to be fast / no event handlers
@@ -181,27 +155,16 @@ class Transaction:
         if item.__is_new__:
             item.__storage__.modified = now
         elif 'modified' not in item.__snapshot__:
-            item.__snapshot__['modified'] = now
+            # item.__snapshot__['modified'] = now
             self.mutate(item, 'modified', SubDocument.UPSERT, now)
             # add to items map
-            self._items[item.id] = item
+            self._updated_items[item.id] = item
 
     async def delete(self, item):
-        # if item.is_collection:
-        #     with system_override():
-        #         children = await item.get_children()
-        #         await asyncio.gather(*[self.delete(c) for c in children])
-
-        await item.on_delete()
-
-        # execute data types on_delete handlers
-        await asyncio.gather(*[
-            dt.on_delete(item, dt.get_value(item))
-            for dt in item.__schema__.values()
-        ])
-
-        self._items.pop(item.id, None)
-        self._deletions[item.id] = item
+        item_id = item.id
+        self._inserted_items.pop(item_id, None)
+        self._updated_items.pop(item_id, None)
+        self._deleted_items[item_id] = item
 
     async def recycle(self, item):
         # execute data types on_recycle handlers
@@ -225,7 +188,7 @@ class Transaction:
         ])
 
         # add to items so that ttl can be calculated
-        self._items[item.id] = item
+        # self._items[item.id] = item
 
         if item.is_collection:
             with system_override():
@@ -273,19 +236,11 @@ class Transaction:
                         and mut_type == 1
                     ):
                         added_id = values[dt.join_field.name]
-                        if (
-                            added_id in self._items
-                        ):
-                            added_items.append(self._items[added_id])
+                        if added_id in self:
+                            item = self[added_id]
+                            if item is not None:
+                                added_items.append(item)
         return added_items
-
-    # def append(self, item_id, key, value):
-    #     if key in self._ext_insertions:
-    #         self._ext_insertions[key].value += value
-    #     else:
-    #         item_appends = self._appends.setdefault(item_id, defaultdict(list))
-    #         if value not in item_appends[key]:
-    #             item_appends[key].append(value)
 
     def insert_external(self, item_id, key, value):
         if key in self._ext_insertions:
@@ -337,6 +292,64 @@ class Transaction:
     #         # add lock key to deletions in order to be released
     #         self._attr_locks.update(multi_insert)
 
+    async def _execute_event_handlers(self):
+        inserted = self._inserted_items
+        updated = self._updated_items
+        deleted = self._deleted_items
+        while inserted or updated or deleted:
+            inserted_items = list(inserted.values())
+            updated_items = list(updated.values())
+            deleted_items = list(deleted.values())
+            inserted, updated, deleted = {}, {}, {}
+            self._inserted_items.maps.insert(0, inserted)
+            self._updated_items.maps.insert(0, updated)
+            self._deleted_items.maps.insert(0, deleted)
+
+            for item in inserted_items:
+                await item.on_create()
+
+                # execute data types on_create handlers
+                try:
+                    await asyncio.gather(*[
+                        data_type.on_create(item, data_type.get_value(item))
+                        for data_type in item.__schema__.values()
+                    ])
+                except exceptions.AttributeSetError as e:
+                    raise exceptions.InvalidUsage(str(e))
+                item.__reset__()
+
+            for item in updated_items:
+                await item.on_change()
+                # execute data types on_change handlers
+                on_change_handlers = []
+                for key, new_value in item.__snapshot__.items():
+                    data_type = utils.get_descriptor_by_storage_key(
+                        type(item), key
+                    )
+                    on_change_handlers.append(
+                        data_type.on_change(
+                            item,
+                            new_value,
+                            data_type.get_value(item, snapshot=False)
+                        )
+                    )
+                try:
+                    await asyncio.gather(*on_change_handlers)
+                except exceptions.AttributeSetError as e:
+                    raise exceptions.InvalidUsage(str(e))
+                item.__reset__()
+
+            for item in deleted_items:
+                await item.on_delete()
+
+                # execute data types on_delete handlers
+                # await asyncio.gather(*[
+                #     dt.on_delete(item, dt.get_value(item))
+                #     for dt in item.__schema__.values()
+                # ])
+                for dt in item.__schema__.values():
+                    await dt.on_delete(item, dt.get_value(item))
+
     async def prepare(self):
         connector = self.connector
         dumps = connector.persist.dumps
@@ -352,31 +365,27 @@ class Transaction:
         #                     log.warn('Detected uncommitted change '
         #                              f'to {desc.name} of {i.friendly_name}')
 
-        inserted_items = []
-        modified_items = []
+        await self._execute_event_handlers()
 
         # expiry map
         expiry_map = {}
 
         # insertions
         statements = []
-        for item_id, item in self._items.items():
-            # expiry_map[item_id] = await item.ttl
-            if item.__is_new__:
-                inserted_items.append(item)
-                values = dumps(item)
-                table_name = item.table_name()
-                statements.append(
-                    (
-                        f'insert into {table_name} values '
-                        f'({",".join([f"${i + 1}" for i in range(len(values.keys()))])})',
-                        values.values()
-                    )
-                    # Insertion('items', dumps(item), expiry_map[item_id],
-                    #           Formats.JSON)
+        for item_id, item in self._inserted_items.items():
+            values = dumps(item)
+            table_name = item.table_name()
+            statements.append(
+                (
+                    f'insert into {table_name} values '
+                    f'({",".join([f"${i + 1}" for i in range(len(values.keys()))])})',
+                    values.values()
                 )
-            else:
-                modified_items.append(item)
+                # Insertion('items', dumps(item), expiry_map[item_id],
+                #           Formats.JSON)
+            )
+            # else:
+            #     modified_items.append(item)
 
         # update insertions with externals
         # for key, doc in self._ext_insertions.items():
@@ -391,28 +400,26 @@ class Transaction:
 
         # sub-document mutations
         for item_id, mutations in self._sd.items():
-            if item_id not in self._deletions:
+            if item_id not in self._deleted_items:
                 attrs = []
                 json_attrs = defaultdict(list)
                 values = []
-                item = self._items[item_id]
+                item = self._updated_items[item_id]
                 table = CompositesTable if item.is_composite else ItemsTable
                 i = 1
                 for path, mutation in mutations.items():
                     mut_type, mut_value = mutation
-                    # print(path)
-                    if '.' in path:
-                        attr, inner_path = path.split('.', 1)
-                    else:
-                        attr = path
-                        inner_path = ''
+                    inner_path = path.split('.')
+                    attr = inner_path[0]
 
                     # define column
                     if attr in table.columns:
                         column = attr
+                        inner_path = inner_path[1:]
                     else:
                         column = 'data'
-                        inner_path = path
+
+                    inner_path = ','.join(inner_path)
 
                     if column != 'data' and not inner_path:
                         if mut_type is SubDocument.COUNTER:
@@ -424,17 +431,22 @@ class Transaction:
                         values.append(mut_value)
                     else:
                         # TODO: implement mutation types
-                        # only upsert, counter for now
+                        # only upsert, counter, remove for now
                         if mut_type is SubDocument.COUNTER:
                             json_attrs[column].append(
-                                f"'{{{inner_path}}}', "
-                                f"(COALESCE({column}->'{inner_path}', '0')::int"
-                                f" + ${i})::text::jsonb"
+                                f"jsonb_set(%s, '{{{inner_path}}}', "
+                                "(COALESCE("
+                                f"{column} #> '{{{inner_path}}}', '0')::int"
+                                f" + ${i})::text::jsonb)"
                             )
                             values.append(mut_value)
+                        elif mut_type is SubDocument.REMOVE:
+                            json_attrs[column].append(
+                                f"%s #- '{{{inner_path}}}'"
+                            )
                         else:
                             json_attrs[column].append(
-                                f"'{{{inner_path}}}', ${i}"
+                                f"jsonb_set(%s, '{{{inner_path}}}', ${i})"
                             )
                             values.append(
                                 orjson.dumps(mut_value).decode('utf-8')
@@ -446,11 +458,18 @@ class Transaction:
                 if json_attrs:
                     for column, updates in json_attrs.items():
                         json_update = reduce(
-                            lambda v, upd: f'jsonb_set({v}, {upd})',
+                            lambda v, upd: upd % v,
                             updates,
                             column
                         )
                         attrs.append(f'{column}={json_update}')
+
+                # print(
+                #     f'update "{item.table_name()}" set '
+                #     f'{",".join(attrs)} '
+                #     f'where id=${len(values)}',
+                #     values
+                # )
 
                 statements.append(
                     (
@@ -512,7 +531,7 @@ class Transaction:
 
         # deletions
         deleted_items = [
-            item for item in self._deletions.values()
+            item for item in self._deleted_items.values()
             if item is not None
         ]
         # rest_ops.extend([Deletion(key) for key in self._deletions])
@@ -526,10 +545,7 @@ class Transaction:
                 )
             )
 
-        return (
-            statements,
-            (inserted_items, modified_items, deleted_items)
-        )
+        return statements
 
     async def commit(self) -> None:
         """
@@ -538,7 +554,7 @@ class Transaction:
         @return: None
         """
         # prepare
-        statements, affected_items = await self.prepare()
+        statements = await self.prepare()
 
         if statements:
             db = ctx_db.get().db
@@ -566,22 +582,30 @@ class Transaction:
 
         # execute post txn event handlers
         actor = context.user
-        inserted_items, modified_items, deleted_items = affected_items
 
-        if inserted_items:
-            asyncio.create_task(self._exec_post_handler('on_post_create',
-                                                        inserted_items, actor))
+        if self._inserted_items:
+            asyncio.create_task(self._exec_post_handler(
+                'on_post_create',
+                self._inserted_items.values(),
+                actor
+            ))
 
-        if modified_items:
-            asyncio.create_task(self._exec_post_handler('on_post_change',
-                                                        modified_items, actor))
+        if self._updated_items:
+            asyncio.create_task(self._exec_post_handler(
+                'on_post_change',
+                self._updated_items.values(),
+                actor
+            ))
 
-        if deleted_items:
-            asyncio.create_task(self._exec_post_handler('on_post_delete',
-                                                        deleted_items, actor))
+        if self._deleted_items:
+            asyncio.create_task(self._exec_post_handler(
+                'on_post_delete',
+                self._deleted_items.values(),
+                actor
+            ))
 
     @staticmethod
-    async def _exec_post_handler(handler: str, items: list, actor):
+    async def _exec_post_handler(handler: str, items, actor):
         async with context_user(server.system_user):
             tasks = [getattr(item, handler)(actor) for item in items]
             results = await asyncio.gather(*tasks, return_exceptions=True)

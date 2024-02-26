@@ -1,6 +1,7 @@
 """
 libsql database object persistence layer
 """
+from copy import copy
 import orjson
 from collections import OrderedDict
 from porcupine import log
@@ -42,9 +43,14 @@ def loads(row):
     return content_class(storage)
 
 
-def dumps(obj):
+def dumps(obj, read_uncommitted=False):
+    # print(type(obj), obj.__snapshot__)
     json_encoder = utils.default_json_encoder
-    dct = obj.__storage__.as_dict()
+    storage = obj.__storage__
+    if read_uncommitted:
+        storage = copy(storage)
+        storage.update(obj.__snapshot__)
+    dct = storage.as_dict()
     params = OrderedDict()
     params['id'] = dct.pop('id')
     params['sig'] = dct.pop('sig')
@@ -56,8 +62,7 @@ def dumps(obj):
             if acl is not None else None
         )
         params['name'] = dct.pop('name')
-        created = dct.pop('created')
-        params['created'] = created if isinstance(created, str) else created.isoformat()
+        params['created'] = dct.pop('created').isoformat()
         params['modified'] = dct.pop('modified').isoformat()
         params['is_collection'] = obj.is_collection
         params['is_system'] = dct.pop('is_system', False)
