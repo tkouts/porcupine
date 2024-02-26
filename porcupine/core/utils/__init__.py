@@ -106,8 +106,8 @@ def get_collection_key(item_id: str, collection_name: str,
     return f'{item_id}/{collection_name}/{chunk_no}'
 
 
-def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
-    return f'{parent_id}>{attr_name}>{hash_series(attr_value, using="mmh3")}'
+# def get_key_of_unique(parent_id: str, attr_name: str, attr_value) -> str:
+#     return f'{parent_id}>{attr_name}>{hash_series(attr_value, using="mmh3")}'
 
 
 def get_composite_path(parent_path: str, comp_name: str) -> str:
