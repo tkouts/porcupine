@@ -3,24 +3,18 @@ Porcupine composition data types
 ================================
 """
 from asyncio import Future
-from typing import Optional, List as ListType
+from typing import Optional  # , List as ListType
 
 from porcupine.hinting import TYPING
 from porcupine import db, exceptions
 from porcupine.contract import contract
 from porcupine.response import no_content
 from porcupine.core.context import context, system_override, ctx_db
-from porcupine.core import utils
 from .datatype import DataType
-from .reference import ItemCollection
+from .collection import ItemCollection
 from .relator import RelatorN, Relator1
 from porcupine.connectors.schematables import CompositesTable
 from .mutable import List
-
-
-def get_path(desc, instance):
-    path = getattr(instance, 'path', instance.id)
-    return utils.get_composite_path(path, desc.name)
 
 
 class EmbeddedCollection(ItemCollection):

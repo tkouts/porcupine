@@ -62,8 +62,14 @@ def dumps(obj, read_uncommitted=False):
             if acl is not None else None
         )
         params['name'] = dct.pop('name')
-        params['created'] = dct.pop('created').isoformat()
-        params['modified'] = dct.pop('modified').isoformat()
+        created = dct.pop('created')
+        params['created'] = (
+            created if isinstance(created, str) else created.isoformat()
+        )
+        modified = dct.pop('modified')
+        params['modified'] = (
+            modified if isinstance(modified, str) else modified.isoformat()
+        )
         params['is_collection'] = obj.is_collection
         params['is_system'] = dct.pop('is_system', False)
         params['parent_id'] = dct.pop('parent_id', None)

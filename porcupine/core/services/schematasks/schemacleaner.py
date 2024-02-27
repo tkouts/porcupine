@@ -1,6 +1,6 @@
 from porcupine import exceptions, log
 from porcupine.core import utils, schemaregistry
-from porcupine.datatypes import Blob, ReferenceN, RelatorN
+from porcupine.datatypes import Blob, RelatorN
 from porcupine.core.services.schematasks.task import SchemaMaintenanceTask
 from porcupine.connectors.mutations import Deletion, Formats
 
@@ -25,17 +25,17 @@ class SchemaCleaner(SchemaMaintenanceTask):
             if isinstance(attr_value, str):
                 if attr_value == Blob.storage_info:
                     externals[storage_key] = (attr_value, None)
-                elif (
-                    attr_value == ReferenceN.storage_info
-                    or attr_value.startswith(RelatorN.storage_info_prefix)
-                ):
-                    try:
-                        active_chunk_key = \
-                            utils.get_active_chunk_key(storage_key)
-                        active_chunk = item_dict.pop(active_chunk_key)
-                    except KeyError:
-                        active_chunk = 0
-                    externals[storage_key] = (attr_value, active_chunk)
+                # elif (
+                #     attr_value == ReferenceN.storage_info
+                #     or attr_value.startswith(RelatorN.storage_info_prefix)
+                # ):
+                #     try:
+                #         active_chunk_key = \
+                #             utils.get_active_chunk_key(storage_key)
+                #         active_chunk = item_dict.pop(active_chunk_key)
+                #     except KeyError:
+                #         active_chunk = 0
+                #     externals[storage_key] = (attr_value, active_chunk)
 
         # add externals storage info
         for_addition = current_schema.difference(item_schema)

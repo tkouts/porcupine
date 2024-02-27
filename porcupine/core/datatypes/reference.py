@@ -1,17 +1,7 @@
 from porcupine import db, exceptions
-from porcupine.contract import contract
 from porcupine.core.context import context, system_override, ctx_db
-from porcupine.core.services import db_connector
-# from porcupine.core.schema.storage import UNSET
 from porcupine.core.schemaregistry import get_content_class
-# from porcupine.core import utils
-from .collection import ItemCollection
-# from .datatype import DataType
 from .common import String
-from .mutable import List
-# from .external import Text, Blob
-from .asyncsetter import AsyncSetter
-from pypika import Table
 
 
 class Acceptable:
@@ -52,7 +42,7 @@ class ItemReference(str):
         return str(self)
 
 
-class Reference1(String, Acceptable):
+class Reference(String, Acceptable):
     """
     This data type is used whenever an item loosely references
     at most one other item. Using this data type, the referenced item
@@ -122,161 +112,3 @@ class Reference1(String, Acceptable):
         if value and expand:
             return await value.item()
         return value
-
-
-class ReferenceN(AsyncSetter, List, Acceptable):
-    safe_type = list, tuple
-    storage = '__externals__'
-
-    def __init__(self, default=(), accepts=(), cascade_delete=False, **kwargs):
-        super(List, self).__init__(default, allow_none=False,
-                                   store_as=None, **kwargs)
-        Acceptable.__init__(self, accepts, cascade_delete)
-        self.t = Table('items')
-        self.data_field = self.t.field('data')
-
-    def getter(self, instance, value=None):
-        return ItemCollection(self, instance)
-
-    async def clone(self, instance, memo):
-        collection = self.__get__(instance, None).items()
-        # TODO: run as system to fetch all collection items
-        super(List, self).__set__(
-            instance,
-            [item async for item in collection]
-        )
-
-    # allow regular snapshots
-    # snapshot = DataType.snapshot
-
-    # permissions providers
-
-    @staticmethod
-    async def can_add(instance, *items):
-        return await instance.can_update(context.user)
-
-    can_remove = can_add
-
-    # Event handlers
-
-    # async def on_create(self, instance, value):
-    #     await super().on_create(instance, value)
-    #     collection = self.__get__(instance, None)
-    #     with system_override():
-    #         try:
-    #             await collection.add(*value)
-    #         except exceptions.AttributeSetError as e:
-    #             raise exceptions.InvalidUsage(str(e))
-    #
-    #     return value, []
-
-    # async def on_change(self, instance, value, old_value):
-    #     # print('change', value, old_value)
-    #     # need to compute deltas
-    #     collection = self.__get__(instance, None)
-    #     new_ids = set([i.__storage__.id for i in value])
-    #     # compute old value leaving out non-accessible items
-    #     # ref_items = await db.get_multi(old_value).list()
-    #     old_ids = set([i.__storage__.id for i in old_value])
-    #     added_ids = new_ids.difference(old_ids)
-    #     removed_ids = old_ids.difference(new_ids)
-    #     added = [i for i in value if i.id in added_ids]
-    #     removed = [i for i in old_value if i.id in removed_ids]
-    #
-    #     with system_override():
-    #         try:
-    #             await collection.add(*added)
-    #         except exceptions.AttributeSetError as e:
-    #             raise exceptions.InvalidUsage(str(e))
-    #         await collection.remove(*removed)
-    #
-    #     return added, removed
-
-    async def on_delete(self, instance, value):
-        if self.cascade_delete:
-            collection = self.__get__(instance, None)
-            with system_override():
-                async for ref_item in collection.items():
-                    await ref_item.remove()
-
-        await super().on_delete(instance, value)
-
-    async def on_recycle(self, instance, value):
-        await super().on_recycle(instance, value)
-        collection = self.__get__(instance, None)
-        if self.cascade_delete:
-            with system_override():
-                async for ref_item in collection.items():
-                    # mark as deleted
-                    ref_item.is_deleted += 1
-                    await context.db.txn.upsert(ref_item)
-                    await context.db.txn.recycle(ref_item)
-
-    async def on_restore(self, instance, value):
-        await super().on_restore(instance, value)
-        collection = self.__get__(instance, None)
-        if self.cascade_delete:
-            with system_override():
-                async for ref_item in collection.items():
-                    await ref_item.restore()
-
-    # HTTP views
-
-    def get_member_id(self, instance, request_path):
-        chunks = request_path.split(f'{instance.id}/{self.name}')
-        member_id = chunks[-1]
-        if member_id.startswith('/'):
-            member_id = member_id[1:]
-        return member_id
-
-    async def get(self, instance, request, expand=False):
-        expand = expand or 'expand' in request.args
-        member_id = self.get_member_id(instance, request.path)
-        collection = getattr(instance, self.name)
-        if member_id:
-            member = await collection.get_member_by_id(member_id, quiet=False)
-            return member
-        else:
-            if expand:
-                return await collection.items().list()
-            return await collection.ids()
-
-    @contract(accepts=str)
-    @db.transactional()
-    async def post(self, instance, request):
-        """
-        Adds an item to the collection
-        :param instance: 
-        :param request: 
-        :return: 
-        """
-        if self.get_member_id(instance, request.path):
-            raise exceptions.MethodNotAllowed('Method not allowed')
-        item = await db.get_item(request.json, quiet=False)
-        collection = getattr(instance, self.name)
-        try:
-            await collection.add(item)
-        except exceptions.AttributeSetError as e:
-            raise exceptions.InvalidUsage(str(e))
-        return True
-
-    @contract(accepts=list)
-    @db.transactional()
-    async def put(self, instance, request):
-        """
-        Adds an item to the collection
-        :param instance:
-        :param request:
-        :return:
-        """
-        collection = await super().put(instance, request)
-        return await collection.ids()
-
-    @db.transactional()
-    async def delete(self, instance, request):
-        member_id = self.get_member_id(instance, request.path)
-        collection = getattr(instance, self.name)
-        if not member_id:
-            raise exceptions.MethodNotAllowed('Method not allowed')
-        member = await collection.get_member_by_id(member_id, quiet=False)
-        await collection.remove(member)

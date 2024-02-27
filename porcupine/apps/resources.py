@@ -4,7 +4,7 @@ from porcupine import App, db, exceptions
 from porcupine.response import json, HTTPResponse
 from porcupine.core.schema.elastic import Elastic
 from porcupine.core.schema.composite import Composite
-from porcupine.datatypes import Composition, Embedded, ReferenceN
+from porcupine.datatypes import Composition, Embedded, RelatorN
 
 
 class Resources(App):
@@ -62,7 +62,7 @@ async def member_handler(request, item_id, path):
                 except exceptions.NotFound:
                     raise exceptions.NotFound(
                         'The resource {0} does not exist'.format(request_path))
-            elif isinstance(resolved, ReferenceN) and not path_tokens:
+            elif isinstance(resolved, RelatorN) and not path_tokens:
                 # let data type handler resolve membership
                 break
             else:

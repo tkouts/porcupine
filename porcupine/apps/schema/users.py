@@ -7,7 +7,7 @@ from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import context_user
 from porcupine.schema import Container
 from porcupine.schema import Item
-from porcupine.datatypes import String, RelatorN, Password, Reference1, \
+from porcupine.datatypes import String, RelatorN, Password, Reference, \
     Dictionary, Email
 
 from .userstorage import UserStorage
@@ -109,9 +109,9 @@ class User(Membership):
     email = Email()
     password = Password()
     settings = Dictionary()
-    personal_folder = Reference1(accepts=(UserStorage, ),
-                                 cascade_delete=True,
-                                 required=True)
+    personal_folder = Reference(accepts=(UserStorage, ),
+                                cascade_delete=True,
+                                required=True)
 
     def authenticate(self, password):
         """Checks if the given string matches the

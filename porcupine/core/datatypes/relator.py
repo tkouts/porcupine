@@ -3,16 +3,19 @@ Porcupine reference data types
 ==============================
 """
 from functools import cached_property
-from porcupine import exceptions
-from porcupine.core.context import context
-from porcupine.core.services import db_connector
-from porcupine.connectors.schematables import ItemsTable
-from porcupine.connectors.postgresql.query import QueryType, PorcupineQuery
-from .reference import Reference1, ReferenceN, ItemReference
-# from .collection import ItemCollection
+
 from pypika import Parameter, Table, Field, Query
 from methodtools import lru_cache
-# from .asyncsetter import AsyncSetterValue
+
+from porcupine import exceptions, db
+from porcupine.contract import contract
+from porcupine.core.context import context, system_override
+from porcupine.connectors.schematables import ItemsTable
+from porcupine.connectors.postgresql.query import QueryType, PorcupineQuery
+from .reference import Reference, Acceptable, ItemReference
+from .collection import ItemCollection
+from .asyncsetter import AsyncSetter
+from .mutable import List
 
 
 class RelatorBase:
@@ -23,30 +26,6 @@ class RelatorBase:
             )
         self.rel_attr = rel_attr
         self.respects_references = respects_references
-
-    # async def add_reference(self, instance, *items):
-    #     with system_override():
-    #         for item in items:
-    #             rel_attr_value = getattr(item, self.rel_attr)
-    #             if isinstance(rel_attr_value, RelatorCollection):
-    #                 # call super add to avoid recursion
-    #                 await super(RelatorCollection, rel_attr_value).add(instance)
-    #             elif rel_attr_value is None or \
-    #                     isinstance(rel_attr_value, RelatorItem):
-    #                 setattr(item, self.rel_attr, instance.id)
-    #                 await context.txn.upsert(item)
-    #
-    # async def remove_reference(self, instance, *items):
-    #     with system_override():
-    #         for item in items:
-    #             rel_attr_value = getattr(item, self.rel_attr)
-    #             if isinstance(rel_attr_value, RelatorCollection):
-    #                 # call super remove to avoid recursion
-    #                 await super(RelatorCollection,
-    #                             rel_attr_value).remove(instance)
-    #             elif isinstance(rel_attr_value, RelatorItem):
-    #                 setattr(item, self.rel_attr, None)
-    #                 await context.txn.upsert(item)
 
 
 class RelatorItem(ItemReference):
@@ -62,7 +41,7 @@ class RelatorItem(ItemReference):
         return item
 
 
-class Relator1(Reference1, RelatorBase):
+class Relator1(Reference, RelatorBase):
     """
     This data type is used whenever an item possibly references another item.
     The referenced item B{IS} aware of the items that reference it.
@@ -120,26 +99,7 @@ class Relator1(Reference1, RelatorBase):
                 # await self.remove_reference(instance, ref_item)
 
 
-# class RelatorCollection(ItemCollection):
-#     def is_consistent(self, item):
-#         descriptor, inst = self._desc, self._inst()
-#         rel_attr = getattr(item, descriptor.rel_attr, None)
-#         if rel_attr:
-#             if isinstance(rel_attr, RelatorItem) and rel_attr != inst.id:
-#                 return False
-#             return True
-#         return False
-#
-#     async def add(self, *items):
-#         await super().add(*items)
-#         await self._desc.add_reference(self._inst(), *items)
-#
-#     async def remove(self, *items):
-#         await super().remove(*items)
-#         await self._desc.remove_reference(self._inst(), *items)
-
-
-class RelatorN(ReferenceN, RelatorBase):
+class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
     """
     This data type is used whenever an item references none, one or more items.
     The referenced items B{ARE} aware of the items that reference them.
@@ -160,13 +120,39 @@ class RelatorN(ReferenceN, RelatorBase):
                          will be deleted upon the object's deletion.
     @type cascade_delete: bool
     """
+    safe_type = list, tuple
+    storage = '__externals__'
     # storage_info_prefix = '_relN_'
 
-    def __init__(self, default=(), rel_attr=None, respects_references=False,
-                 **kwargs):
-        super().__init__(default, **kwargs)
+    def __init__(
+        self,
+        default=(),
+        accepts=(),
+        rel_attr=None,
+        cascade_delete=False,
+        respects_references=False,
+        **kwargs
+    ):
+        Acceptable.__init__(self, accepts, cascade_delete)
         RelatorBase.__init__(self, rel_attr, respects_references)
+        super(List, self).__init__(
+            default,
+            allow_none=False,
+            store_as=None,
+            **kwargs
+        )
         self.t = ItemsTable(self)
+
+    async def clone(self, instance, memo):
+        collection = self.__get__(instance, None).items()
+        # TODO: run as system to fetch all collection items
+        super(List, self).__set__(
+            instance,
+            [item async for item in collection]
+        )
+
+    def getter(self, instance, value=None):
+        return ItemCollection(self, instance)
 
     @cached_property
     def is_many_to_many(self):
@@ -261,6 +247,101 @@ class RelatorN(ReferenceN, RelatorBase):
             q = q.select(*self.t.partial_fields)
         # print(q)
         return PorcupineQuery(q, query_type=query_type)
+
+    @staticmethod
+    async def can_add(instance, *items):
+        return await instance.can_update(context.user)
+
+    can_remove = can_add
+
+    async def on_delete(self, instance, value):
+        if self.cascade_delete:
+            collection = self.__get__(instance, None)
+            with system_override():
+                async for ref_item in collection.items():
+                    await ref_item.remove()
+
+        await super().on_delete(instance, value)
+
+    async def on_recycle(self, instance, value):
+        await super().on_recycle(instance, value)
+        collection = self.__get__(instance, None)
+        if self.cascade_delete:
+            with system_override():
+                async for ref_item in collection.items():
+                    # mark as deleted
+                    ref_item.is_deleted += 1
+                    await context.db.txn.upsert(ref_item)
+                    await context.db.txn.recycle(ref_item)
+
+    async def on_restore(self, instance, value):
+        await super().on_restore(instance, value)
+        collection = self.__get__(instance, None)
+        if self.cascade_delete:
+            with system_override():
+                async for ref_item in collection.items():
+                    await ref_item.restore()
+
+    # HTTP views
+
+    def get_member_id(self, instance, request_path):
+        chunks = request_path.split(f'{instance.id}/{self.name}')
+        member_id = chunks[-1]
+        if member_id.startswith('/'):
+            member_id = member_id[1:]
+        return member_id
+
+    async def get(self, instance, request, expand=False):
+        expand = expand or 'expand' in request.args
+        member_id = self.get_member_id(instance, request.path)
+        collection = getattr(instance, self.name)
+        if member_id:
+            member = await collection.get_member_by_id(member_id, quiet=False)
+            return member
+        else:
+            if expand:
+                return await collection.items().list()
+            return await collection.ids()
+
+    @contract(accepts=str)
+    @db.transactional()
+    async def post(self, instance, request):
+        """
+        Adds an item to the collection
+        :param instance:
+        :param request:
+        :return:
+        """
+        if self.get_member_id(instance, request.path):
+            raise exceptions.MethodNotAllowed('Method not allowed')
+        item = await db.get_item(request.json, quiet=False)
+        collection = getattr(instance, self.name)
+        try:
+            await collection.add(item)
+        except exceptions.AttributeSetError as e:
+            raise exceptions.InvalidUsage(str(e))
+        return True
+
+    @contract(accepts=list)
+    @db.transactional()
+    async def put(self, instance, request):
+        """
+        Adds an item to the collection
+        :param instance:
+        :param request:
+        :return:
+        """
+        collection = await super().put(instance, request)
+        return await collection.ids()
+
+    @db.transactional()
+    async def delete(self, instance, request):
+        member_id = self.get_member_id(instance, request.path)
+        collection = getattr(instance, self.name)
+        if not member_id:
+            raise exceptions.MethodNotAllowed('Method not allowed')
+        member = await collection.get_member_by_id(member_id, quiet=False)
+        await collection.remove(member)
 
     # async def on_create(self, instance, value):
     #     added, _ = await super().on_create(instance, value)
