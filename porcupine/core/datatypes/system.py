@@ -117,7 +117,7 @@ class Children(RelatorN):
     def getter(self, instance, value=None):
         return ChildrenCollection(self, instance)
 
-    def clone(self, instance, memo):
+    def clone(self, instance, clone, memo):
         # do not clone children
         ...
 

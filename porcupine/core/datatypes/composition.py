@@ -68,63 +68,13 @@ class Composition(RelatorN):
     def is_many_to_many(self):
         return False
 
-    async def clone(self, instance, memo):
-        composites = self.__get__(instance, None).items()
-        super(List, self).__set__(
-            instance,
-            [await item.clone(memo) async for item in composites]
-        )
-
-    # async def on_create(self, instance, value):
-    #     for composite in value:
-    #         if not composite.__is_new__:
-    #             # TODO: revisit
-    #             raise TypeError('Can only add new items to composition.')
-    #         await context.txn.insert(composite)
-    #     with system_override():
-    #         await super().on_create(instance, value)
-
-    # async def on_change(self,
-    #                     instance: TYPING.ANY_ITEM_CO,
-    #                     composites: ListType[TYPING.COMPOSITE_CO],
-    #                     old_value: TYPING.ID_LIST):
-    #     with system_override():
-    #         added, removed = await super().on_change(
-    #             instance,
-    #             composites,
-    #             old_value
-    #         )
-    #         for composite in composites:
-    #             if not composite.__is_new__ and composite not in removed:
-    #                 # update composite
-    #                 await context.db.txn.upsert(composite)
-        # collection = getattr(instance, self.name)
-        # old_ids = frozenset(old_value)
-        # new_ids = frozenset([c.__storage__.id for c in composites])
-        # removed_ids = old_ids.difference(new_ids)
-        # with system_override():
-        #     added = []
-        #     removed = []
-        #     if removed_ids:
-        #         async for composite in db.get_multi(removed_ids):
-        #             removed.append(composite)
-        #     for composite in composites:
-        #         if composite.__is_new__:
-        #             added.append(composite)
-        #         else:
-        #             # update composite
-        #             await context.txn.upsert(composite)
-        #     if removed:
-        #         await collection.remove(*removed)
-        #     if added:
-        #         await collection.add(*added)
-
-    # async def on_delete(self, instance, value):
-    #     collection = self.__get__(instance, None)
-    #     async for composite in collection.items():
-    #         await context.txn.delete(composite)
-    #     # remove collection documents
-    #     await super().on_delete(instance, value)
+    async def clone(self, instance, clone, memo):
+        composites = self.__get__(instance, None)
+        clone_composites = self.__get__(clone, None)
+        with system_override():
+            await clone_composites.add(
+                *[await item.clone() async for item in composites.items()]
+            )
 
     # HTTP views
     async def get(self, instance: TYPING.ANY_ITEM_CO, request, expand=True):
@@ -223,17 +173,9 @@ class Embedded(Relator1):
             future = Future()
             future.set_result(value)
             return future
-        # return EmbeddedItem(value, self)
         return self.fetch(value)
 
-    # def getter(self, instance, value=None):
-    #     return EmbeddedItem(self, instance)
-
-    # def snapshot(self, instance, composite, previous_value):
-    #     # unconditional snapshot
-    #     instance.__snapshot__[self.storage_key] = composite
-
-    async def clone(self, instance, memo):
+    async def clone(self, instance, clone, memo):
         embedded = self.__get__(instance, None)
         composite = await embedded  # .item()
         if composite:

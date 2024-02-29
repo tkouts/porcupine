@@ -73,20 +73,6 @@ class Relator1(Reference, RelatorBase):
         if value:
             return RelatorItem(value, self)
 
-    # async def on_create(self, instance, value):
-    #     ref_item = await super().on_create(instance, value)
-    #     if ref_item:
-    #         await self.add_reference(instance, ref_item)
-
-    # async def on_change(self, instance, value, old_value):
-    #     ref_item = await super().on_change(instance, value, old_value)
-    #     if ref_item:
-    #         await self.add_reference(instance, ref_item)
-    #     if old_value:
-    #         old_ref_item = await db_connector().get(old_value)
-    #         if old_ref_item:
-    #             await self.remove_reference(instance, old_ref_item)
-
     async def on_delete(self, instance, value):
         await super().on_delete(instance, value)
         if value and not self.cascade_delete:
@@ -143,13 +129,13 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
         )
         self.t = ItemsTable(self)
 
-    async def clone(self, instance, memo):
-        collection = self.__get__(instance, None).items()
-        # TODO: run as system to fetch all collection items
-        super(List, self).__set__(
-            instance,
-            [item async for item in collection]
-        )
+    async def clone(self, instance, clone, memo):
+        collection = self.__get__(instance, None)
+        clone_collection = self.__get__(clone, None)
+        with system_override():
+            await clone_collection.add(
+                *[item async for item in collection.items()]
+            )
 
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)
@@ -255,24 +241,37 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
     can_remove = can_add
 
     async def on_delete(self, instance, value):
-        if self.cascade_delete:
+        if self.cascade_delete or self.respects_references:
             collection = self.__get__(instance, None)
             with system_override():
                 async for ref_item in collection.items():
-                    await ref_item.remove()
+                    if self.respects_references:
+                        raise exceptions.Forbidden(
+                            f'{instance.friendly_name} can not be '
+                            'removed because is referenced by other items.'
+                        )
+                    else:
+                        await ref_item.remove()
 
         await super().on_delete(instance, value)
 
     async def on_recycle(self, instance, value):
         await super().on_recycle(instance, value)
-        collection = self.__get__(instance, None)
-        if self.cascade_delete:
+
+        if self.cascade_delete or self.respects_references:
+            collection = self.__get__(instance, None)
             with system_override():
                 async for ref_item in collection.items():
-                    # mark as deleted
-                    ref_item.is_deleted += 1
-                    await context.db.txn.upsert(ref_item)
-                    await context.db.txn.recycle(ref_item)
+                    if self.respects_references:
+                        raise exceptions.Forbidden(
+                            f'{instance.friendly_name} can not be '
+                            'removed because is referenced by other items.'
+                        )
+                    else:
+                        # mark as deleted
+                        ref_item.is_deleted += 1
+                        await context.db.txn.upsert(ref_item)
+                        await context.db.txn.recycle(ref_item)
 
     async def on_restore(self, instance, value):
         await super().on_restore(instance, value)
@@ -342,28 +341,3 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
             raise exceptions.MethodNotAllowed('Method not allowed')
         member = await collection.get_member_by_id(member_id, quiet=False)
         await collection.remove(member)
-
-    # async def on_create(self, instance, value):
-    #     added, _ = await super().on_create(instance, value)
-    #     if added:
-    #         await self.add_reference(instance, *added)
-
-    # async def on_change(self, instance, value, old_value):
-    #     added, removed = await super().on_change(instance, value, old_value)
-    #     if added:
-    #         await self.add_reference(instance, *added)
-    #     if removed:
-    #         await self.remove_reference(instance, *removed)
-
-    # async def on_delete(self, instance, value):
-    #     collection = self.__get__(instance, None)
-    #     if not self.cascade_delete:
-    #         with system_override():
-    #             async for ref_item in collection.items():
-    #                 if self.respects_references:
-    #                     raise exceptions.Forbidden(
-    #                         f'{instance.friendly_name} can not be '
-    #                         'removed because is referenced by other items.')
-    #                 # await self.remove_reference(instance, ref_item)
-    #     # remove collection documents
-    #     await super().on_delete(instance, value)

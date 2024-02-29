@@ -113,7 +113,7 @@ class DataType:
             raise ValueError('Attribute {0} is mandatory. '
                              'Got {1!r}.'.format(self.name, value))
 
-    def clone(self, instance, memo):
+    def clone(self, instance, clone, memo):
         ...
 
     # event handlers

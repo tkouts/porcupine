@@ -244,16 +244,15 @@ class Elastic(ElasticSlotsBase, metaclass=ElasticMeta):
             memo = {
                 '_dup_ext_': True
             }
-        new_id = utils.generate_oid()
         clone = copy.deepcopy(self)
+        with system_override():
+            clone.id = utils.generate_oid()
+        clone.__is_new__ = True
         # call data types clone method
         for dt in self.__schema__.values():
-            _ = dt.clone(clone, memo)
+            _ = dt.clone(self, clone, memo)
             if asyncio.iscoroutine(_):
                 await _
-        with system_override():
-            clone.id = new_id
-        clone.__is_new__ = True
         return clone
 
     # event handlers
