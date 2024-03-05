@@ -123,14 +123,20 @@ class Children(RelatorN):
 
     def __get__(self, instance, owner):
         if instance is None:
+            # if 'indexes' in owner.__dict__:
+            indexes = owner.indexes
+            # else:
+            #     indexes = ()
             if self.name not in owner.__dict__:
                 # create a separate instance per owner
                 # accepting the container's containment types
                 clazz = type(self)
-                children = clazz(accepts=owner.containment)
+                children = clazz(accepts=owner.containment, indexes=indexes)
                 setattr(owner, clazz.name, children)
                 return children
-            return self
+            else:
+                self.indexes = indexes
+                return self
         return super().__get__(instance, owner)
 
     async def accepts_item(self, item):

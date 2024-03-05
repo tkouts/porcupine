@@ -91,7 +91,7 @@ async def resolve_visibility(item) -> bool:
     db = ctx_db.get()
 
     if item.is_composite:
-        return await resolve_visibility(await db.get(item.item_id))
+        return await resolve_visibility(await db.get(item.parent_id))
 
     parent_id = item.parent_id
 

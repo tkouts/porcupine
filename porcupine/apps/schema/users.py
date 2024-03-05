@@ -1,7 +1,5 @@
 import hashlib
 
-from methodtools import lru_cache
-
 from porcupine import db
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import context_user
@@ -56,12 +54,12 @@ class Membership(Item):
         accepts=('Group', ),
         rel_attr='members'
     )
-    policies = RelatorN(
-        accepts=(
-            # 'org.innoscript.desktop.schema.security.Policy',
-        ),
-        rel_attr='granted_to'
-    )
+    # policies = RelatorN(
+    #     accepts=(
+    #         # 'org.innoscript.desktop.schema.security.Policy',
+    #     ),
+    #     rel_attr='granted_to'
+    # )
 
     def __init__(self, dict_storage=None, **kwargs):
         super().__init__(dict_storage, **kwargs)
@@ -157,4 +155,9 @@ class UsersContainer(Container):
     """
     containment = (Membership, )
 
-    indexes = ['name', 'created', 'modified']
+    # indexes = ['name', 'created', 'modified']
+    indexes = (
+        db.DBIndex('name', unique=True),
+        db.DBIndex('created'),
+        db.DBIndex('modified')
+    )

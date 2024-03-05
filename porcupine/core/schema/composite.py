@@ -1,7 +1,6 @@
 from porcupine import db, exceptions
 from porcupine.contract import contract
-from porcupine.datatypes import String, Relator1, Composition, Embedded
-from porcupine.core.services import db_connector
+from porcupine.datatypes import String, Composition
 from porcupine.core.context import context
 from .elastic import Elastic
 from .item import GenericItem
@@ -29,12 +28,13 @@ class Composite(Elastic):
     embedded_in = None
     collection_name = None
 
-    item_id = String(
+    parent_id = String(
         required=True,
         readonly=True,
         protected=True,
         immutable=True
     )
+    p_type = String(readonly=True, protected=True, required=True)
 
     @classmethod
     def table_name(cls):
@@ -56,7 +56,7 @@ class Composite(Elastic):
     @property
     def parent(self):
         return context.db.get(
-            self.item_id,
+            self.parent_id,
             _table=self.embedded_in.table_name()
         )
 

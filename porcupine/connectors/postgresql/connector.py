@@ -6,7 +6,7 @@ from lru import LRU
 
 from porcupine import log, exceptions
 from .transaction import Transaction
-from porcupine.connectors.schematables import ItemsTable
+from porcupine.connectors.schematables import ItemsTable, CompositesTable
 from porcupine.core.accesscontroller import resolve_visibility
 from porcupine.core.utils import hash_series
 # from porcupine.core.stream.streamer import BaseStreamer
@@ -65,63 +65,60 @@ class Postgresql:
                 )
             ''')
 
-            await db.execute('''
-                create table if not exists tmp (
-                    id text primary key not null,
-                    sig text not null,
-                    type text not null,
-                    acl jsonb,
-                    name text not null,
-                    created text not null,
-                    modified text not null,
-                    is_collection boolean,
-                    is_system boolean,
-                    parent_id text REFERENCES items(id) ON DELETE CASCADE,
-                    p_type text,
-                    expires_at integer,
-                    is_deleted integer,
-                    data jsonb not null
-                )
-            ''')
-
-            # TODO: remove when indexes are implemented
-            await db.execute('''
-                create index if not exists idx_is_collection on
-                items(parent_id, is_collection)
-            ''')
-
             ##############
             # compositions
             ##############
             for cls, composition in schemaregistry.get_compositions():
+                table = composition.t
                 await db.execute(f'''
-                    create table if not exists {composition.t.get_table_name()} (
+                    create table if not exists {table.get_table_name()} (
                         id text primary key not null,
                         sig text not null,
                         type text not null,
-                        item_id TEXT NOT NULL
+                        parent_id TEXT NOT NULL
                             REFERENCES {cls.table_name()}(id) ON DELETE CASCADE,
+                        p_type text NOT NULL,
                         data jsonb not null
                     )
                 ''')
 
             ####################
-            # unique constraints
+            # indexes
             ####################
-            for cls, attr, subclasses in schemaregistry.get_unique_constraints():
-                items_table = ItemsTable(cls.children)
-                quoted_subclasses = [f"'{s}'" for s in subclasses]
+            for index, index_info in schemaregistry.get_indexes().items():
+                dt = index_info['dt']
+                subclasses = index_info['cls']
+                # print(dt.t.get_table_name(), index.on, subclasses)
+                quoted_subclasses = [f"'{s.__name__}'" for s in subclasses]
+                db_fields = [getattr(dt.t, attr) for attr in index.on]
+                prefix = 'UX' if index.unique else 'IX'
                 index_name = (
-                    f'UX'
-                    f'_{cls.__name__.lower()}'
-                    f'_{hash_series(subclasses)[:8]}'
-                    f'_{attr}'
+                    f'{prefix}'
+                    f'_{dt.name}'
+                    f'_{hash_series(quoted_subclasses)[:8]}'
+                    f'_{"_".join(index.on)}'
                 )
+                extra = ''
+                if index.when_value_is:
+                    extra_conditions = [
+                        str(f == v)
+                        for f, v in zip(db_fields, index.when_value_is)
+                    ]
+                    extra = f' and {" and ".join(extra_conditions)}'
+                    # print(extra)
+                # print(f'''
+                #     create{' unique' if index.unique else ''} index
+                #     if not exists {index_name}
+                #     on {dt.t.get_table_name()}
+                #     ("parent_id", {', '.join([str(f) for f in db_fields])})
+                #     where p_type in ({", ".join(quoted_subclasses)}){extra};
+                # ''')
                 await db.execute(f'''
-                    create unique index if not exists {index_name}
-                    on {items_table.get_table_name()}
-                    (parent_id, {getattr(items_table, attr)})
-                    where p_type in ({",".join(quoted_subclasses)});
+                    create{' unique' if index.unique else ''} index
+                    if not exists {index_name}
+                    on {dt.t.get_table_name()}
+                    ("parent_id", {', '.join([str(f) for f in db_fields])})
+                    where p_type in ({", ".join(quoted_subclasses)}){extra};
                 ''')
                 # print(dt.name, hash_series(subclasses))
 

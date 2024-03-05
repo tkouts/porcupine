@@ -21,6 +21,8 @@ class SchemaTable(Table):
         self.data_field = super().field('data')
 
     def field(self, name: str):
+        if name == 'content_class':
+            name = 'type'
         if name in self.columns:
             # return column
             return super().field(name)
@@ -57,7 +59,7 @@ class ItemsTable(SchemaTable):
 
 class CompositesTable(SchemaTable):
     columns = (
-        'id', 'sig', 'type', 'item_id'
+        'id', 'sig', 'type', 'parent_id', 'p_type'
     )
     # partial_fields = (
     #     'id', 'parent_id', 'type', 'acl', 'is_system',

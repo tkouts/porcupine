@@ -82,8 +82,8 @@ class GenericItem(Removable, Elastic):
     async def ttl(self):
         return self.expires_at
 
-    def reset_effective_acl(self):
-        self.__effective_acl = None
+    # def reset_effective_acl(self):
+    #     self.__effective_acl = None
 
     async def clone(self, memo: dict = None) -> 'Elastic':
         clone: 'Elastic' = await super().clone(memo)

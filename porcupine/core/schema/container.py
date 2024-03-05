@@ -10,6 +10,7 @@ from porcupine.core.datatypes.system import Children
 from porcupine.core.accesscontroller import AccessRecord
 from .item import Item
 from .shortcut import Shortcut
+from porcupine.connectors.index import Index
 from porcupine.connectors.postgresql.query import QueryType
 
 
@@ -28,7 +29,8 @@ class Container(Item):
     children = Children()
 
     unique_constraints = 'name',
-    indexes = 'is_collection',
+    # indexes = 'is_collection',
+    indexes = Index('is_collection'), Index('name', unique=True)
 
     @property
     def access_record(self):

@@ -28,18 +28,15 @@ def loads(row):
         storage['name'] = row['name']
         storage['created'] = row['created']
         storage['modified'] = row['modified']
-        # params['is_collection'] = obj.is_collection
         storage['is_system'] = bool(row['is_system'])
         storage['parent_id'] = row['parent_id']
         storage['p_type'] = row['p_type']
         storage['expires_at'] = row['expires_at']
         storage['is_deleted'] = row['is_deleted']
     else:
-        storage['item_id'] = row['item_id']
-    # item_meta_cache = context.item_meta
-    # item_meta = {}
-    # if not content_class.is_composite:
-    #     item_meta['_score'] = item_meta_cache.get(storage['id'], 0)
+        storage['parent_id'] = row['parent_id']
+        storage['p_type'] = row['p_type']
+
     return content_class(storage)
 
 
@@ -77,7 +74,8 @@ def dumps(obj, read_uncommitted=False):
         params['expires_at'] = dct.pop('expires_at', None)
         params['is_deleted'] = dct.pop('is_deleted', 0)
     else:
-        params['item_id'] = dct.pop('item_id')
+        params['parent_id'] = dct.pop('parent_id')
+        params['p_type'] = dct.pop('p_type')
 
     params['data'] = orjson.dumps(dct, default=json_encoder).decode('utf-8')
     # print(params)

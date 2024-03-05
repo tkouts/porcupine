@@ -43,23 +43,40 @@ def get_compositions(root_cls=None):
     return comps
 
 
-def get_unique_constraints():
-    # from porcupine.core.datatypes.datatype import DataType
-    uniques = []
+# def get_unique_constraints():
+#     # from porcupine.core.datatypes.datatype import DataType
+#     uniques = []
+#     for cls in _ELASTIC_MAP.values():
+#         # for dt in cls.__dict__.values():
+#         if cls.is_collection and 'unique_constraints' in cls.__dict__:
+#             for attr in cls.unique_constraints:
+#                 uniques.append((
+#                     cls,
+#                     attr,
+#                     [
+#                         cls.__name__
+#                         for cls in get_all_subclasses(cls)
+#                         if attr in cls.unique_constraints
+#                     ]
+#                 ))
+#     return uniques
+
+
+def get_indexes():
+    from porcupine.core.datatypes.relator import RelatorN
+    indexes = {}
     for cls in _ELASTIC_MAP.values():
-        # for dt in cls.__dict__.values():
-        if cls.is_collection and 'unique_constraints' in cls.__dict__:
-            for attr in cls.unique_constraints:
-                uniques.append((
-                    cls,
-                    attr,
-                    [
-                        cls.__name__
-                        for cls in get_all_subclasses(cls)
-                        if attr in cls.unique_constraints
-                    ]
-                ))
-    return uniques
+        for dt in cls.__schema__.values():
+            if (
+                isinstance(dt, RelatorN)
+                and not dt.is_many_to_many
+            ):
+                dt = getattr(cls, dt.name)
+                if dt.indexes:
+                    for index in dt.indexes:
+                        indexes.setdefault(index, {'dt': dt, 'cls': []})
+                        indexes[index]['cls'].append(cls)
+    return indexes
 
 
 def get_fts_indexes():
@@ -74,9 +91,11 @@ def get_fts_indexes():
     return fts_indexes
 
 
-def get_all_subclasses(cls):
+def get_all_subclasses(cls, condition=None):
     subclasses = [cls]
     for subclass in cls.__subclasses__():
+        if condition and not condition(subclass):
+            continue
         subclasses.extend(get_all_subclasses(subclass))
     return subclasses
 
@@ -86,7 +105,7 @@ def get_datatype_from_attr_name(classes, name):
     for cls in classes:
         if name in cls.__schema__:
             return cls.__schema__[name]
-        key = get_datatype_from_attr_name(cls.__subclasses__(), name)
+        key = get_datatype_from_attr_name(tuple(cls.__subclasses__()), name)
         if key:
             return key
     raise NameError(f"Unknown schema attribute '{name}'.")

@@ -46,7 +46,7 @@ class Relator1(Reference, RelatorBase):
     This data type is used whenever an item possibly references another item.
     The referenced item B{IS} aware of the items that reference it.
 
-    @cvar rel_attr: contains the name of the attribute of the referenced
+    @var rel_attr: contains the name of the attribute of the referenced
                    content classes. The type of the referenced attribute should
                    be B{strictly} be a L{Relator1} or L{RelatorN}
                    data type for one-to-one and one-to-many relationships
@@ -61,8 +61,13 @@ class Relator1(Reference, RelatorBase):
                          will be deleted upon the object's deletion.
     @type cascade_delete: bool
     """
-    def __init__(self, default=None, rel_attr=None, respects_references=False,
-                 **kwargs):
+    def __init__(
+        self,
+        default=None,
+        rel_attr=None,
+        respects_references=False,
+        **kwargs
+    ):
         super().__init__(default, **kwargs)
         RelatorBase.__init__(self, rel_attr, respects_references)
 
@@ -90,19 +95,19 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
     This data type is used whenever an item references none, one or more items.
     The referenced items B{ARE} aware of the items that reference them.
 
-    @cvar rel_attr: the name of the attribute of the referenced
-                    content classes.
-                    The type of the referenced attribute should be B{strictly}
-                    be a subclass of L{Relator1} or L{RelatorN} data types for
-                    one-to-many and many-to-many relationships respectively.
+    @var rel_attr: the name of the attribute of the referenced
+                   content classes.
+                   The type of the referenced attribute should be B{strictly}
+                   be a subclass of L{Relator1} or L{RelatorN} data types for
+                   one-to-many and many-to-many relationships respectively.
     @type rel_attr: str
 
-    @cvar respects_references: if set to C{True} then the object
-                               cannot be deleted if there are objects that
-                               reference it.
+    @var respects_references: if set to C{True} then the object
+                              cannot be deleted if there are objects that
+                              reference it.
     @type respects_references: bool
 
-    @cvar cascade_delete: if set to C{True} then all the objects referenced
+    @var cascade_delete: if set to C{True} then all the objects referenced
                          will be deleted upon the object's deletion.
     @type cascade_delete: bool
     """
@@ -117,6 +122,7 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
         rel_attr=None,
         cascade_delete=False,
         respects_references=False,
+        indexes=(),
         **kwargs
     ):
         Acceptable.__init__(self, accepts, cascade_delete)
@@ -128,6 +134,7 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
             **kwargs
         )
         self.t = ItemsTable(self)
+        self.indexes = indexes
 
     async def clone(self, instance, clone, memo):
         collection = self.__get__(instance, None)

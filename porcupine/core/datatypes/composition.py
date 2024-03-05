@@ -30,7 +30,9 @@ class EmbeddedCollection(ItemCollection):
         for composite in composites:
             # print(composite)
             if not composite.__is_new__:
-                raise TypeError('Can only add new items to composition')
+                raise TypeError('Can only add new items to composition.')
+            with system_override():
+                composite.p_type = self._inst().content_class
             await context.db.txn.insert(composite)
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
@@ -54,7 +56,7 @@ class Composition(RelatorN):
     @see: L{porcupine.schema.Composite}
     """
     def __init__(self, **kwargs):
-        super().__init__(rel_attr='item_id', **kwargs)
+        super().__init__(rel_attr='parent_id', **kwargs)
         accepts = self.accepts[0]
         table_name = accepts if isinstance(accepts, str) else accepts.__name__
         self.t = CompositesTable(self, name=table_name.lower())
@@ -149,10 +151,9 @@ class Embedded(Relator1):
     """
     # safe_type = Composite
     # storage_info = '_comp1_'
-    # TODO: disallow unique
 
     def __init__(self, **kwargs):
-        super().__init__(rel_attr='item_id', protected=True, **kwargs)
+        super().__init__(rel_attr='parent_id', protected=True, **kwargs)
         accepts = self.accepts[0]
         table_name = accepts if isinstance(accepts, str) else accepts.__name__
         self.t = CompositesTable(self, name=table_name.lower())
@@ -186,6 +187,7 @@ class Embedded(Relator1):
             composite_id = composite.id
             with system_override():
                 setattr(composite, self.rel_attr, instance.id)
+                composite.p_type = instance.content_class
                 await context.db.txn.insert(composite)
                 # validate value
                 await super().on_create(instance, composite_id)
