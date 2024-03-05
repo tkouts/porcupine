@@ -6,7 +6,7 @@ from lru import LRU
 
 from porcupine import log, exceptions
 from .transaction import Transaction
-from porcupine.connectors.schematables import ItemsTable, CompositesTable
+from porcupine.connectors.schematables import ItemsTable
 from porcupine.core.accesscontroller import resolve_visibility
 from porcupine.core.utils import hash_series
 # from porcupine.core.stream.streamer import BaseStreamer
