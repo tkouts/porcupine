@@ -15,6 +15,7 @@ from .query import PorcupineQuery, QueryType
 from pypika import Query
 from porcupine.connectors.postgresql import persist
 from porcupine.core import schemaregistry
+from porcupine.db.index import Index, FTSIndex
 
 # from pypika import Table
 
@@ -82,46 +83,6 @@ class Postgresql:
                     )
                 ''')
 
-            ####################
-            # indexes
-            ####################
-            for index, index_info in schemaregistry.get_indexes().items():
-                dt = index_info['dt']
-                subclasses = index_info['cls']
-                # print(dt.t.get_table_name(), index.on, subclasses)
-                quoted_subclasses = [f"'{s.__name__}'" for s in subclasses]
-                db_fields = [getattr(dt.t, attr) for attr in index.on]
-                prefix = 'UX' if index.unique else 'IX'
-                index_name = (
-                    f'{prefix}'
-                    f'_{dt.name}'
-                    f'_{hash_series(quoted_subclasses)[:8]}'
-                    f'_{"_".join(index.on)}'
-                )
-                extra = ''
-                if index.when_value_is:
-                    extra_conditions = [
-                        str(f == v)
-                        for f, v in zip(db_fields, index.when_value_is)
-                    ]
-                    extra = f' and {" and ".join(extra_conditions)}'
-                    # print(extra)
-                # print(f'''
-                #     create{' unique' if index.unique else ''} index
-                #     if not exists {index_name}
-                #     on {dt.t.get_table_name()}
-                #     ("parent_id", {', '.join([str(f) for f in db_fields])})
-                #     where p_type in ({", ".join(quoted_subclasses)}){extra};
-                # ''')
-                await db.execute(f'''
-                    create{' unique' if index.unique else ''} index
-                    if not exists {index_name}
-                    on {dt.t.get_table_name()}
-                    ("parent_id", {', '.join([str(f) for f in db_fields])})
-                    where p_type in ({", ".join(quoted_subclasses)}){extra};
-                ''')
-                # print(dt.name, hash_series(subclasses))
-
             ########################
             # many-to-many relations
             ########################
@@ -129,7 +90,7 @@ class Postgresql:
                 d.associative_table: d.associative_table_fields
                 for d in schemaregistry.get_many_to_many_relationships()
             }
-            print(many_to_many)
+            # print(many_to_many)
             for table, fields in many_to_many.items():
                 await db.execute(f'''
                     create table if not exists {table.get_table_name()} (
@@ -141,32 +102,64 @@ class Postgresql:
                     )
                 ''')
 
-            ###################
-            # full text indexes
-            ###################
-            fts_indexes = schemaregistry.get_fts_indexes()
-            for cls, indexed_attributes, subclasses in fts_indexes:
-                print(cls, indexed_attributes, subclasses)
-                quoted_subclasses = [f"'{s}'" for s in subclasses]
-                items_table = ItemsTable(cls.children)
-                schema_attributes = [
-                    str(getattr(items_table, a))
-                    for a in indexed_attributes
-                ]
-                for attr_name, attr in zip(indexed_attributes,
-                                           schema_attributes):
+            ####################
+            # indexes
+            ####################
+            for index, index_info in schemaregistry.get_indexes().items():
+                dt = index_info['dt']
+                subclasses = index_info['cls']
+                # print(dt.t.get_table_name(), index.on, subclasses)
+                quoted_subclasses = [f"'{s.__name__}'" for s in subclasses]
+                db_fields = [getattr(dt.t, attr) for attr in index.on]
+                if isinstance(index, Index):
+                    # Btree Index
+                    prefix = 'UX' if index.unique else 'IX'
                     index_name = (
-                        f'FTS'
-                        f'_{cls.__name__.lower()}'
-                        f'_{hash_series(subclasses)[:8]}'
-                        f'_{attr_name.replace(".", "_")}'
+                        f'{prefix}'
+                        f'_{dt.name}'
+                        f'_{hash_series(quoted_subclasses)[:8]}'
+                        f'_{"_".join(index.on)}'
                     )
-                    await db.execute(
-                        f'CREATE INDEX IF NOT EXISTS {index_name}'
-                        ' ON items '
-                        f'USING GIN (to_tsvector(\'english\', {attr})) '
-                        f'where p_type in ({",".join(quoted_subclasses)});'
+                    extra = ''
+                    if index.when_value_is:
+                        extra_conditions = [
+                            str(f == v)
+                            for f, v in zip(db_fields, index.when_value_is)
+                        ]
+                        extra = f' and {" and ".join(extra_conditions)}'
+                        # print(extra)
+                    # print(f'''
+                    #     create{' unique' if index.unique else ''} index
+                    #     if not exists {index_name}
+                    #     on {dt.t.get_table_name()}
+                    #     ("parent_id", {', '.join([str(f) for f in db_fields])})
+                    #     where p_type in ({", ".join(quoted_subclasses)}){extra};
+                    # ''')
+                    await db.execute(f'''
+                        create{' unique' if index.unique else ''} index
+                        if not exists {index_name}
+                        on {dt.t.get_table_name()}
+                        ("parent_id", {', '.join([str(f) for f in db_fields])})
+                        where p_type in ({', '.join(quoted_subclasses)}){extra};
+                    ''')
+                else:
+                    # FTS index
+                    index_name = (
+                        'FT'
+                        f'_{dt.name}'
+                        f'_{hash_series(quoted_subclasses)[:8]}'
+                        f'_{"_".join(index.on)}'
                     )
+                    # print(dt.name, hash_series(subclasses))
+                    await db.execute(f'''
+                        CREATE INDEX IF NOT EXISTS "{index_name}"
+                        ON {dt.t.get_table_name()}
+                        USING GIN (to_tsvector(
+                            '{index.locale}',
+                            {', '.join([str(f) for f in db_fields])}
+                        ))
+                        where p_type in ({', '.join(quoted_subclasses)});
+                    ''')
 
 
 class PoolAcquire:

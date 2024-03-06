@@ -12,9 +12,6 @@ from porcupine.hinting import TYPING
 from porcupine.core.context import ctx_db, context
 from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import EmptyStreamer, BaseStreamer
-from porcupine.connectors.index import Index
-
-DBIndex = Index
 
 
 async def get_item(item_id: str, quiet: bool = True) -> Optional[

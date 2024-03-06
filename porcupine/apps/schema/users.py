@@ -1,6 +1,7 @@
 import hashlib
 
 from porcupine import db
+from porcupine.db.index import Index
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import context_user
 from porcupine.schema import Container
@@ -157,7 +158,7 @@ class UsersContainer(Container):
 
     # indexes = ['name', 'created', 'modified']
     indexes = (
-        db.DBIndex('name', unique=True),
-        db.DBIndex('created'),
-        db.DBIndex('modified')
+        Index('name', unique=True),
+        Index('created'),
+        Index('modified')
     )

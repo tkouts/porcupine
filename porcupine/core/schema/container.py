@@ -2,15 +2,12 @@ from typing import Awaitable
 
 from pypika import Parameter, Order
 
-# from porcupine import db, exceptions, pipe
 from porcupine.view import view
 from porcupine.core.datatypes.system import Children
-# from porcupine.core.services import db_connector
-# from porcupine.core import utils
 from porcupine.core.accesscontroller import AccessRecord
 from .item import Item
 from .shortcut import Shortcut
-from porcupine.connectors.index import Index
+from porcupine.db.index import Index
 from porcupine.connectors.postgresql.query import QueryType
 
 

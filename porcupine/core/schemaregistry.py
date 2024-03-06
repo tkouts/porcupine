@@ -79,16 +79,16 @@ def get_indexes():
     return indexes
 
 
-def get_fts_indexes():
-    fts_indexes = []
-    for cls in _ELASTIC_MAP.values():
-        if cls.is_collection and 'full_text_indexes' in cls.__dict__:
-            fts_indexes.append((
-                cls,
-                cls.full_text_indexes,
-                [cls.__name__ for cls in get_all_subclasses(cls)]
-            ))
-    return fts_indexes
+# def get_fts_indexes():
+#     fts_indexes = []
+#     for cls in _ELASTIC_MAP.values():
+#         if cls.is_collection and 'full_text_indexes' in cls.__dict__:
+#             fts_indexes.append((
+#                 cls,
+#                 cls.full_text_indexes,
+#                 [cls.__name__ for cls in get_all_subclasses(cls)]
+#             ))
+#     return fts_indexes
 
 
 def get_all_subclasses(cls, condition=None):

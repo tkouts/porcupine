@@ -4,8 +4,14 @@ Porcupine data types
 """
 
 from .core.datatypes.datatype import DataType
-from .core.datatypes.common import String, Integer, Float, Password, Boolean, \
+from .core.datatypes.common import (
+    String,
+    Integer,
+    Float,
+    Password,
+    Boolean,
     Email
+)
 from .core.datatypes.datetime import Date, DateTime
 from .core.datatypes.mutable import List, Dictionary
 from .core.datatypes.atomicmap import AtomicMap
