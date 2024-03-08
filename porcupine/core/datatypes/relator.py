@@ -22,7 +22,7 @@ class RelatorBase:
     def __init__(self, rel_attr, respects_references):
         if not rel_attr:
             raise exceptions.SchemaError(
-                'Relator must specify its related attribute'
+                'Relator must specify its related attribute.'
             )
         self.rel_attr = rel_attr
         self.respects_references = respects_references
@@ -226,8 +226,7 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
             rel_attr = self.rel_attr
             q = (
                 Query
-                .from_(self.t,
-                       wrap_set_operation_queries=False)
+                .from_(self.t, wrap_set_operation_queries=False)
                 .select()
                 .where(
                     getattr(self.t, rel_attr) == Parameter(':instance_id')
