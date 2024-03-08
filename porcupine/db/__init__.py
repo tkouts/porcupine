@@ -14,8 +14,11 @@ from porcupine.core.services import db_connector
 from porcupine.core.stream.streamer import EmptyStreamer, BaseStreamer
 
 
-async def get_item(item_id: str, quiet: bool = True) -> Optional[
-        TYPING.ANY_ITEM_CO]:
+async def get_item(
+    item_id: str,
+    quiet: bool = True,
+    _table='items'
+) -> Optional[TYPING.ANY_ITEM_CO]:
     """
     Fetches an object from the database.
     If the user has no read permissions on the object
@@ -31,7 +34,7 @@ async def get_item(item_id: str, quiet: bool = True) -> Optional[
     :rtype: L{GenericItem<porcupine.systemObjects.GenericItem>}
     """
     db = ctx_db.get()
-    item = await db.get(item_id, quiet=quiet)
+    item = await db.get(item_id, quiet=quiet, _table=_table)
     if item is not None:
         can_read = await item.can_read(context.user)
         if can_read:

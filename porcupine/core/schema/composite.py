@@ -41,6 +41,10 @@ class Composite(Elastic):
         composition = getattr(cls.embedded_in, cls.collection_name)
         return composition.allowed_types[0].__name__.lower()
 
+    @classmethod
+    def fetch(cls, item_id: str, quiet: bool = True):
+        return db.get_item(item_id, quiet, _table=cls.table_name())
+
     # @property
     # async def effective_acl(self):
     #     item = await self.item
