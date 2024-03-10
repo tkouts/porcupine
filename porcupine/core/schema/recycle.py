@@ -56,4 +56,7 @@ class DeletedItem(GenericItem):
 class RecycleBin(Container):
     # unique_constraints = ()
     containment = DeletedItem,
-    indexes = ()
+
+    @staticmethod
+    def indexes(t):
+        return ()

@@ -113,7 +113,6 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
     """
     safe_type = list, tuple
     storage = '__externals__'
-    # storage_info_prefix = '_relN_'
 
     def __init__(
         self,
@@ -122,7 +121,7 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
         rel_attr=None,
         cascade_delete=False,
         respects_references=False,
-        indexes=(),
+        indexes=None,
         **kwargs
     ):
         Acceptable.__init__(self, accepts, cascade_delete)
@@ -134,7 +133,13 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
             **kwargs
         )
         self.t = ItemsTable(self)
-        self.indexes = indexes
+        self._indexes = indexes
+
+    @cached_property
+    def indexes(self):
+        if self._indexes:
+            return self._indexes(self.t)
+        return ()
 
     async def clone(self, instance, clone, memo):
         collection = self.__get__(instance, None)

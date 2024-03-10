@@ -156,9 +156,10 @@ class UsersContainer(Container):
     """
     containment = (Membership, )
 
-    # indexes = ['name', 'created', 'modified']
-    indexes = (
-        Index('name', unique=True),
-        Index('created'),
-        Index('modified')
-    )
+    @staticmethod
+    def indexes(t):
+        return (
+            Index(t.name, unique=True),
+            Index(t.created),
+            Index(t.modified)
+        )

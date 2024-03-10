@@ -237,6 +237,7 @@ class ItemCollection(AsyncSetterValue):
             for item in items:
                 if item.id == item_id:
                     member = item
+                    break
         if member is None and not quiet:
             raise NotFound(
                 f"Collection '{self._desc.name} '"

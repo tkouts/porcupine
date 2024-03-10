@@ -26,8 +26,13 @@ class Container(Item):
     children = Children()
 
     unique_constraints = 'name',
-    # indexes = 'is_collection',
-    indexes = Index('is_collection'), Index('name', unique=True)
+
+    @staticmethod
+    def indexes(t):
+        return (
+            Index(t.is_collection),
+            Index(t.name, unique=True)
+        )
 
     @property
     def access_record(self):

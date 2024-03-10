@@ -121,6 +121,7 @@ class PorcupineQuery:
 
     async def execute(self, first_only=False, **kwargs):
         db = ctx_db.get()
+        # print(self._q.get_sql(), {**kwargs, **self._params})
         results = await db.query(
             self._q.get_sql(),
             {**kwargs, **self._params}

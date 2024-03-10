@@ -43,25 +43,6 @@ def get_compositions(root_cls=None):
     return comps
 
 
-# def get_unique_constraints():
-#     # from porcupine.core.datatypes.datatype import DataType
-#     uniques = []
-#     for cls in _ELASTIC_MAP.values():
-#         # for dt in cls.__dict__.values():
-#         if cls.is_collection and 'unique_constraints' in cls.__dict__:
-#             for attr in cls.unique_constraints:
-#                 uniques.append((
-#                     cls,
-#                     attr,
-#                     [
-#                         cls.__name__
-#                         for cls in get_all_subclasses(cls)
-#                         if attr in cls.unique_constraints
-#                     ]
-#                 ))
-#     return uniques
-
-
 def get_indexes():
     from porcupine.core.datatypes.relator import RelatorN
     indexes = {}
@@ -77,18 +58,6 @@ def get_indexes():
                         indexes.setdefault(index, {'dt': dt, 'cls': []})
                         indexes[index]['cls'].append(cls)
     return indexes
-
-
-# def get_fts_indexes():
-#     fts_indexes = []
-#     for cls in _ELASTIC_MAP.values():
-#         if cls.is_collection and 'full_text_indexes' in cls.__dict__:
-#             fts_indexes.append((
-#                 cls,
-#                 cls.full_text_indexes,
-#                 [cls.__name__ for cls in get_all_subclasses(cls)]
-#             ))
-#     return fts_indexes
 
 
 def get_all_subclasses(cls, condition=None):

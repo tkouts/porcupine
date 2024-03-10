@@ -135,7 +135,7 @@ class Children(RelatorN):
                 setattr(owner, clazz.name, children)
                 return children
             else:
-                self.indexes = indexes
+                self._indexes = indexes
                 return self
         return super().__get__(instance, owner)
 

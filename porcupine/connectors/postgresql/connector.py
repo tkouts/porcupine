@@ -109,56 +109,59 @@ class Postgresql:
                 dt = index_info['dt']
                 subclasses = index_info['cls']
                 # print(dt.t.get_table_name(), index.on, subclasses)
-                quoted_subclasses = [f"'{s.__name__}'" for s in subclasses]
-                db_fields = [getattr(dt.t, attr) for attr in index.on]
+                quoted_subclasses = tuple(
+                    [f"'{s.__name__}'" for s in subclasses]
+                )
+                db_fields = tuple([str(f) for f in index.on])
                 if isinstance(index, Index):
                     # Btree Index
                     prefix = 'UX' if index.unique else 'IX'
                     index_name = (
                         f'{prefix}'
                         f'_{dt.name}'
-                        f'_{hash_series(quoted_subclasses)[:8]}'
-                        f'_{"_".join(index.on)}'
+                        f'_{hash_series(quoted_subclasses + db_fields)[:8]}'
                     )
                     extra = ''
-                    if index.when_value_is:
-                        extra_conditions = [
-                            str(f == v)
-                            for f, v in zip(db_fields, index.when_value_is)
-                        ]
-                        extra = f' and {" and ".join(extra_conditions)}'
-                        # print(extra)
+                    if index.where:
+                        extra = f' and {index.where}'
                     # print(f'''
-                    #     create{' unique' if index.unique else ''} index
-                    #     if not exists {index_name}
-                    #     on {dt.t.get_table_name()}
-                    #     ("parent_id", {', '.join([str(f) for f in db_fields])})
-                    #     where p_type in ({", ".join(quoted_subclasses)}){extra};
+                    #     CREATE{' UNIQUE' if index.unique else ''} INDEX
+                    #     IF NOT EXISTS {index_name}
+                    #     ON {dt.t.get_table_name()}
+                    #     ("parent_id", {', '.join(db_fields)})
+                    #     WHERE p_type IN ({', '.join(quoted_subclasses)}){extra};
                     # ''')
                     await db.execute(f'''
-                        create{' unique' if index.unique else ''} index
-                        if not exists {index_name}
-                        on {dt.t.get_table_name()}
-                        ("parent_id", {', '.join([str(f) for f in db_fields])})
-                        where p_type in ({', '.join(quoted_subclasses)}){extra};
+                        CREATE{' UNIQUE' if index.unique else ''} INDEX
+                        IF NOT EXISTS {index_name}
+                        ON {dt.t.get_table_name()}
+                        ("parent_id", {', '.join(db_fields)})
+                        WHERE p_type IN ({', '.join(quoted_subclasses)}){extra};
                     ''')
                 else:
                     # FTS index
                     index_name = (
                         'FT'
                         f'_{dt.name}'
-                        f'_{hash_series(quoted_subclasses)[:8]}'
-                        f'_{"_".join(index.on)}'
+                        f'_{hash_series(quoted_subclasses + db_fields)[:8]}'
                     )
-                    # print(dt.name, hash_series(subclasses))
+                    # print(f'''
+                    #     CREATE INDEX IF NOT EXISTS {index_name}
+                    #     ON {dt.t.get_table_name()}
+                    #     USING GIN (to_tsvector(
+                    #         '{index.locale}',
+                    #         {" || ' ' || ".join(db_fields)}
+                    #     ))
+                    #     WHERE p_type IN ({', '.join(quoted_subclasses)});
+                    # ''')
                     await db.execute(f'''
                         CREATE INDEX IF NOT EXISTS "{index_name}"
                         ON {dt.t.get_table_name()}
                         USING GIN (to_tsvector(
                             '{index.locale}',
-                            {', '.join([str(f) for f in db_fields])}
+                            {" || ' ' || ".join(db_fields)}
                         ))
-                        where p_type in ({', '.join(quoted_subclasses)});
+                        WHERE p_type IN ({', '.join(quoted_subclasses)});
                     ''')
 
 
