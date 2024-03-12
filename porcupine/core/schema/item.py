@@ -8,11 +8,15 @@ from porcupine import exceptions, db
 from porcupine.contract import contract
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import system_override, context
-from porcupine.core.services import db_connector
-from porcupine.core.context import ctx_db
+# from porcupine.core.services import db_connector
+# from porcupine.core.context import ctx_db
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import date
-from porcupine.core.accesscontroller import resolve_acl, is_contained_in
+from porcupine.core.accesscontroller import (
+    resolve_acl,
+    is_contained_in,
+    get_ancestor_id
+)
 from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
@@ -78,9 +82,9 @@ class GenericItem(Removable, Elastic):
         # # print(self.__effective_acl.to_json())
         # return self.__effective_acl
 
-    @property
-    async def ttl(self):
-        return self.expires_at
+    # @property
+    # async def ttl(self):
+    #     return self.expires_at
 
     # def reset_effective_acl(self):
     #     self.__effective_acl = None
@@ -122,7 +126,10 @@ class GenericItem(Removable, Elastic):
         if self.parent_id is not None:
             return await db.get_item(self.parent_id)
 
-    async def get_ancestor(self, n_levels=1) -> Optional[TYPING.CONTAINER_CO]:
+    async def get_ancestor(
+        self,
+        n_levels: int = 1
+    ) -> Optional[TYPING.CONTAINER_CO]:
         """
         Returns the element that is situated n_levels above the base object
         in the hierarchy.
@@ -131,12 +138,9 @@ class GenericItem(Removable, Elastic):
         @return: the requested object
         @rtype: type
         """
-        ancestor = self
-        for i in range(n_levels):
-            ancestor = await ancestor.get_parent()
-            if ancestor is None:
-                break
-        return ancestor
+        ancestor_id = get_ancestor_id(self, n_levels)
+        if ancestor_id:
+            return await db.get_item(ancestor_id)
 
     async def get_all_parents(self) -> List[TYPING.CONTAINER_CO]:
         """

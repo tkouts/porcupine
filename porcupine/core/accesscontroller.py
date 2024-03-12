@@ -84,6 +84,18 @@ def is_contained_in(item, container):
     return False
 
 
+def get_ancestor_id(item, n_levels: int):
+    if n_levels == 1:
+        return item.parent_id
+    if item.parent_id is not None:
+        n_levels -= 2
+        parent_ids = _iter_access_item(item.parent_id, 'parent_id')
+        for i, parent_id in enumerate(parent_ids):
+            if i == n_levels:
+                return parent_id
+    return None
+
+
 async def resolve_visibility(item) -> bool:
     if item.__is_new__ or ctx_sys.get():
         return True
