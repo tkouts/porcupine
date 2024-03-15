@@ -152,11 +152,12 @@ class Embedded(Relator1):
     # safe_type = Composite
     # storage_info = '_comp1_'
 
-    def __init__(self, **kwargs):
+    def __init__(self, swappable=True, **kwargs):
         super().__init__(rel_attr='parent_id', protected=True, **kwargs)
         accepts = self.accepts[0]
         table_name = accepts if isinstance(accepts, str) else accepts.__name__
         self.t = CompositesTable(self, name=table_name.lower())
+        self.swappable = swappable
 
     async def fetch(self, embedded_id):
         with system_override():
@@ -192,7 +193,11 @@ class Embedded(Relator1):
                 # validate value
                 await super().on_create(instance, composite_id)
             # keep composite id in snapshot
-            self.snapshot(instance, composite_id, None)
+            self.snapshot(
+                instance,
+                composite_id,
+                self.get_value(instance, snapshot=False)
+            )
         else:
             # None validation
             await super().on_create(instance, None)
@@ -203,6 +208,8 @@ class Embedded(Relator1):
         # print('embedded on change', old_composite_id)
         if composite is not None:
             await self.on_create(instance, composite)
+        else:
+            self.snapshot(instance, None, old_composite_id)
         await DataType.on_change(
             self,
             instance,
@@ -215,6 +222,7 @@ class Embedded(Relator1):
                     old_composite_id,
                     _table=self.t.get_table_name()
                 )
+
                 if composite is not None:
                     await context.db.txn.delete(composite)
             # await self.on_delete(instance, old_composite_id)

@@ -82,6 +82,16 @@ class Postgresql:
                         data jsonb not null
                     )
                 ''')
+                if (
+                    hasattr(composition, 'swappable')
+                    and not composition.swappable
+                ):
+                    await db.execute(f'''
+                        CREATE UNIQUE INDEX IF NOT EXISTS
+                        UX_{composition.name}
+                        ON {table.get_table_name()}
+                        ("parent_id")
+                    ''')
 
             ########################
             # many-to-many relations
@@ -123,7 +133,7 @@ class Postgresql:
                     )
                     extra = ''
                     if index.where:
-                        extra = f' and {index.where}'
+                        extra = f' AND {index.where}'
                     # print(f'''
                     #     CREATE{' UNIQUE' if index.unique else ''} INDEX
                     #     IF NOT EXISTS {index_name}
