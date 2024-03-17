@@ -14,9 +14,8 @@ from porcupine.core.accesscontroller import resolve_visibility
 
 class QueryType(Enum):
     RAW = 0
-    RAW_ASSOCIATIVE = 1
-    PARTIAL = 2
-    ITEMS = 3
+    PARTIAL = 1
+    ITEMS = 2
 
 
 class Cursor(AsyncIterable):
@@ -93,6 +92,14 @@ class PorcupineQuery:
 
     def orderby(self, *args, **kwargs):
         q = self._q.orderby(*args, **kwargs)
+        return PorcupineQuery(q, self.type, {**self._params})
+
+    def join(self, *args, **kwargs):
+        q = self._q.join(*args, **kwargs)
+        return PorcupineQuery(q, self.type, {**self._params})
+
+    def on(self, *args, **kwargs):
+        q = self._q.on(*args, **kwargs)
         return PorcupineQuery(q, self.type, {**self._params})
 
     def __mul__(self, other: 'QueryBuilder'):

@@ -8,8 +8,6 @@ from porcupine.core.context import system_override, context
 from porcupine.core.schema.storage import UNSET
 from .asyncsetter import AsyncSetterValue
 from porcupine.connectors.postgresql.query import QueryType
-# from porcupine.core.services import db_connector
-# from porcupine.connectors.mutations import SubDocument
 from pypika import Parameter, Query, Order
 from pypika.terms import ValueWrapper
 from pypika.functions import Count
@@ -58,34 +56,16 @@ class ItemCollection(AsyncSetterValue):
 
     @property
     def __membership_check_query(self):
-        if self._desc.is_many_to_many:
-            return self.query(
-                QueryType.RAW_ASSOCIATIVE,
-                where=self._desc.join_field == Parameter(':member_id')
-            ).select(1)
-        else:
-            return self.query(
-                QueryType.RAW,
-                where=self.id == Parameter(':member_id')
-            ).select(1)
+        return self.query(
+            QueryType.RAW,
+            where=self.id == Parameter(':member_id')
+        ).select(1)
 
     def is_fetched(self) -> bool:
         instance = self._inst()
         return instance.__is_new__ or self._desc.get_value(
             instance, use_default=False
         ) is not UNSET
-
-    # @property
-    # def ttl(self):
-    #     return self._inst().ttl
-
-    # @property
-    # def key(self):
-    #     return self._desc.key_for(self._inst())
-
-    # @staticmethod
-    # def is_consistent(_):
-    #     return True
 
     def items(
         self,
@@ -102,12 +82,8 @@ class ItemCollection(AsyncSetterValue):
 
     async def ids(self) -> Tuple[TYPING.ITEM_ID]:
         if not self.is_fetched():
-            if self._desc.is_many_to_many:
-                q = self.query(QueryType.RAW_ASSOCIATIVE)
-                q = q.select(self._desc.join_field.as_('id'))
-            else:
-                q = self.query(QueryType.RAW)
-                q = q.select(self.id)
+            q = self.query(QueryType.RAW)
+            q = q.select(self.id)
             results = await q.execute()
             ids = tuple([r[0] for r in results])
             return ids
@@ -241,7 +217,7 @@ class ItemCollection(AsyncSetterValue):
         if member is None and not quiet:
             raise NotFound(
                 f"Collection '{self._desc.name} '"
-                f"has no member with ID '{item_id}'."
+                f" has no member with ID '{item_id}'."
             )
         return member
 
@@ -256,8 +232,5 @@ class ItemCollection(AsyncSetterValue):
             return await self.get_member_by_id(item_id) is not None
 
     async def count(self, where=None):
-        if self._desc.is_many_to_many and where is None:
-            q = self.query(QueryType.RAW_ASSOCIATIVE).select(Count(1))
-        else:
-            q = self.query(QueryType.RAW, where).select(Count(1))
+        q = self.query(QueryType.RAW, where).select(Count(1))
         return (await q.execute(first_only=True))[0]

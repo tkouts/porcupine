@@ -203,35 +203,26 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
 
     @lru_cache(maxsize=None)
     def query(self, query_type=QueryType.ITEMS):
-        # Query = db_connector().Query
         if self.is_many_to_many:
-            if query_type is QueryType.RAW_ASSOCIATIVE:
-                q = (
-                    Query
-                    .from_(self.associative_table,
-                           wrap_set_operation_queries=False)
-                    .select()
-                    .where(
-                        self.equality_field == Parameter(':instance_id')
-                    )
+            q = (
+                PorcupineQuery
+                .from_(self.associative_table,
+                       wrap_set_operation_queries=False,
+                       query_type=query_type)
+                .join(self.t)
+                .on(self.join_field == self.t.id)
+                .select()
+                .where(
+                    self.equality_field == Parameter(':instance_id')
                 )
-            else:
-                q = (
-                    Query
-                    .from_(self.associative_table,
-                           wrap_set_operation_queries=False)
-                    .join(self.t)
-                    .on(self.join_field == self.t.id)
-                    .select()
-                    .where(
-                        self.equality_field == Parameter(':instance_id')
-                    )
-                )
+            )
         else:
             rel_attr = self.rel_attr
             q = (
-                Query
-                .from_(self.t, wrap_set_operation_queries=False)
+                PorcupineQuery
+                .from_(self.t,
+                       wrap_set_operation_queries=False,
+                       query_type=query_type)
                 .select()
                 .where(
                     getattr(self.t, rel_attr) == Parameter(':instance_id')
@@ -242,8 +233,7 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
             q = q.select(*[Field(name, table=self.t) for name in columns])
         elif query_type is QueryType.PARTIAL:
             q = q.select(*self.t.partial_fields)
-        # print(q)
-        return PorcupineQuery(q, query_type=query_type)
+        return q
 
     @staticmethod
     async def can_add(instance, *items):
