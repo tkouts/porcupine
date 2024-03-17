@@ -1,3 +1,4 @@
+import time
 from collections import OrderedDict
 from typing import Tuple
 
@@ -28,14 +29,27 @@ class ItemCollection(AsyncSetterValue):
     def __getitem__(self, item):
         return self._desc.t[item]
 
-    def query(self, query_type=QueryType.ITEMS, where=None,
-              order_by=None, order=Order.asc):
-        q = self._desc.query(query_type)
-        q.set_params(self.__query_params)
+    def query(
+        self,
+        query_type=QueryType.ITEMS,
+        where=None,
+        order_by=None,
+        order=Order.asc
+    ):
+        descr = self._desc
+        q = descr.query(query_type)
+        params = {**self.__query_params}
+        if descr.t.get_table_name() == 'items' and not context.system_override:
+            q = q.where(
+                (self.expires_at.isnull())
+                | (self.expires_at > Parameter(':now'))
+            )
+            params['now'] = time.time()
+        q.set_params(params)
         _db = context.db
         if _db.txn is not None:
             # READ YOUR OWN WRITES
-            instance, descr = self._inst(), self._desc
+            instance = self._inst()
             removals = _db.txn.get_collection_removals(descr, instance)
             if removals:
                 q = q.where(self.id.notin(removals))
@@ -47,7 +61,7 @@ class ItemCollection(AsyncSetterValue):
                     q *= Query.select(
                         *[ValueWrapper(i) for i in (values.values())]
                     )
-                # print(q._q)
+
         if where is not None:
             q = q.where(where)
         if order_by is not None:
