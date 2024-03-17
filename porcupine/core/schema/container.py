@@ -5,13 +5,13 @@ from pypika import Parameter, Order
 from porcupine.view import view
 from porcupine.core.datatypes.system import Children
 from porcupine.core.accesscontroller import AccessRecord
-from .item import Item
-from .shortcut import Shortcut
 from porcupine.db.index import Index
 from porcupine.connectors.postgresql.query import QueryType
+from .item import BaseItem
+from .shortcut import Shortcut
 
 
-class Container(Item):
+class Container(BaseItem):
     """
     Generic container class.
 
@@ -22,7 +22,7 @@ class Container(Item):
     @type containment: tuple
     """
     is_collection = True
-    containment = (Item, )
+    containment = (BaseItem, )
     children = Children()
 
     unique_constraints = 'name',
@@ -39,8 +39,7 @@ class Container(Item):
         return AccessRecord(
             self.parent_id,
             self.acl.to_json(),
-            self.is_deleted,
-            self.expires_at
+            self.is_deleted
         )
 
     async def child_exists(self, name: str) -> bool:
@@ -67,7 +66,9 @@ class Container(Item):
         return self.children.count()
 
     def items_count(self):
-        return self.children.count(self.children.is_collection == False)
+        return self.children.count(
+            self.children.is_collection == False
+        )
 
     def containers_count(self):
         return self.children.count(self.children.is_collection == True)
@@ -157,7 +158,7 @@ class Container(Item):
     #     return not await self.containers.items().is_empty()
 
     # permissions providers
-    can_append = Item.can_update
+    can_append = BaseItem.can_update
 
     @view
     async def items(self, _):

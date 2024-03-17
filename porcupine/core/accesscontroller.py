@@ -17,7 +17,7 @@ from porcupine.core.context import (
 
 AccessRecord = namedtuple(
     'AccessRecord',
-    ['parent_id', 'acl', 'is_deleted', 'expires_at']
+    ['parent_id', 'acl', 'is_deleted']
 )
 
 
@@ -41,18 +41,10 @@ def _is_deleted(item):
 
 
 def _is_expired(item):
-    # print('expired')
-    parent_id = item.parent_id
-    expiry_list = [
-        e for e in _iter_access_item(parent_id, 'expires_at')
-        if e is not None
-    ]
+    if item.is_collection:
+        return False
     if item.expires_at is not None:
-        expiry_list.append(item.expires_at)
-
-    if expiry_list:
-        return time.time() > min(expiry_list)
-
+        return time.time() > item.expires_at
     return False
 
 
@@ -113,7 +105,7 @@ async def resolve_visibility(item) -> bool:
     use_cache = (
         parent_id is not None
         and not item.is_deleted
-        and item.expires_at is None
+        and (item.is_collection or item.expires_at is None)
     )
     cache_key = parent_id
     if use_cache and cache_key in visibility_cache:
@@ -131,11 +123,11 @@ async def resolve_visibility(item) -> bool:
         container_id = item.id if item.is_collection else parent_id
         results = await db.fetch_access_map(container_id)
         access_map.update({
-            row['id']: AccessRecord(row['parent_id'],
-                                    row['acl'] and
-                                    orjson.loads(row['acl']),
-                                    row['is_deleted'],
-                                    row['expires_at'])
+            row['id']: AccessRecord(
+                row['parent_id'],
+                row['acl'] and orjson.loads(row['acl']),
+                row['is_deleted']
+            )
             for row in results
             if row['id'] not in access_map
         })

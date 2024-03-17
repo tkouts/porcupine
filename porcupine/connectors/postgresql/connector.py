@@ -9,15 +9,10 @@ from .transaction import Transaction
 from porcupine.connectors.schematables import ItemsTable
 from porcupine.core.accesscontroller import resolve_visibility
 from porcupine.core.utils import hash_series
-# from porcupine.core.stream.streamer import BaseStreamer
-# from porcupine.core.schema.partial import PartialItem
 from .query import PorcupineQuery, QueryType
-from pypika import Query
 from porcupine.connectors.postgresql import persist
 from porcupine.core import schemaregistry
-from porcupine.db.index import Index, FTSIndex
-
-# from pypika import Table
+from porcupine.db.index import Index
 
 
 class Postgresql:
@@ -248,12 +243,11 @@ class Connection:
         ]
 
         if fetch_from_db:
-            q = self.Query(
-                Query
-                .from_(t)
+            q = (
+                self.Query
+                .from_(t, query_type=QueryType.ITEMS)
                 .select(t.star)
-                .where(t.id.isin(fetch_from_db)),
-                QueryType.ITEMS
+                .where(t.id.isin(fetch_from_db))
             )
             async for item in q.cursor(_skip_acl_check=True):
                 ordered_ids[item.id] = item
@@ -277,7 +271,7 @@ class Connection:
                     select items.parent_id from items, parent_ids
                     where items.id=parent_ids.id
                 )
-            select id, parent_id, acl, is_deleted, expires_at
+            select id, parent_id, acl, is_deleted
             from items where items.id in (select id from parent_ids);
         ''', [item_id])
 

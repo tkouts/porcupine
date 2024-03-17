@@ -6,6 +6,7 @@ from pendulum import DateTime as PendulumDateTime
 from porcupine.hinting import TYPING
 from porcupine import exceptions, db
 from porcupine.contract import contract
+from porcupine.response import no_content
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import system_override, context
 # from porcupine.core.services import db_connector
@@ -42,13 +43,11 @@ class GenericItem(Removable, Elastic):
     :cvar description: A short description.
     :type description: str
     """
-    # __slots__ = '__effective_acl'
 
     # system attributes
     parent_id = ParentId()
     created: PendulumDateTime = DateTime(readonly=True)
     modified: PendulumDateTime = DateTime(required=True, readonly=True)
-    expires_at = Integer(None, immutable=True, allow_none=True, protected=True)
     p_type = String(readonly=True, protected=True)
 
     # security attributes
@@ -62,10 +61,6 @@ class GenericItem(Removable, Elastic):
     modified_by = String(required=True, readonly=True, store_as='mdby')
     description = String(store_as='desc')
 
-    # def __init__(self, dict_storage=None, **kwargs):
-    #     super().__init__(dict_storage, **kwargs)
-    #     self.__effective_acl = None
-
     @classmethod
     def table_name(cls):
         return 'items'
@@ -77,17 +72,6 @@ class GenericItem(Removable, Elastic):
     @property
     def effective_acl(self) -> Mapping:
         return resolve_acl(self)
-        # if self.__effective_acl is None:
-        #     self.__effective_acl = resolve_acl(self)
-        # # print(self.__effective_acl.to_json())
-        # return self.__effective_acl
-
-    # @property
-    # async def ttl(self):
-    #     return self.expires_at
-
-    # def reset_effective_acl(self):
-    #     self.__effective_acl = None
 
     async def clone(self, memo: dict = None) -> 'Elastic':
         clone: 'Elastic' = await super().clone(memo)
@@ -109,12 +93,6 @@ class GenericItem(Removable, Elastic):
         @rtype: bool
         """
         return is_contained_in(self, item)
-        # parent = await self.get_parent()
-        # while parent:
-        #     if parent.id == item.id:
-        #         return True
-        #     parent = await parent.get_parent()
-        # return False
 
     async def get_parent(self) -> Optional[TYPING.CONTAINER_CO]:
         """
@@ -280,10 +258,10 @@ class GenericItem(Removable, Elastic):
     @db.transactional()
     async def delete(self, _):
         await self.remove()
-        return True
+        return no_content()
 
 
-class Item(Cloneable, Movable, Recyclable, GenericItem):
+class BaseItem(Cloneable, Movable, Recyclable, GenericItem):
     """
     Simple item with shortcuts.
 
@@ -296,3 +274,7 @@ class Item(Cloneable, Movable, Recyclable, GenericItem):
         rel_attr='target',
         cascade_delete=True,
     )
+
+
+class Item(BaseItem):
+    expires_at = Integer(None, immutable=True, allow_none=True, protected=True)

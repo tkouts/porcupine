@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import AsyncIterable, Union
 
+from pypika import Query
 from pypika.queries import QueryBuilder, Selectable
 from porcupine import pipe
 from porcupine.core.schemaregistry import get_content_class
@@ -36,7 +37,7 @@ class Cursor(AsyncIterable):
                 statement = statement.replace(f':{param}', f'${i}')
                 positional.append(value)
                 i += 1
-        async with db.transaction(readonly=True):
+        async with db.transaction():
             cursor = await db.cursor(
                 statement,
                 *positional
@@ -66,6 +67,15 @@ class PorcupineQuery:
         if isinstance(i, shortcut):
             return await i.get_target()
         return i
+
+    @classmethod
+    def from_(
+        cls,
+        table: Union[Selectable, str],
+        query_type=QueryType.ITEMS,
+        **kwargs
+    ) -> "PorcupineQuery":
+        return cls(Query.from_(table, **kwargs), query_type)
 
     def set_params(self, params):
         self._params = params

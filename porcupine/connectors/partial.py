@@ -31,8 +31,7 @@ class PartialItem:
         return AccessRecord(
             self.parent_id,
             self.acl.to_json(),
-            self.is_deleted,
-            self.expires_at
+            self.is_deleted
         )
 
     @property
