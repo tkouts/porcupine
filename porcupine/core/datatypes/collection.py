@@ -39,7 +39,7 @@ class ItemCollection(AsyncSetterValue):
         descr = self._desc
         q = descr.query(query_type)
         params = {**self.__query_params}
-        if descr.t.get_table_name() == 'items' and not context.system_override:
+        if not context.system_override:
             q = q.where(
                 (self.expires_at.isnull())
                 | (self.expires_at > Parameter(':now'))
@@ -67,13 +67,6 @@ class ItemCollection(AsyncSetterValue):
         if order_by is not None:
             q = q.orderby(order_by, order=order)
         return q
-
-    @property
-    def __membership_check_query(self):
-        return self.query(
-            QueryType.RAW,
-            where=self.id == Parameter(':member_id')
-        ).select(1)
 
     def is_fetched(self) -> bool:
         instance = self._inst()
@@ -237,7 +230,11 @@ class ItemCollection(AsyncSetterValue):
 
     async def has(self, item_id: TYPING.ITEM_ID) -> bool:
         if not self.is_fetched():
-            result = await self.__membership_check_query.execute(
+            query = self.query(
+                QueryType.RAW,
+                where=self.id == Parameter(':member_id')
+            ).select(1)
+            result = await query.execute(
                 first_only=True,
                 member_id=item_id
             )

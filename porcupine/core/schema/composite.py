@@ -1,6 +1,6 @@
 from porcupine import db, exceptions
 from porcupine.contract import contract
-from porcupine.datatypes import String, Composition
+from porcupine.datatypes import String, Composition, Integer
 from porcupine.core.context import context
 from .elastic import Elastic
 from .item import GenericItem
@@ -35,6 +35,7 @@ class Composite(Elastic):
         immutable=True
     )
     p_type = String(readonly=True, protected=True, required=True)
+    expires_at = Integer(None, immutable=True, allow_none=True, protected=True)
 
     @classmethod
     def table_name(cls):
@@ -44,11 +45,6 @@ class Composite(Elastic):
     @classmethod
     def fetch(cls, item_id: str, quiet: bool = True):
         return db.get_item(item_id, quiet, _table=cls.table_name())
-
-    # @property
-    # async def effective_acl(self):
-    #     item = await self.item
-    #     return item.effective_acl
 
     @property
     async def item(self):
@@ -63,19 +59,6 @@ class Composite(Elastic):
             self.parent_id,
             _table=self.embedded_in.table_name()
         )
-
-    # @property
-    # async def ttl(self):
-    #     item = await self.item
-    #     return item.expires_at
-
-    # async def clone(self, memo: dict = None) -> 'Composite':
-    #     clone: 'Composite' = await super().clone(memo)
-    #     with system_override():
-    #         id_map = memo['_id_map_']
-    #         clone.path = '.'.join([id_map.get(oid, oid)
-    #                                for oid in self.path.split('.')])
-    #     return clone
 
     async def touch(self):
         item = await self.item

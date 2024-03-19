@@ -32,7 +32,9 @@ class EmbeddedCollection(ItemCollection):
             if not composite.__is_new__:
                 raise TypeError('Can only add new items to composition.')
             with system_override():
-                composite.p_type = self._inst().content_class
+                instance = self._inst()
+                composite.p_type = instance.content_class
+                composite.expires_at = instance.expires_at
             await context.db.txn.insert(composite)
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
@@ -189,6 +191,7 @@ class Embedded(Relator1):
             with system_override():
                 setattr(composite, self.rel_attr, instance.id)
                 composite.p_type = instance.content_class
+                composite.expires_at = instance.expires_at
                 await context.db.txn.insert(composite)
                 # validate value
                 await super().on_create(instance, composite_id)

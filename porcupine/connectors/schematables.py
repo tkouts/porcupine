@@ -59,7 +59,7 @@ class ItemsTable(SchemaTable):
 
 class CompositesTable(SchemaTable):
     columns = (
-        'id', 'sig', 'type', 'parent_id', 'p_type'
+        'id', 'sig', 'type', 'parent_id', 'p_type', 'expires_at'
     )
     # partial_fields = (
     #     'id', 'parent_id', 'type', 'acl', 'is_system',
