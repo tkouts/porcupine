@@ -9,16 +9,21 @@ from porcupine.contract import contract
 from porcupine.response import no_content
 from porcupine.core.accesscontroller import Roles
 from porcupine.core.context import system_override, context
-# from porcupine.core.services import db_connector
-# from porcupine.core.context import ctx_db
 from porcupine.core.datatypes.system import Acl, AclValue, ParentId
 from porcupine.core.utils import date
+from porcupine.connectors.schematables import ItemsTable
 from porcupine.core.accesscontroller import (
     resolve_acl,
     is_contained_in,
     get_ancestor_id
 )
-from porcupine.datatypes import String, Boolean, RelatorN, DateTime, Integer
+from porcupine.datatypes import (
+    String,
+    Boolean,
+    RelatorN,
+    DateTime,
+    Integer
+)
 from .elastic import Elastic
 from .mixins import Cloneable, Movable, Removable, Recyclable
 
@@ -62,8 +67,8 @@ class GenericItem(Removable, Elastic):
     description = String(store_as='desc')
 
     @classmethod
-    def table_name(cls):
-        return 'items'
+    def table(cls, collection=None):
+        return ItemsTable(collection)
 
     @property
     def friendly_name(self):
@@ -194,18 +199,6 @@ class GenericItem(Removable, Elastic):
             return True
         return False
 
-    def expires_after(self, days=0, hours=0, minutes=0, seconds=0):
-        ts = time.time()
-        if days:
-            ts += days * 86400
-        if hours:
-            ts += hours * 3600
-        if minutes:
-            ts += minutes * 60
-        if seconds:
-            ts += seconds
-        self.expires_at = int(ts)
-
     # permissions providers
     async def can_read(self, membership):
         if context.system_override:
@@ -278,3 +271,15 @@ class BaseItem(Cloneable, Movable, Recyclable, GenericItem):
 
 class Item(BaseItem):
     expires_at = Integer(None, immutable=True, allow_none=True, protected=True)
+
+    def expires_after(self, days=0, hours=0, minutes=0, seconds=0):
+        ts = time.time()
+        if days:
+            ts += days * 86400
+        if hours:
+            ts += hours * 3600
+        if minutes:
+            ts += minutes * 60
+        if seconds:
+            ts += seconds
+        self.expires_at = int(ts)

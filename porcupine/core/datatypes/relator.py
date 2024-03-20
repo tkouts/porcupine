@@ -4,13 +4,12 @@ Porcupine reference data types
 """
 from functools import cached_property
 
-from pypika import Parameter, Table, Field, Query
+from pypika import Parameter, Table, Field
 from methodtools import lru_cache
 
 from porcupine import exceptions, db
 from porcupine.contract import contract
 from porcupine.core.context import context, system_override
-from porcupine.connectors.schematables import ItemsTable
 from porcupine.connectors.postgresql.query import QueryType, PorcupineQuery
 from .reference import Reference, Acceptable, ItemReference
 from .collection import ItemCollection
@@ -132,7 +131,6 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
             store_as=None,
             **kwargs
         )
-        self.t = ItemsTable(self)
         self._indexes = indexes
 
     @cached_property
@@ -141,13 +139,18 @@ class RelatorN(AsyncSetter, List, Acceptable, RelatorBase):
             return self._indexes(self.t)
         return ()
 
-    async def clone(self, instance, clone, memo):
-        collection = self.__get__(instance, None)
-        clone_collection = self.__get__(clone, None)
-        with system_override():
-            await clone_collection.add(
-                *[item async for item in collection.items()]
-            )
+    @cached_property
+    def t(self):
+        accepts = self.allowed_types[0]
+        return accepts.table(self)
+
+    # async def clone(self, instance, clone, memo):
+    #     collection = self.__get__(instance, None)
+    #     clone_collection = self.__get__(clone, None)
+    #     with system_override():
+    #         await clone_collection.add(
+    #             *[item async for item in collection.items()]
+    #         )
 
     def getter(self, instance, value=None):
         return ItemCollection(self, instance)

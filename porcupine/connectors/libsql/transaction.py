@@ -358,7 +358,7 @@ class Transaction:
             if item.__is_new__:
                 inserted_items.append(item)
                 values = dumps(item)
-                table_name = item.table_name()
+                table_name = item.table().get_table_name()
                 statements.append(
                     libsql_client.Statement(
                         f'insert into {table_name} values '
@@ -441,7 +441,7 @@ class Transaction:
                 # )
                 statements.append(
                     libsql_client.Statement(
-                        f'update "{item.table_name()}" set '
+                        f'update "{item.table().get_table_name()}" set '
                         f'{",".join(attrs)} '
                         f'where id=?',
                         values
@@ -504,7 +504,7 @@ class Transaction:
         ]
         # rest_ops.extend([Deletion(key) for key in self._deletions])
         for item in deleted_items:
-            table_name = item.table_name()
+            table_name = item.table().get_table_name()
             statements.append(
                 libsql_client.Statement(
                     f'delete from "{table_name}" '

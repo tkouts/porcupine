@@ -59,9 +59,6 @@ class Composition(RelatorN):
     """
     def __init__(self, **kwargs):
         super().__init__(rel_attr='parent_id', **kwargs)
-        accepts = self.accepts[0]
-        table_name = accepts if isinstance(accepts, str) else accepts.__name__
-        self.t = CompositesTable(self, name=table_name.lower())
 
     def __get__(self, instance, owner):
         if instance is None:

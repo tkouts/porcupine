@@ -171,7 +171,8 @@ class LibSql:
                     sig text not null,
                     type text not null,
                     item_id TEXT NOT NULL
-                        REFERENCES {cls.table_name()}(id) ON DELETE CASCADE,
+                        REFERENCES {cls.table().get_table_name()}(id)
+                        ON DELETE CASCADE,
                     data json not null
                 )
             ''')

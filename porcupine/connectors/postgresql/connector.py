@@ -72,7 +72,8 @@ class Postgresql:
                         sig text not null,
                         type text not null,
                         parent_id TEXT NOT NULL
-                            REFERENCES {cls.table_name()}(id) ON DELETE CASCADE,
+                            REFERENCES {cls.table().get_table_name()}(id)
+                            ON DELETE CASCADE,
                         p_type text NOT NULL,
                         expires_at integer,
                         data jsonb not null

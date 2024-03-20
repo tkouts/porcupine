@@ -2,6 +2,7 @@ from porcupine import db, exceptions
 from porcupine.contract import contract
 from porcupine.datatypes import String, Composition, Integer
 from porcupine.core.context import context
+from porcupine.connectors.schematables import CompositesTable
 from .elastic import Elastic
 from .item import GenericItem
 
@@ -38,13 +39,14 @@ class Composite(Elastic):
     expires_at = Integer(None, immutable=True, allow_none=True, protected=True)
 
     @classmethod
-    def table_name(cls):
+    def table(cls, collection=None):
         composition = getattr(cls.embedded_in, cls.collection_name)
-        return composition.allowed_types[0].__name__.lower()
+        table_name = composition.allowed_types[0].__name__.lower()
+        return CompositesTable(collection, name=table_name)
 
     @classmethod
     def fetch(cls, item_id: str, quiet: bool = True):
-        return db.get_item(item_id, quiet, _table=cls.table_name())
+        return db.get_item(item_id, quiet, _table=cls.table().get_table_name())
 
     @property
     async def item(self):
@@ -57,7 +59,7 @@ class Composite(Elastic):
     def parent(self):
         return context.db.get(
             self.parent_id,
-            _table=self.embedded_in.table_name()
+            _table=self.embedded_in.table().get_table_name()
         )
 
     async def touch(self):

@@ -374,18 +374,18 @@ class Transaction:
         statements = []
         for item_id, item in self._inserted_items.items():
             values = dumps(item)
-            table_name = item.table_name()
-            statements.append(
-                (
-                    f'insert into {table_name} values '
-                    f'({",".join([f"${i + 1}" for i in range(len(values.keys()))])})',
-                    values.values()
-                )
-                # Insertion('items', dumps(item), expiry_map[item_id],
-                #           Formats.JSON)
+            sql_params = [f"${i + 1}" for i in range(len(values.keys()))]
+            table_name = item.table().get_table_name()
+            statement = (
+                f'insert into {table_name} values '
+                f'({",".join(sql_params)})',
+                values.values()
+
             )
-            # else:
-            #     modified_items.append(item)
+            if item.is_composite:
+                statements.append(statement)
+            else:
+                statements.insert(0, statement)
 
         # update insertions with externals
         # for key, doc in self._ext_insertions.items():
@@ -473,7 +473,7 @@ class Transaction:
 
                 statements.append(
                     (
-                        f'update "{item.table_name()}" set '
+                        f'update "{item.table().get_table_name()}" set '
                         f'{",".join(attrs)} '
                         f'where id=${len(values)}',
                         values
@@ -536,11 +536,11 @@ class Transaction:
         ]
         # rest_ops.extend([Deletion(key) for key in self._deletions])
         for item in deleted_items:
-            table_name = item.table_name()
+            table_name = item.table().get_table_name()
             statements.append(
                 (
-                    f'delete from "{table_name}" '
-                    f'where id=$1',
+                    f'delete from "{table_name}"'
+                    f' where id=$1',
                     [item.id]
                 )
             )
