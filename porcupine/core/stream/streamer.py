@@ -5,7 +5,7 @@ from aiostream import stream, async_
 from porcupine import pipe
 from porcupine.hinting import TYPING
 from porcupine.core.context import ctx_user, ctx_db
-from porcupine.core.services import db_connector
+# from porcupine.core.services import db_connector
 from porcupine.connectors.partial import PartialItem
 from porcupine.core.accesscontroller import resolve_visibility
 

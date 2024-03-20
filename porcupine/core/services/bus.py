@@ -14,7 +14,7 @@ from .service import AbstractService
 
 
 class EventDoesntExist(Exception):
-    """ Raised when trying remove an event that doesn't exist. """
+    """ Raised when trying to remove an event that doesn't exist. """
     pass
 
 
@@ -102,7 +102,7 @@ class EventBus:
         return outer
 
     def add_event(self, func: Callable, event: str) -> None:
-        """ Adds a function to a event.
+        """ Adds a function to an event.
 
         :param func: The function to call when event is emitted
         :type func: Callable
@@ -154,7 +154,7 @@ class EventBus:
         .. note:
             This plainly just calls functions without passing params into the
             subscribed callables. This is great if you want to do some kind
-            of post processing without the callable requiring information
+            of post-processing without the callable requiring information
             before doing so.
         """
 
@@ -199,12 +199,12 @@ class EventBus:
     # ------------------------------------------
 
     def _event_funcs(self, event: str) -> Iterable[Callable]:
-        """ Returns an Iterable of the functions subscribed to a event.
+        """ Returns an Iterable of the functions subscribed to an event.
 
         :param event: Name of the event.
         :type event: str
 
-        :return: A iterable to do things with.
+        :return: An iterable to do things with.
         :rtype: Iterable
         """
         for func in self._events[event]:

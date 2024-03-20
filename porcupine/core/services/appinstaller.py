@@ -5,6 +5,7 @@ import os
 import sys
 import pkgutil
 import inspect
+from typing import Sequence
 from multiprocessing import Lock
 
 from porcupine import apps
@@ -36,7 +37,7 @@ class AppInstaller(AbstractService):
             if os.path.isdir(static_dir_path):
                 self.server.static('/', static_dir_path)
 
-    def gather_apps(self, path: list, prefix: str = '') -> None:
+    def gather_apps(self, path: Sequence[str], prefix: str = '') -> None:
         found_apps = []
         # locate apps in path
         for loader, name, is_pkg in pkgutil.walk_packages(path, prefix=prefix):
@@ -48,12 +49,14 @@ class AppInstaller(AbstractService):
             for member_name, value in inspect.getmembers(mod):
                 if member_name.startswith('__'):
                     continue
-                if isinstance(value, App) and \
-                        sys.modules[value.__module__] == mod:
+                if (
+                    isinstance(value, App)
+                    and sys.modules[value.__module__] == mod
+                ):
                     found_apps.append(value)
         # install apps
         for app in found_apps:
-            porcupine_log.info('Installing application {0}'.format(app.name))
+            porcupine_log.info(f'Installing application {app.name}')
             self.apps.append(app)
             self.server.blueprint(app, url_prefix=app.name)
 

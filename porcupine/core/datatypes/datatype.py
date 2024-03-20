@@ -63,9 +63,8 @@ class DataType:
                     storage = getattr(instance, self.storage)
                     if getattr(storage, self.storage_key) is not UNSET:
                         raise AttributeError(
-                            'Attribute {0} of {1} is immutable.'.format(
-                                self.name, type(instance).__name__
-                            )
+                            f'Attribute {self.name} of'
+                            f' {type(instance).__name__} is immutable.'
                         )
         if self.allow_none and value is None:
             return
