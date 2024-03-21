@@ -27,10 +27,11 @@ class Cloneable(TYPING.ITEM_TYPE):
         @type target: L{Container}
         @return: L{Item}
         """
-        # if self.is_collection and await target.is_contained_in(self):
-        #     raise exceptions.InvalidUsage(
-        #         'Cannot copy item to destination. '
-        #         'The destination is contained in the source.')
+        if self.is_collection and target.is_contained_in(self):
+            raise exceptions.InvalidUsage(
+                'Cannot copy item to destination. '
+                'The destination is contained in the source.'
+            )
 
         # check permissions on target folder
         if not await target.can_update(context.user):
@@ -66,7 +67,7 @@ class Movable(TYPING.ITEM_TYPE):
         @type target: L{Container}
         @return: None
         """
-        if self.is_collection and await target.is_contained_in(self):
+        if self.is_collection and target.is_contained_in(self):
             raise exceptions.InvalidUsage(
                 'Cannot move item to destination. '
                 'The destination is contained in the source.'
@@ -148,7 +149,7 @@ class Recyclable(TYPING.ITEM_TYPE):
 
         from .recycle import DeletedItem, RecycleBin
         if not isinstance(recycle_bin, RecycleBin):
-            raise TypeError("'{0}' is not instance of RecycleBin"
+            raise TypeError("'{0}' is not instance of RecycleBin."
                             .format(type(recycle_bin).__name__))
 
         with system_override():

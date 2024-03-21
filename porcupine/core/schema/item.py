@@ -89,7 +89,7 @@ class GenericItem(Removable, Elastic):
             clone.parent_id = None
         return clone
 
-    async def is_contained_in(self, item: 'GenericItem') -> bool:
+    def is_contained_in(self, item: 'GenericItem') -> bool:
         """
         Checks if the item is contained in the specified container.
 
