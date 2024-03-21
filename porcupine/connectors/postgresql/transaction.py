@@ -371,7 +371,8 @@ class Transaction:
         expiry_map = {}
 
         # insertions
-        statements = []
+        item_insertions = []
+        composite_insertions = []
         for item_id, item in self._inserted_items.items():
             values = dumps(item)
             sql_params = [f"${i + 1}" for i in range(len(values.keys()))]
@@ -383,9 +384,11 @@ class Transaction:
 
             )
             if item.is_composite:
-                statements.append(statement)
+                composite_insertions.append(statement)
             else:
-                statements.insert(0, statement)
+                item_insertions.append(statement)
+
+        statements = item_insertions + composite_insertions
 
         # update insertions with externals
         # for key, doc in self._ext_insertions.items():
