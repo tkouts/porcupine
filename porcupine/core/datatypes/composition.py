@@ -34,7 +34,8 @@ class EmbeddedCollection(ItemCollection):
             with system_override():
                 instance = self._inst()
                 composite.p_type = instance.content_class
-                composite.expires_at = instance.expires_at
+                if not instance.is_collection:
+                    composite.expires_at = instance.expires_at
             await context.db.txn.insert(composite)
 
     async def remove(self, *composites: TYPING.COMPOSITE_CO):
@@ -188,7 +189,8 @@ class Embedded(Relator1):
             with system_override():
                 setattr(composite, self.rel_attr, instance.id)
                 composite.p_type = instance.content_class
-                composite.expires_at = instance.expires_at
+                if not instance.is_collection:
+                    composite.expires_at = instance.expires_at
                 await context.db.txn.insert(composite)
                 # validate value
                 await super().on_create(instance, composite_id)
