@@ -1,12 +1,10 @@
 import asyncio
 import orjson
 import re
-# import random
 from typing import Dict, Optional
 from collections import defaultdict, ChainMap
 from functools import reduce
-# from datetime import timedelta
-# import libsql_client
+
 from asyncpg.exceptions import DeadlockDetectedError, UniqueViolationError
 
 from porcupine.hinting import TYPING
@@ -168,34 +166,43 @@ class Transaction:
 
     async def recycle(self, item):
         # execute data types on_recycle handlers
-        await asyncio.gather(*[
-            dt.on_recycle(item, dt.get_value(item))
-            for dt in item.__schema__.values()
-        ])
+        # await asyncio.gather(*[
+        #     dt.on_recycle(item, dt.get_value(item))
+        #     for dt in item.__schema__.values()
+        # ])
+        for dt in item.__schema__.values():
+            await dt.on_recycle(item, dt.get_value(item))
 
         if item.is_collection:
             with system_override():
-                children = await item.get_children()
-                await asyncio.gather(
-                    *[self.recycle(child) for child in children]
-                )
+                async for child in item.children.items():
+                    await self.recycle(child)
+                # children = await item.get_children()
+                # await asyncio.gather(
+                #     *[self.recycle(child) for child in children]
+                # )
 
     async def restore(self, item):
         # execute data types on_restore handlers
-        await asyncio.gather(*[
-            dt.on_restore(item, dt.get_value(item))
-            for dt in item.__schema__.values()
-        ])
+        # await asyncio.gather(*[
+        #     dt.on_restore(item, dt.get_value(item))
+        #     for dt in item.__schema__.values()
+        # ])
+        for dt in item.__schema__.values():
+            await dt.on_restore(item, dt.get_value(item))
 
         # add to items so that ttl can be calculated
         # self._items[item.id] = item
 
         if item.is_collection:
             with system_override():
-                children = await item.get_children()
-                await asyncio.gather(
-                    *[self.restore(child) for child in children]
-                )
+                with system_override():
+                    async for child in item.children.items():
+                        await self.restore(child)
+                # children = await item.get_children()
+                # await asyncio.gather(
+                #     *[self.restore(child) for child in children]
+                # )
 
     def mutate(self, item, path, mutation_type, value):
         item_mutations = self._sd[item.id]

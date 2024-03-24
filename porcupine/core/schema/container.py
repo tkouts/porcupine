@@ -38,8 +38,7 @@ class Container(BaseItem):
     def access_record(self):
         return AccessRecord(
             self.parent_id,
-            self.acl.to_json(),
-            self.is_deleted
+            self.acl.to_json()
         )
 
     async def child_exists(self, name: str) -> bool:

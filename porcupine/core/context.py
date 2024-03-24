@@ -7,7 +7,7 @@ from .log import porcupine_log
 
 ctx_user = ContextVar('user', default=None)
 ctx_sys = ContextVar('__sys__', default=False)
-ctx_visibility_cache = ContextVar('visibility_cache')
+# ctx_visibility_cache = ContextVar('visibility_cache')
 ctx_membership_cache = ContextVar('membership_cache')
 ctx_access_map = ContextVar('access_map')
 ctx_db = ContextVar('db')
@@ -34,13 +34,13 @@ class PContext:
     def access_map(self):
         return ctx_access_map.get()
 
-    @property
-    def visibility_cache(self):
-        return ctx_visibility_cache.get()
+    # @property
+    # def visibility_cache(self):
+    #     return ctx_visibility_cache.get()
 
     @staticmethod
     def prepare():
-        ctx_visibility_cache.set(LRU(128))
+        # ctx_visibility_cache.set(LRU(128))
         ctx_membership_cache.set(LRU(16))
         ctx_access_map.set({})
 

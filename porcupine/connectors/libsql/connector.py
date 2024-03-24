@@ -46,7 +46,7 @@ class LibSql:
             item = await self.get_raw(object_id, _table)
             if item is not None:
                 item = self.persist.loads(item)
-                is_visible = await resolve_visibility(item)
+                is_visible = resolve_visibility(item)
                 if not is_visible:
                     item = None
             context.db_cache[object_id] = item

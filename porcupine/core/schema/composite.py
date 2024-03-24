@@ -37,6 +37,7 @@ class Composite(Elastic):
     )
     p_type = String(readonly=True, protected=True, required=True)
     expires_at = Integer(None, immutable=True, allow_none=True, protected=True)
+    is_deleted = Integer(readonly=True, protected=True)
 
     @classmethod
     def table(cls, collection=None):

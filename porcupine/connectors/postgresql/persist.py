@@ -77,6 +77,7 @@ def dumps(obj, read_uncommitted=False):
         params['parent_id'] = dct.pop('parent_id')
         params['p_type'] = dct.pop('p_type')
         params['expires_at'] = dct.pop('expires_at', None)
+        params['is_deleted'] = dct.pop('is_deleted', 0)
 
     params['data'] = orjson.dumps(dct, default=json_encoder).decode('utf-8')
     # print(params)

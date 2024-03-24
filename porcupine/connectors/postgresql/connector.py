@@ -61,21 +61,50 @@ class Postgresql:
                 )
             ''')
 
+            # is_deleted function handler
+            await db.execute('''
+                CREATE OR REPLACE FUNCTION update_items_deleted()
+                RETURNS TRIGGER LANGUAGE plpgsql AS 
+                $$
+                declare 
+                  delta integer;
+                begin
+                  delta := NEW.is_deleted - OLD.is_deleted;
+                  EXECUTE format(
+                    'UPDATE %I SET is_deleted = %I.is_deleted + $1
+                    WHERE %I.%I=$2',
+                    TG_ARGV[0], TG_ARGV[0], TG_ARGV[0], TG_ARGV[1]
+                  ) USING delta, NEW.id; 
+                  RETURN NULL;
+                end;
+                $$;
+            ''')
+            await db.execute('''
+                CREATE OR REPLACE TRIGGER updateItemsDeleted
+                AFTER UPDATE OF is_deleted ON items
+                FOR EACH ROW
+                WHEN (NEW.is_collection)
+                EXECUTE FUNCTION update_items_deleted('items', 'parent_id');
+            ''')
+
             ##############
             # compositions
             ##############
-            for cls, composition in schemaregistry.get_compositions():
+            for cls, composition, subclasses in schemaregistry.get_compositions():
                 table = composition.t
+                table_name = table.get_table_name()
+                reference_table = cls.table().get_table_name()
                 await db.execute(f'''
-                    create table if not exists {table.get_table_name()} (
+                    create table if not exists {table_name} (
                         id text primary key not null,
                         sig text not null,
                         type text not null,
                         parent_id TEXT NOT NULL
-                            REFERENCES {cls.table().get_table_name()}(id)
+                            REFERENCES {reference_table}(id)
                             ON DELETE CASCADE,
                         p_type text NOT NULL,
                         expires_at integer,
+                        is_deleted integer,
                         data jsonb not null
                     )
                 ''')
@@ -86,9 +115,21 @@ class Postgresql:
                     await db.execute(f'''
                         CREATE UNIQUE INDEX IF NOT EXISTS
                         UX_{composition.name}
-                        ON {table.get_table_name()}
+                        ON {table_name}
                         ("parent_id")
                     ''')
+                # add is_deleted trigger
+                quoted_subclasses = tuple(
+                    [f"'{s.__name__}'" for s in subclasses]
+                )
+                await db.execute(f'''
+                    CREATE OR REPLACE TRIGGER
+                    update{table_name.capitalize()}Deleted
+                    AFTER UPDATE OF is_deleted ON {reference_table}
+                    FOR EACH ROW
+                    WHEN (NEW.type IN ({', '.join(quoted_subclasses)}))
+                    EXECUTE FUNCTION update_items_deleted('{table_name}', 'parent_id');
+                ''')
 
             ########################
             # many-to-many relations
@@ -212,7 +253,7 @@ class Connection:
             item = await self.get_raw(object_id, _table)
             if item is not None:
                 item = self.persist.loads(item)
-                is_visible = await resolve_visibility(item)
+                is_visible = resolve_visibility(item)
                 if not is_visible:
                     item = None
             self.cache[object_id] = item
@@ -273,7 +314,7 @@ class Connection:
                     select items.parent_id from items, parent_ids
                     where items.id=parent_ids.id
                 )
-            select id, parent_id, acl, is_deleted
+            select id, parent_id, acl
             from items where items.id in (select id from parent_ids);
         ''', [item_id])
 

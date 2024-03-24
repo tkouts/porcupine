@@ -59,10 +59,6 @@ class ItemsTable(SchemaTable):
 
 class CompositesTable(SchemaTable):
     columns = (
-        'id', 'sig', 'type', 'parent_id', 'p_type', 'expires_at'
+        'id', 'sig', 'type', 'parent_id', 'p_type',
+        'is_deleted', 'expires_at'
     )
-    # partial_fields = (
-    #     'id', 'parent_id', 'type', 'acl', 'is_system',
-    #     'is_deleted', 'expires_at'
-    # )
-    # table_name = 'composites'

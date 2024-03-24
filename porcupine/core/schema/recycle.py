@@ -9,9 +9,10 @@ from .container import Container
 
 class DeletedItem(GenericItem):
     location = String(immutable=True, required=True)
+    expires_at = None
 
-    def __init__(self, dict_storage=None, deleted_item=None, **kwargs):
-        super().__init__(dict_storage, **kwargs)
+    def __init__(self, dict_storage=None, deleted_item=None):
+        super().__init__(dict_storage)
         if self.__is_new__ and not context.system_override:
             raise TypeError('DeletedItem objects cannot be instantiated')
         if deleted_item is not None:
@@ -33,7 +34,13 @@ class DeletedItem(GenericItem):
     async def restore(self):
         deleted_item = await self.deleted_item()
         await deleted_item.restore()
-        await self.remove()
+        await super().remove()
+
+    async def remove(self) -> None:
+        deleted_item = await self.deleted_item()
+        if deleted_item is not None:
+            await deleted_item.remove()
+        await super().remove()
 
     @contract(accepts=bool)
     @db.transactional()
@@ -43,14 +50,6 @@ class DeletedItem(GenericItem):
             return True
         return False
     restored = view(put=restored)
-
-    @db.transactional()
-    async def delete(self, request):
-        deleted_item = await self.deleted_item()
-        if deleted_item is not None:
-            await deleted_item.remove()
-        await super().delete(request)
-        return True
 
 
 class RecycleBin(Container):

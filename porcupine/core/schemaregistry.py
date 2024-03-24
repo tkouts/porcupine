@@ -38,7 +38,7 @@ def get_compositions(root_cls=None):
                 for composite_class in dt.allowed_types:
                     composite_class.embedded_in = cls
                     composite_class.collection_name = dt.name
-                comps.append((cls, dt))
+                comps.append((cls, dt, get_all_subclasses(cls)))
                 comps.extend(get_compositions(cls))
     return comps
 

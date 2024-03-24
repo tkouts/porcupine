@@ -147,7 +147,7 @@ class PorcupineQuery:
             user = ctx_user.get()
             results = [
                 p for p in (PartialItem(r) for r in results)
-                if await resolve_visibility(p)
+                if resolve_visibility(p)
                 and await p.can_read(user)
             ]
             if self.type is QueryType.ITEMS:

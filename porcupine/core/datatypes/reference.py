@@ -48,8 +48,13 @@ class Reference(String, Acceptable):
     at most one other item. Using this data type, the referenced item
     B{IS NOT} aware of the items that reference it.
     """
-    def __init__(self, default=None, accepts=(), cascade_delete=False,
-                 **kwargs):
+    def __init__(
+        self,
+        default=None,
+        accepts=(),
+        cascade_delete=False,
+        **kwargs
+    ):
         super().__init__(default, allow_none=True, **kwargs)
         Acceptable.__init__(self, accepts, cascade_delete)
 
@@ -97,9 +102,9 @@ class Reference(String, Acceptable):
     async def on_restore(self, instance, value):
         await super().on_restore(instance, value)
         if value and self.cascade_delete:
-            ref_item = await ctx_db.get().get(value)
-            if ref_item:
-                with system_override():
+            with system_override():
+                ref_item = await ctx_db.get().get(value)
+                if ref_item:
                     await ref_item.restore()
 
     # def clone(self, instance, memo):

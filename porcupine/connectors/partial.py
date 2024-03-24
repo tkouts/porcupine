@@ -30,8 +30,7 @@ class PartialItem:
     def access_record(self):
         return AccessRecord(
             self.parent_id,
-            self.acl.to_json(),
-            self.is_deleted
+            self.acl.to_json()
         )
 
     @property

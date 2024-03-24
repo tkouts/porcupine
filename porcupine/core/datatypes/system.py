@@ -76,10 +76,12 @@ class ChildrenCollection(ItemCollection):
 
         for item in items:
             if not item.__is_new__:
-                raise exceptions.DBAlreadyExists('Object already exists')
+                raise exceptions.DBAlreadyExists('Object already exists.')
 
             with system_override():
-                item.owner = user.id
+                if not item.owner:
+                    # new item not cloned
+                    item.owner = user.id
                 item.created = item.modified = date.utcnow()
                 item.modified_by = user.name
                 item.p_type = parent.content_class

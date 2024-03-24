@@ -9,7 +9,7 @@ from porcupine.core.context import (
     # ctx_user,
     ctx_db,
     ctx_sys,
-    ctx_visibility_cache,
+    # ctx_visibility_cache,
     ctx_membership_cache,
     # context_cacheable,
     # context_user
@@ -17,7 +17,7 @@ from porcupine.core.context import (
 
 AccessRecord = namedtuple(
     'AccessRecord',
-    ['parent_id', 'acl', 'is_deleted']
+    ['parent_id', 'acl']
 )
 
 
@@ -27,25 +27,6 @@ def _iter_access_item(parent_id, access_item):
         access_record = access_map[parent_id]
         yield getattr(access_record, access_item)
         parent_id = access_record.parent_id
-
-
-def _is_deleted(item):
-    if item.is_deleted:
-        return True
-    parent_id = item.parent_id
-    if parent_id is not None:
-        for deleted in _iter_access_item(parent_id, 'is_deleted'):
-            if deleted:
-                return True
-    return False
-
-
-def _is_expired(item):
-    if item.is_collection:
-        return False
-    if item.expires_at is not None:
-        return time.time() > item.expires_at
-    return False
 
 
 def resolve_acl(item):
@@ -88,68 +69,17 @@ def get_ancestor_id(item, n_levels: int):
     return None
 
 
-async def resolve_visibility(item) -> bool:
+def resolve_visibility(item) -> bool:
     if item.__is_new__ or ctx_sys.get():
         return True
 
-    db = ctx_db.get()
+    # check recycled / expired
+    if item.is_deleted:
+        return False
+    elif not item.is_collection and item.expires_at is not None:
+        return time.time() < item.expires_at
 
-    if item.is_composite:
-        return await resolve_visibility(await db.get(item.parent_id))
-
-    parent_id = item.parent_id
-
-    # check cache
-    # user = ctx_user.get()
-    visibility_cache = ctx_visibility_cache.get()
-    use_cache = (
-        parent_id is not None
-        and not item.is_deleted
-        and (item.is_collection or item.expires_at is None)
-    )
-    cache_key = parent_id
-    if use_cache and cache_key in visibility_cache:
-        # print('using cache', item)
-        return visibility_cache[cache_key]
-
-    access_map = ctx_access_map.get()
-
-    if item.is_collection:
-        # update access map
-        access_map[item.id] = item.access_record
-
-    if parent_id is not None and parent_id not in access_map:
-        # print('fetching', parent_id)
-        container_id = item.id if item.is_collection else parent_id
-        results = await db.fetch_access_map(container_id)
-        access_map.update({
-            row['id']: AccessRecord(
-                row['parent_id'],
-                row['acl'] and orjson.loads(row['acl']),
-                row['is_deleted']
-            )
-            for row in results
-            if row['id'] not in access_map
-        })
-
-    is_visible = True
-
-    if not item.is_system:
-        # check recycled / expired
-        deleted = _is_deleted(item)
-        if deleted:
-            is_visible = False
-        elif not db.supports_ttl:
-            expired = _is_expired(item)
-            if expired:
-                is_visible = False
-
-    # can_read = can_read and await item.can_read(user)
-
-    if use_cache:
-        visibility_cache[cache_key] = is_visible
-
-    return is_visible
+    return True
 
 
 class Roles:
@@ -166,6 +96,25 @@ class Roles:
 
     @staticmethod
     async def resolve(item, membership):
+        # fetch access map if needed
+        access_map = ctx_access_map.get()
+        parent_id = item.parent_id
+        if parent_id is not None and parent_id not in access_map:
+            db = ctx_db.get()
+            container_id = item.id if item.is_collection else parent_id
+            results = await db.fetch_access_map(container_id)
+            access_map.update({
+                row['id']: AccessRecord(
+                    row['parent_id'],
+                    row['acl'] and orjson.loads(row['acl'])
+                )
+                for row in results
+                if row['id'] not in access_map
+            })
+        if item.is_collection:
+            # update access map
+            access_map[item.id] = item.access_record
+
         acl = item.effective_acl
         member_of = set()
         if membership is not None:
