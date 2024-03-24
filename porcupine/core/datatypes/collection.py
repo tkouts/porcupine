@@ -43,6 +43,7 @@ class ItemCollection(AsyncSetterValue):
             q = q.where(
                 (self.expires_at.isnull())
                 | (self.expires_at > Parameter(':now'))
+                & (self.is_deleted == 0)
             )
             params['now'] = time.time()
         q.set_params(params)
